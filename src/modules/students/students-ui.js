@@ -2,6 +2,7 @@ import { getRosterStatus, getFilterOptions, searchStudents, getRosterStats, getS
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES, SESSION_NAMES } from "../schedule/schedule-service.js";
+import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -39,18 +40,59 @@ function resizeImageToDataUrl(file) {
   });
 }
 
+// يستورد شيت "كشف الطلاب" من نفس ملف كشف الطلاب الكامل المستخدم لبقية
+// الاستيرادات — عبر cloud-runtime.js، خلف تسجيل الدخول + RLS، بدل ملف ثابت
+// بالمستودع العام (كان يعني أي زائر يقدر يجلب بيانات الطلبة مباشرة).
+function renderImportSection(root, { onImported, isUpdate }) {
+  root.innerHTML = `
+    <div class="card">
+      <h3>${isUpdate ? "تحديث سجل الطلبة" : "استيراد سجل الطلبة"}</h3>
+      <p class="hint">ارفع ملف كشف الطلاب الكامل (شيت "كشف الطلاب") — يستبدل السجل الحالي بالكامل بمحتوى الملف.</p>
+      <input type="file" id="students-import-file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
+      <div id="students-import-preview"></div>
+    </div>
+  `;
+
+  const fileInput = root.querySelector("#students-import-file");
+  const previewRoot = root.querySelector("#students-import-preview");
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    previewRoot.innerHTML = '<p class="hint">جارٍ القراءة…</p>';
+    try {
+      const { students } = await parseStudentsWorkbook(file);
+      if (!students.length) {
+        previewRoot.innerHTML = '<p class="hint" style="color:var(--critical);">ما لقينا أي صف طالب صالح بالملف.</p>';
+        return;
+      }
+      previewRoot.innerHTML = `
+        <p class="hint">${students.length} طالبًا جاهزين للاستيراد.</p>
+        <button class="btn btn-primary" id="students-import-commit">${isUpdate ? "استبدال السجل الحالي بهذا الملف" : "اعتماد الاستيراد"}</button>
+      `;
+      previewRoot.querySelector("#students-import-commit").addEventListener("click", async () => {
+        if (isUpdate && !confirm(`سيُستبدل سجل الطلبة الحالي بالكامل بـ${students.length} طالبًا من هذا الملف — لا يوجد دمج. متأكد؟`)) return;
+        await commitStudentsImport(students);
+        previewRoot.innerHTML = '<p class="hint">تم الاستيراد بنجاح. جارٍ إعادة التحميل…</p>';
+        await onImported();
+      });
+    } catch (err) {
+      previewRoot.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(err.message)}</p>`;
+    }
+  });
+}
+
 function renderEmptyState(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>سجل الطلبة</h1><div class="sub">لا يوجد كشف طلاب محلي بعد</div></div>
+      <div><h1>سجل الطلبة</h1><div class="sub">لا يوجد سجل طلبة مستورَد بعد</div></div>
     </div>
-    <div class="card">
-      <div class="empty">
-        لم يُعثر على ملف <code>data/students.local.json</code>. هذا الملف محلي فقط (لا يُدفع إلى git لحساسية بيانات الطلبة)
-        — ضعه داخل مجلد <code>masar-app/data/</code> في نسختك المحلية ثم أعد تحميل الصفحة.
-      </div>
-    </div>
+    <div id="students-import-root"></div>
   `;
+  renderImportSection(container.querySelector("#students-import-root"), {
+    isUpdate: false,
+    onImported: () => mountStudentsView(container),
+  });
 }
 
 // onQueryChange is kept separate from onChange (level/department/track) and
@@ -349,11 +391,23 @@ export async function mountStudentsView(container) {
     <div class="topbar">
       <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي — بيانات مشتركة سحابيًا بين الحسابات النشطة، لا تُدفع إلى git</div></div>
       <div class="meta" id="students-count"></div>
+      <button class="btn btn-ghost" id="students-toggle-import" style="margin-inline-start:8px;">تحديث سجل الطلبة</button>
     </div>
+    <div id="students-import-root" style="display:none;margin-bottom:16px;"></div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>
     <div id="students-results"></div>
   `;
+
+  const importRoot = container.querySelector("#students-import-root");
+  container.querySelector("#students-toggle-import").addEventListener("click", () => {
+    const hidden = importRoot.style.display === "none";
+    importRoot.style.display = hidden ? "" : "none";
+    if (hidden && !importRoot.dataset.mounted) {
+      importRoot.dataset.mounted = "1";
+      renderImportSection(importRoot, { isUpdate: true, onImported: () => mountStudentsView(container) });
+    }
+  });
 
   const stats = await getRosterStats();
   const topLevels = Object.entries(stats.byLevel);

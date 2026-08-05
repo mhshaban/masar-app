@@ -14,6 +14,16 @@ async function fetchRoster() {
   }
 }
 
+// After a manual roster import (students-import-service.js) replaces the
+// "students" collection outright, the cached result above would otherwise
+// keep reporting the pre-import state (even {available:false}) for the
+// rest of the page's lifetime — every screen reads roster status through
+// this same cached promise. Import must call this so the next check is
+// fresh.
+export function resetStudentsSeedCache() {
+  ensured = null;
+}
+
 export function ensureStudentsSeeded() {
   if (!ensured) {
     ensured = (async () => {
