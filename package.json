@@ -1,0 +1,12 @@
+{
+  "name": "masar-app",
+  "private": true,
+  "description": "اختبارات آلية لخدمات مسار (dev-only — لا تؤثر على التطبيق المُشغَّل في المتصفح بدون خطوة بناء)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5"
+  }
+}
