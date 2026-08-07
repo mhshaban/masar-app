@@ -4,9 +4,11 @@
   "description": "اختبارات آلية لخدمات مسار (dev-only — لا تؤثر على التطبيق المُشغَّل في المتصفح بدون خطوة بناء)",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "import-certificates": "node scripts/import-certificates.mjs"
   },
   "devDependencies": {
-    "fake-indexeddb": "^6.2.5"
+    "fake-indexeddb": "^6.2.5",
+    "pdfjs-dist": "^2.16.105"
   }
 }
