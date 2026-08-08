@@ -51,12 +51,29 @@ function rowToRecord(row) {
 // الطلاب دفعة وحدة) — يحمي من طلب HTTP ضخم واحد بدل تعطيل الحد الأقصى.
 const CHUNK_SIZE = 500;
 
+// PostgREST يرجّع حد أقصى لعدد الصفوف بكل طلب (غالبًا 1000 افتراضيًا على
+// Supabase) بصمت — بلا خطأ، فقط صفحة واحدة بدل الكل. رُصد هذا فعليًا: سجل
+// طلبة فيه أكثر من 1000 صف كان يظهر "1000" فقط بكل شاشة تعتمد على list()
+// (الإحصائيات، البحث...)، رغم إن كل الصفوف كانت محفوظة صح بقاعدة البيانات
+// فعليًا — المشكلة بالقراءة فقط. نجلب صفحة صفحة حتى تكون آخر صفحة أصغر من
+// حجم الصفحة (يعني ما تبقى شي).
+const PAGE_SIZE = 1000;
+
 export async function list(collection) {
   const backend = testBackend();
   if (backend) return backend.list(collection);
-  const res = await request(`${collection}?select=id,data&order=id.asc`);
-  const rows = await res.json();
-  return rows.map(rowToRecord);
+  const allRows = [];
+  let offset = 0;
+  while (true) {
+    const res = await request(`${collection}?select=id,data&order=id.asc`, {
+      headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+    });
+    const page = await res.json();
+    allRows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return allRows.map(rowToRecord);
 }
 
 export async function get(collection, id) {

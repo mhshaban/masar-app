@@ -112,13 +112,25 @@ async function login(email, password) {
   return data.access_token;
 }
 
+// PostgREST يرجّع حد أقصى صفوف بكل طلب بصمت (غالبًا 1000) — نفس العلة
+// المُصلَحة بـ cloud-runtime.js's list()، مكرّرة هنا لأن هذا سكربت مستقل لا
+// يستورد cloud-runtime.js (يبني طلباته يدويًا). نجلب صفحة صفحة.
+const PAGE_SIZE = 1000;
+
 async function fetchStudents(token) {
-  const res = await fetch(`${SB_URL}/rest/v1/students?select=id,data`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("تعذّر تحميل سجل الطلبة من Supabase: " + (await res.text()));
-  const rows = await res.json();
-  return rows.map((r) => ({ ...r.data, id: r.id }));
+  const allRows = [];
+  let offset = 0;
+  while (true) {
+    const res = await fetch(`${SB_URL}/rest/v1/students?select=id,data&order=id.asc`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`, Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+    });
+    if (!res.ok) throw new Error("تعذّر تحميل سجل الطلبة من Supabase: " + (await res.text()));
+    const page = await res.json();
+    allRows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return allRows.map((r) => ({ ...r.data, id: r.id }));
 }
 
 async function bulkPut(token, collection, records) {
