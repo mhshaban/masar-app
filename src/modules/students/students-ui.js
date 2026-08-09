@@ -1,7 +1,7 @@
 import { getRosterStatus, getFilterOptions, searchStudents, getRosterStats, getStudent, updateStudentPhoto, removeStudentPhoto } from "./students-service.js";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
-import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES, SESSION_NAMES } from "../schedule/schedule-service.js";
+import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
 
 function esc(str) {
@@ -185,42 +185,69 @@ function scheduleRow(label, value) {
   return `<div class="row-item"><div class="body"><div class="title">${esc(label)}</div></div><span class="pill pill-neutral">${esc(value) || "—"}</span></div>`;
 }
 
-async function renderDetailedSchedule(root, section) {
-  const rows = await getStudentSchedule(section);
-  if (!rows.length) {
-    root.innerHTML = '<div class="card"><div class="empty">لا يوجد جدول دراسي تفصيلي مستورَد بعد لهذه الشعبة — استورده من شاشة "الطلاب المرفعين"</div></div>';
-    return;
-  }
+// نسخة مختصرة من SESSION_NAMES تطابق تسمية الجدول الرسمي المطبوع
+// ("صباحي"/"مسائي") بدل الاسم الكامل المستخدم بلوحة الساعات المكتبية.
+const SHORT_SESSION_NAMES = { 1: "صباحي", 2: "مسائي" };
+const GRID_DAYS = [1, 2, 3, 4, 5];
 
-  const teachers = [...new Set(rows.map((r) => r.teacher).filter(Boolean))];
-  const officeHours = await getOfficeHoursForTeachers(teachers);
-  const officeByTeacher = new Map(officeHours.map((o) => [o.teacher, o]));
-
-  const byDay = new Map();
+// يبني الجدول الأسبوعي بنفس شكل الجدول الرسمي المطبوع اللي يستخدمه المرشد
+// فعليًا: الأيام أعمدة، وكل حصة صف من 4 أسطر (المقرر/المعلم/الغرفة/الفترة).
+// حقل "الغرفة" هنا هو نفسه اللي كان يُعرض بجدول أيام التنقل المنفصل سابقًا —
+// المدرسة تكتب فيه رمز تنقل بدل رقم قاعة بالحصص اللي ما فيها قاعة فعلية، فدمج
+// الجدولين بواحد (بدل عرضهما منفصلين) ما يفقد أي معلومة كانت تُعرض قبل.
+function scheduleGridTable(rows) {
+  const blocks = new Map();
   for (const r of rows) {
-    if (!byDay.has(r.day)) byDay.set(r.day, []);
-    byDay.get(r.day).push(r);
+    const key = `${r.session ?? 0}-${r.period ?? 0}`;
+    if (!blocks.has(key)) blocks.set(key, { session: r.session, period: r.period, byDay: new Map() });
+    blocks.get(key).byDay.set(r.day, r);
   }
+  const sortedBlocks = [...blocks.values()].sort((a, b) => (a.session - b.session) || (a.period - b.period));
+
+  const labelRow = (label, block, pick) => `
+    <tr>
+      <td><strong>${esc(label)}</strong></td>
+      ${GRID_DAYS.map((d) => `<td>${esc(pick(block.byDay.get(d))) || "—"}</td>`).join("")}
+    </tr>
+  `;
+
+  return `
+    <div class="tablewrap"><table>
+      <thead>
+        <tr><th>اليوم</th>${GRID_DAYS.map((d) => `<th>${esc(DAY_NAMES[d])}</th>`).join("")}</tr>
+      </thead>
+      <tbody>
+        ${sortedBlocks.map((block) => `
+          ${labelRow("المقرر", block, (r) => r?.subjectCode)}
+          ${labelRow("المعلم", block, (r) => r?.teacher)}
+          ${labelRow("الغرفة", block, (r) => r?.room)}
+          ${labelRow("الفترة", block, (r) => (r?.session ? SHORT_SESSION_NAMES[r.session] : null))}
+        `).join("")}
+      </tbody>
+    </table></div>
+  `;
+}
+
+async function renderDetailedSchedule(root, section, weekSchedule) {
+  const rows = await getStudentSchedule(section);
+  const teachers = [...new Set(rows.map((r) => r.teacher).filter(Boolean))];
+  const officeHours = teachers.length ? await getOfficeHoursForTeachers(teachers) : [];
+  const officeByTeacher = new Map(officeHours.map((o) => [o.teacher, o]));
+  const hasWeekFallback = !rows.length && Object.values(weekSchedule || {}).some(Boolean);
 
   root.innerHTML = `
     <div class="grid g2">
       <div class="card">
-        <h3>الجدول الدراسي التفصيلي</h3>
-        ${[...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([day, dayRows]) => `
-          <div style="margin-bottom:10px;">
-            <div class="hint" style="font-weight:700; margin-bottom:4px;">${esc(DAY_NAMES[day] || day)}</div>
-            <ul class="plain">
-              ${dayRows.map((r) => `
-                <li class="row-item">
-                  <div class="body">
-                    <div class="title">${esc(r.subjectCode) || "—"} ${r.room ? `· ${esc(r.room)}` : ""}</div>
-                    <div class="meta">${esc(r.teacher) || "—"}${r.session ? ` · ${esc(SESSION_NAMES[r.session] || "")}` : ""}</div>
-                  </div>
-                </li>
-              `).join("")}
-            </ul>
-          </div>
-        `).join("")}
+        <h3>الجدول الدراسي الأسبوعي</h3>
+        ${rows.length ? scheduleGridTable(rows) : hasWeekFallback ? `
+          <ul class="plain">
+            ${scheduleRow("الأحد", weekSchedule.sunday)}
+            ${scheduleRow("الاثنين", weekSchedule.monday)}
+            ${scheduleRow("الثلاثاء", weekSchedule.tuesday)}
+            ${scheduleRow("الأربعاء", weekSchedule.wednesday)}
+            ${scheduleRow("الخميس", weekSchedule.thursday)}
+          </ul>
+        ` : '<div class="empty">لا يوجد جدول دراسي مستورَد بعد لهذه الشعبة — استورده من شاشة "الطلاب المرفعين"</div>'}
       </div>
       <div class="card">
         <h3>الساعات المكتبية لمعلمي الطالب</h3>
@@ -315,30 +342,18 @@ async function renderDetail(container, id, onBack) {
       </div>
     </div>
 
-    <div class="grid g2" style="margin-top:16px;">
-      <div class="card">
-        <h3>جدول أيام التنقل</h3>
-        <ul class="plain">
-          ${scheduleRow("الأحد", s.weekSchedule?.sunday)}
-          ${scheduleRow("الاثنين", s.weekSchedule?.monday)}
-          ${scheduleRow("الثلاثاء", s.weekSchedule?.tuesday)}
-          ${scheduleRow("الأربعاء", s.weekSchedule?.wednesday)}
-          ${scheduleRow("الخميس", s.weekSchedule?.thursday)}
-        </ul>
-      </div>
-      <div class="card">
-        <h3>ملاحظات إضافية</h3>
-        <div class="tablewrap"><table>
-          <tbody>
-            <tr><td>الإرشاد الاجتماعي</td><td>${esc(s.socialGuidance) || "—"}</td></tr>
-            <tr><td>الدعم المطلوب</td><td>${esc(s.supportNeeded) || "—"}</td></tr>
-            <tr><td>جنسيات غير عربية</td><td>${esc(s.nonArabNationality) || "—"}</td></tr>
-            <tr><td>رغبة التخصص</td><td>${esc(s.specializationPreference) || "—"}</td></tr>
-            <tr><td>الحد الأدنى للتخصص</td><td class="num">${esc(s.minSpecializationThreshold) || "—"}</td></tr>
-            <tr><td>رقم المقعد / اللجنة</td><td class="num"><span dir="ltr">${esc(s.seatNumber) || "—"} / ${esc(s.committee) || "—"}</span></td></tr>
-          </tbody>
-        </table></div>
-      </div>
+    <div class="card" style="margin-top:16px;">
+      <h3>ملاحظات إضافية</h3>
+      <div class="tablewrap"><table>
+        <tbody>
+          <tr><td>الإرشاد الاجتماعي</td><td>${esc(s.socialGuidance) || "—"}</td></tr>
+          <tr><td>الدعم المطلوب</td><td>${esc(s.supportNeeded) || "—"}</td></tr>
+          <tr><td>جنسيات غير عربية</td><td>${esc(s.nonArabNationality) || "—"}</td></tr>
+          <tr><td>رغبة التخصص</td><td>${esc(s.specializationPreference) || "—"}</td></tr>
+          <tr><td>الحد الأدنى للتخصص</td><td class="num">${esc(s.minSpecializationThreshold) || "—"}</td></tr>
+          <tr><td>رقم المقعد / اللجنة</td><td class="num"><span dir="ltr">${esc(s.seatNumber) || "—"} / ${esc(s.committee) || "—"}</span></td></tr>
+        </tbody>
+      </table></div>
     </div>
 
     <div id="student-detailed-schedule" style="margin-top:16px;"></div>
@@ -374,7 +389,7 @@ async function renderDetail(container, id, onBack) {
     });
   }
 
-  await renderDetailedSchedule(container.querySelector("#student-detailed-schedule"), s.section);
+  await renderDetailedSchedule(container.querySelector("#student-detailed-schedule"), s.section, s.weekSchedule);
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
 
