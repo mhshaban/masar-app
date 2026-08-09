@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { subjectKeyForGrade } from "../src/modules/grades/subject-groups.js";
+import { subjectKeyForGrade, subjectSortRank } from "../src/modules/grades/subject-groups.js";
 
 test("subjectKeyForGrade merges the real code split reported by the counselor (كيم/فيز -> العلوم)", () => {
   assert.equal(subjectKeyForGrade({ subjectCode: "كيم801", subjectName: "الطاقة" }), "العلوم");
@@ -83,4 +83,18 @@ test("subjectKeyForGrade applies the counselor's confirmed name aliases for subj
 
 test("subjectKeyForGrade resolves تمك803 (a term-3/4 الكهرباء code with its own distinct prefix) correctly", () => {
   assert.equal(subjectKeyForGrade({ subjectCode: "تمك803" }), "الكهرباء");
+});
+
+test("subjectSortRank ranks ثقافة عامة subjects before تخصصية/مساندة ones (counselor's requested ordering)", () => {
+  assert.equal(subjectSortRank("الرياضيات"), 0); // ثقافة عامة
+  assert.equal(subjectSortRank("العلوم"), 0); // ثقافة عامة
+  assert.equal(subjectSortRank("الكهرباء"), 1); // تخصصية
+  assert.equal(subjectSortRank("الإلكترونيات"), 1); // تخصصية
+  assert.equal(subjectSortRank("تقنيات وصيانة الحاسوب"), 1); // تخصصية
+  assert.equal(subjectSortRank("الحاسب الآلي"), 1); // مساندة
+  assert.ok(subjectSortRank("الرياضيات") < subjectSortRank("الكهرباء"));
+});
+
+test("subjectSortRank defaults an unrecognized subject name to the general-subjects rank (safer than pushing it to the end)", () => {
+  assert.equal(subjectSortRank("مادة غير موجودة بالجدول"), 0);
 });

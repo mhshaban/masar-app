@@ -14,6 +14,19 @@ for (const group of SUBJECT_GROUPS) {
   }
 }
 
+// Subject → السجل الرسمي's category (تخصصية/ثقافة عامة/مساندة), for screens
+// that group or order subjects by category rather than alphabetically.
+const SUBJECT_TO_TYPE = new Map(SUBJECT_GROUPS.map((g) => [g.subject, g.type]));
+
+// ترتيب العرض اللي طلبه المرشد: المواد العامة أول القائمة، والتخصصية
+// والمساندة معًا بآخرها (بدل ترتيب أبجدي بحت يخلط الكل). مادة مو موجودة
+// بالجدول الرسمي إطلاقًا (نادر — راجع subjectKeyForGrade) تُعامل كعامة
+// افتراضيًا، أأمن من دفعها لآخر القائمة بالغلط.
+export function subjectSortRank(subjectName) {
+  const type = SUBJECT_TO_TYPE.get(subjectName);
+  return type === "تخصصية" || type === "مساندة" ? 1 : 0;
+}
+
 // A real student's grade record can carry a code the six-term table doesn't
 // list at all (e.g. "دين812", "رسم816", "ريض352" — retake/extra terms,
 // older cohorts, etc.), confirmed against real data. The counselor's own

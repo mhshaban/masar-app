@@ -1,6 +1,6 @@
 import { listWhere } from "../../services/cloud-runtime.js";
 import { gradeRowPct } from "./score-conventions.js";
-import { subjectKeyForGrade } from "./subject-groups.js";
+import { subjectKeyForGrade, subjectSortRank } from "./subject-groups.js";
 
 // Term labels are free text (typed by the counselor for Excel imports, or
 // extracted verbatim from the certificate's own line for PDF imports), so
@@ -71,7 +71,13 @@ export async function getStudentSubjectTimeline(studentId) {
     return { subject, points };
   });
 
-  return subjects.sort((a, b) => a.subject.localeCompare(b.subject, "ar"));
+  // المواد العامة أول الجدول، والتخصصية/المساندة معًا بآخره — طلب المرشد
+  // صراحةً، بدل ترتيب أبجدي بحت يخلط الكل.
+  return subjects.sort((a, b) => {
+    const rankDiff = subjectSortRank(a.subject) - subjectSortRank(b.subject);
+    if (rankDiff !== 0) return rankDiff;
+    return a.subject.localeCompare(b.subject, "ar");
+  });
 }
 
 // Chronologically-ordered distinct term labels across this student's grade
