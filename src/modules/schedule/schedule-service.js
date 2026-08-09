@@ -1,4 +1,4 @@
-import { list as listAll, clear, bulkPut } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, clear, bulkPut } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 
 // Both sheets live inside the school's own full roster workbook, found by
@@ -96,10 +96,8 @@ export async function commitSchedule({ scheduleRows, officeHoursRows }) {
 
 export async function getStudentSchedule(section) {
   const normalized = normalizeSectionDigits(section);
-  const rows = await listAll("teacherSchedule");
-  return rows
-    .filter((r) => r.section === normalized)
-    .sort((a, b) => (a.day - b.day) || (a.session - b.session) || (a.period - b.period));
+  const rows = await listWhere("teacherSchedule", "section", normalized);
+  return rows.sort((a, b) => (a.day - b.day) || (a.session - b.session) || (a.period - b.period));
 }
 
 export async function getOfficeHoursForTeachers(teacherNames) {

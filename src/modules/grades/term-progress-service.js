@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/cloud-runtime.js";
+import { listWhere } from "../../services/cloud-runtime.js";
 import { gradeRowPct } from "./score-conventions.js";
 import { subjectKeyForGrade } from "./subject-groups.js";
 
@@ -38,9 +38,8 @@ export function termSortKey(term) {
 // result, and plotting it on the same line as official term averages would
 // misrepresent the student's actual per-term trend.
 export async function getStudentTermTimeline(studentId) {
-  const officialTerms = await listAll("termAverages");
+  const officialTerms = await listWhere("termAverages", "studentId", studentId);
   return officialTerms
-    .filter((t) => t.studentId === studentId)
     .map((t) => ({ term: t.term, sortKey: termSortKey(t.term), averagePct: t.averagePct, rating: t.rating }))
     .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 }
@@ -51,10 +50,9 @@ export async function getStudentTermTimeline(studentId) {
 // "العلوم"), so subjects that visibly split across levels under a plain
 // code or name comparison land in one row here instead.
 export async function getStudentSubjectTimeline(studentId) {
-  const grades = await listAll("grades");
+  const grades = await listWhere("grades", "studentId", studentId);
   const bySubject = new Map();
   for (const g of grades) {
-    if (g.studentId !== studentId) continue;
     const key = subjectKeyForGrade(g);
     if (!bySubject.has(key)) bySubject.set(key, []);
     bySubject.get(key).push(g);

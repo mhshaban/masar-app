@@ -76,6 +76,32 @@ export async function list(collection) {
   return allRows.map(rowToRecord);
 }
 
+// list() fetches an entire collection — correct for screens that genuinely
+// need every row (roster stats, cross-student candidate lists), but a real
+// cost once a collection is large (grades: tens of thousands of rows for
+// the whole school) and the caller only wants one student's rows. This asks
+// Supabase to filter server-side on a field inside the jsonb `data` column
+// (PostgREST's ->> text-extract operator), instead of downloading
+// everything and filtering client-side. Confirmed live: a student's
+// academic-path view was taking 3+ minutes before this (list("grades") was
+// paging through the whole school's grades to find one student's rows).
+export async function listWhere(collection, field, value) {
+  const backend = testBackend();
+  if (backend) return backend.listWhere(collection, field, value);
+  const allRows = [];
+  let offset = 0;
+  while (true) {
+    const res = await request(`${collection}?select=id,data&data->>${field}=eq.${encodeURIComponent(value)}&order=id.asc`, {
+      headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+    });
+    const page = await res.json();
+    allRows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return allRows.map(rowToRecord);
+}
+
 export async function get(collection, id) {
   const backend = testBackend();
   if (backend) return backend.get(collection, id);

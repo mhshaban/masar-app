@@ -1,4 +1,4 @@
-import { list as listAll, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, save, remove } from "../../services/cloud-runtime.js";
 import { listStudents } from "../students/students-service.js";
 
 // The final secondary-school year (based on this school's actual level values:
@@ -42,8 +42,8 @@ export async function listStudentsWithSessions() {
 }
 
 export async function getStudentSessions(studentId) {
-  const sessions = await listAllSessions();
-  return sessions.filter((s) => s.studentId === studentId).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const sessions = await listWhere("careerSessions", "studentId", studentId);
+  return sessions.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
 
 export async function addSession({ studentId, studentName, date, topic, notes, recommendation }) {

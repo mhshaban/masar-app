@@ -1,4 +1,4 @@
-import { list as listAll, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 import { extractPdfRows } from "../../services/pdf-parser.js";
 import { parseCertificateRows } from "./certificate-parser.js";
@@ -204,8 +204,7 @@ export async function rollbackBatch(batchId) {
 }
 
 export async function listGradesForStudent(studentId) {
-  const grades = await listAll("grades");
-  return grades.filter((g) => g.studentId === String(studentId));
+  return listWhere("grades", "studentId", String(studentId));
 }
 
 export async function getGradeStats() {

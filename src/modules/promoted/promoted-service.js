@@ -1,4 +1,4 @@
-import { list as listAll, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 
@@ -149,6 +149,5 @@ export async function listStudentsWithPendingSubjects() {
 }
 
 export async function getPendingSubjectsForStudent(studentId) {
-  const records = await listAll("promotedSubjects");
-  return records.filter((r) => r.studentId === String(studentId));
+  return listWhere("promotedSubjects", "studentId", String(studentId));
 }

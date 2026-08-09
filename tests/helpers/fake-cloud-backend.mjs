@@ -22,6 +22,11 @@ globalThis.__MASAR_TEST_BACKEND__ = {
     const record = collectionMap(collection).get(id);
     return record ? { ...record } : null;
   },
+  async listWhere(collection, field, value) {
+    return [...collectionMap(collection).values()]
+      .filter((r) => String(r[field]) === String(value))
+      .map((r) => ({ ...r }));
+  },
   async save(collection, record) {
     const toSave = record.id ? record : { ...record, id: genId() };
     collectionMap(collection).set(toSave.id, { ...toSave });
