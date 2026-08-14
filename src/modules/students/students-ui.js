@@ -3,6 +3,7 @@ import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
+import { matchPhotoFiles, commitPhotoMatches } from "../../services/photos-import-service.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -79,6 +80,78 @@ function renderImportSection(root, { onImported, isUpdate }) {
     } catch (err) {
       previewRoot.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(err.message)}</p>`;
     }
+  });
+}
+
+// استيراد دفعة صور دفعة واحدة (بدل رفع صورة صورة من صفحة كل طالب) — الملفات
+// يجب أن تكون مسمّاة بالرقم الأكاديمي للطالب. يعرض تقرير مطابقة أولًا (مين
+// انطابق، مين ما انطابق، مين له أكثر من ملف) قبل أي كتابة فعلية، ويحفظ على
+// دفعات صغيرة (بدل الكل دفعة وحدة) عشان لا يعلّق المتصفح مع مئات الصور —
+// نفس درس أزمة رفع شهادات PDF الكبيرة سابقًا.
+const PHOTO_COMMIT_BATCH = 40;
+
+function renderPhotoImportSection(root, { onImported }) {
+  root.innerHTML = `
+    <div class="card">
+      <h3>استيراد صور الطلبة</h3>
+      <p class="hint">اختر كل ملفات الصور دفعة واحدة — لازم يكون اسم كل ملف هو الرقم الأكاديمي للطالب (مثال: 20254220.jpg). تتم المطابقة تلقائيًا ويظهر تقرير قبل الحفظ.</p>
+      <input type="file" id="photos-import-input" accept="image/*" multiple style="margin-bottom:12px;">
+      <div id="photos-import-preview"></div>
+    </div>
+  `;
+
+  const fileInput = root.querySelector("#photos-import-input");
+  const previewRoot = root.querySelector("#photos-import-preview");
+
+  fileInput.addEventListener("change", async () => {
+    const files = [...fileInput.files];
+    if (!files.length) return;
+    previewRoot.innerHTML = '<p class="hint">جارٍ المطابقة…</p>';
+
+    const { matched, unmatched, duplicates } = await matchPhotoFiles(files);
+
+    previewRoot.innerHTML = `
+      <div class="tablewrap"><table>
+        <tbody>
+          <tr><td>ملفات لها طالب مطابق</td><td class="num">${matched.length}</td></tr>
+          <tr><td>ملفات بدون طالب مطابق (تحقق من اسم الملف)</td><td class="num">${unmatched.length}</td></tr>
+          <tr><td>طلبة لهم أكثر من ملف بنفس الرقم (يُستخدم أول ملف فقط لكل طالب)</td><td class="num">${duplicates.length}</td></tr>
+        </tbody>
+      </table></div>
+      ${unmatched.length ? `
+        <details style="margin-top:10px;">
+          <summary class="hint" style="cursor:pointer;">عرض الملفات غير المطابقة (${unmatched.length})</summary>
+          <ul class="plain">${unmatched.map((u) => `<li class="row-item"><div class="body"><div class="title">${esc(u.file.name)}</div></div></li>`).join("")}</ul>
+        </details>
+      ` : ""}
+      ${matched.length ? `<button class="btn btn-primary" id="photos-import-commit" style="margin-top:12px;">حفظ ${matched.length} صورة</button>` : ""}
+      <div id="photos-import-progress" style="margin-top:10px;"></div>
+    `;
+
+    const commitBtn = previewRoot.querySelector("#photos-import-commit");
+    if (!commitBtn) return;
+    commitBtn.addEventListener("click", async () => {
+      commitBtn.disabled = true;
+      const progressRoot = previewRoot.querySelector("#photos-import-progress");
+      let done = 0;
+      let failed = 0;
+      for (let i = 0; i < matched.length; i += PHOTO_COMMIT_BATCH) {
+        const batch = matched.slice(i, i + PHOTO_COMMIT_BATCH);
+        const resolved = [];
+        for (const { file, student } of batch) {
+          try {
+            resolved.push({ student, dataUrl: await resizeImageToDataUrl(file) });
+          } catch {
+            failed += 1;
+          }
+        }
+        await commitPhotoMatches(resolved);
+        done += batch.length;
+        progressRoot.innerHTML = `<p class="hint">تم حفظ ${done} من ${matched.length}…</p>`;
+      }
+      progressRoot.innerHTML = `<p class="hint">تم بنجاح — ${matched.length - failed} صورة محفوظة${failed ? `، تعذّرت قراءة ${failed} ملف` : ""}.</p>`;
+      await onImported();
+    });
   });
 }
 
@@ -406,8 +479,10 @@ export async function mountStudentsView(container) {
     <div class="topbar">
       <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي — بيانات مشتركة سحابيًا بين الحسابات النشطة، لا تُدفع إلى git</div></div>
       <div class="meta" id="students-count"></div>
+      <button class="btn btn-ghost" id="students-toggle-photos" style="margin-inline-start:8px;">استيراد صور الطلبة</button>
       <button class="btn btn-ghost" id="students-toggle-import" style="margin-inline-start:8px;">تحديث سجل الطلبة</button>
     </div>
+    <div id="students-photos-root" style="display:none;margin-bottom:16px;"></div>
     <div id="students-import-root" style="display:none;margin-bottom:16px;"></div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>
@@ -421,6 +496,16 @@ export async function mountStudentsView(container) {
     if (hidden && !importRoot.dataset.mounted) {
       importRoot.dataset.mounted = "1";
       renderImportSection(importRoot, { isUpdate: true, onImported: () => mountStudentsView(container) });
+    }
+  });
+
+  const photosRoot = container.querySelector("#students-photos-root");
+  container.querySelector("#students-toggle-photos").addEventListener("click", () => {
+    const hidden = photosRoot.style.display === "none";
+    photosRoot.style.display = hidden ? "" : "none";
+    if (hidden && !photosRoot.dataset.mounted) {
+      photosRoot.dataset.mounted = "1";
+      renderPhotoImportSection(photosRoot, { onImported: () => mountStudentsView(container) });
     }
   });
 
