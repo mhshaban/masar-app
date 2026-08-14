@@ -269,13 +269,18 @@ const GRID_DAYS = [1, 2, 3, 4, 5];
 // المدرسة تكتب فيه رمز تنقل بدل رقم قاعة بالحصص اللي ما فيها قاعة فعلية، فدمج
 // الجدولين بواحد (بدل عرضهما منفصلين) ما يفقد أي معلومة كانت تُعرض قبل.
 function scheduleGridTable(rows) {
+  // التجميع بـ"الحصة" وحدها لا بـ"الحصة+الفترة" معًا: يوم واحد قد يدرّس نفس
+  // رقم الحصة بفترة مختلفة عن بقية الأيام (مثال حقيقي مؤكَّد من جدول رسمي:
+  // نفس الحصة الثالثة مسائية يوم الأحد وصباحية بقية الأيام) — التجميع
+  // بالاثنين معًا كان يفصلهما بصفين منفصلين بدل صف واحد، فتظهر أغلب أعمدة
+  // كل صف فارغة بالخطأ رغم توفر بياناتها.
   const blocks = new Map();
   for (const r of rows) {
-    const key = `${r.session ?? 0}-${r.period ?? 0}`;
-    if (!blocks.has(key)) blocks.set(key, { session: r.session, period: r.period, byDay: new Map() });
+    const key = String(r.period ?? 0);
+    if (!blocks.has(key)) blocks.set(key, { period: r.period, byDay: new Map() });
     blocks.get(key).byDay.set(r.day, r);
   }
-  const sortedBlocks = [...blocks.values()].sort((a, b) => (a.session - b.session) || (a.period - b.period));
+  const sortedBlocks = [...blocks.values()].sort((a, b) => a.period - b.period);
 
   const labelRow = (label, block, pick) => `
     <tr>

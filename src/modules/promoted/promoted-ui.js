@@ -1,7 +1,8 @@
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
 } from "./promoted-service.js";
-import { parseScheduleWorkbook, commitSchedule, getScheduleSummary } from "../schedule/schedule-service.js";
+import { parseScheduleWorkbook, commitSchedule, commitScheduleFromPdfSections, getScheduleSummary } from "../schedule/schedule-service.js";
+import { extractPdfSectionSchedule } from "../../services/schedule-pdf-parser.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -224,6 +225,76 @@ async function renderScheduleImportSection(root, onCommitted) {
   });
 }
 
+// مصدر ثانٍ لنفس بيانات الجدول الدراسي — بدل شيت "جداول المعلمين" الكامل،
+// المدرسة ترفع ملف PDF "جدول حصص الفصل الدراسي" الرسمي منفصلًا لكل شعبة.
+// يقبل عدة ملفات دفعة واحدة (شعبة واحدة لكل ملف)، ويعرض تقرير الشعب
+// المستخرجة قبل أي اعتماد فعلي — نفس فلسفة استيراد صور الطلبة.
+async function renderSchedulePdfImportSection(root, onCommitted) {
+  root.innerHTML = `
+    <div class="card" style="margin-top:16px;">
+      <h3>استيراد جدول شعب (PDF)</h3>
+      <p class="hint">اختر عدة ملفات PDF دفعة واحدة — ملف "جدول حصص الفصل الدراسي" الرسمي لكل شعبة على حِدة. كل شعبة تُستبدل بياناتها بالكامل دون التأثير على بقية الشعب المستوردة مسبقًا.</p>
+      <input type="file" id="schedule-pdf-input" accept="application/pdf,.pdf" multiple style="margin-bottom:12px;">
+      <div id="schedule-pdf-preview"></div>
+    </div>
+  `;
+
+  const fileInput = root.querySelector("#schedule-pdf-input");
+  const previewRoot = root.querySelector("#schedule-pdf-preview");
+
+  fileInput.addEventListener("change", async () => {
+    const files = [...fileInput.files];
+    if (!files.length) return;
+    previewRoot.innerHTML = '<p class="hint">جارٍ قراءة الملفات…</p>';
+
+    const parsed = []; // { fileName, section }
+    const failed = []; // { fileName, reason }
+    for (const file of files) {
+      try {
+        const result = await extractPdfSectionSchedule(file);
+        if (!result.section || !result.rows.length) {
+          failed.push({ fileName: file.name, reason: "تعذّر التعرّف على الشعبة أو الحصص داخل الملف" });
+        } else {
+          parsed.push({ fileName: file.name, ...result });
+        }
+      } catch (err) {
+        failed.push({ fileName: file.name, reason: err.message || "تعذّرت قراءة الملف" });
+      }
+    }
+
+    previewRoot.innerHTML = `
+      ${parsed.length ? `
+        <div class="tablewrap"><table>
+          <thead><tr><th>الملف</th><th>الشعبة</th><th>المستوى</th><th>عدد الحصص</th></tr></thead>
+          <tbody>
+            ${parsed.map((p) => `
+              <tr><td>${esc(p.fileName)}</td><td>${esc(p.section)}</td><td>${esc(p.level) || "—"}</td><td class="num">${p.rows.length}</td></tr>
+            `).join("")}
+          </tbody>
+        </table></div>
+      ` : ""}
+      ${failed.length ? `
+        <details style="margin-top:10px;">
+          <summary class="hint" style="cursor:pointer;">ملفات تعذّرت قراءتها (${failed.length})</summary>
+          <ul class="plain">${failed.map((f) => `<li class="row-item"><div class="body"><div class="title">${esc(f.fileName)}</div><div class="meta">${esc(f.reason)}</div></div></li>`).join("")}</ul>
+        </details>
+      ` : ""}
+      ${parsed.length ? `<button class="btn btn-primary" id="schedule-pdf-commit" style="margin-top:12px; background:var(--critical);">استبدال جدول ${parsed.length} شعبة بهذا الاستيراد</button>` : ""}
+    `;
+
+    const commitBtn = previewRoot.querySelector("#schedule-pdf-commit");
+    if (!commitBtn) return;
+    commitBtn.addEventListener("click", async () => {
+      if (!confirm(`سيُستبدل الجدول الدراسي لـ${parsed.length} شعبة بمحتوى هذه الملفات. بقية الشعب لن تتأثر. هل أنت متأكد؟`)) return;
+      commitBtn.disabled = true;
+      const total = await commitScheduleFromPdfSections(parsed);
+      previewRoot.innerHTML = `<p class="hint">تم استيراد ${total} صفًا عبر ${parsed.length} شعبة بنجاح.</p>`;
+      fileInput.value = "";
+      await onCommitted();
+    });
+  });
+}
+
 export async function mountPromotedView(container) {
   container.innerHTML = `
     <div class="topbar">
@@ -233,6 +304,7 @@ export async function mountPromotedView(container) {
     <div id="promoted-import"></div>
     <div id="promoted-history" style="margin-top:20px;"></div>
     <div id="schedule-import" style="margin-top:20px;"></div>
+    <div id="schedule-pdf-import"></div>
   `;
 
   const pendingRoot = container.querySelector("#promoted-pending");
@@ -245,4 +317,7 @@ export async function mountPromotedView(container) {
     await renderBatchHistory(historyRoot);
   });
   await renderScheduleImportSection(container.querySelector("#schedule-import"), async () => {});
+  await renderSchedulePdfImportSection(container.querySelector("#schedule-pdf-import"), async () => {
+    await renderScheduleSummary(container.querySelector("#schedule-summary"));
+  });
 }

@@ -1,4 +1,4 @@
-import { list as listAll, listWhere, clear, bulkPut } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, clear, bulkPut, remove } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 
 // Both sheets live inside the school's own full roster workbook, found by
@@ -92,6 +92,25 @@ export async function commitSchedule({ scheduleRows, officeHoursRows }) {
       await bulkPut("officeHours", officeHoursRows.map((r, i) => ({ id: `office-${i}`, ...r })));
     }
   }
+}
+
+// مصدر بديل لنفس مجموعة teacherSchedule — بدل شيت "جداول المعلمين" الكامل،
+// المدرسة قد ترفع ملف PDF "جدول حصص الفصل الدراسي" الرسمي منفصلًا لكل شعبة
+// (schedule-pdf-parser.js). كل شعبة تُستبدل بياناتها بالكامل بشكل مستقل —
+// عكس commitSchedule أعلاه (اللي يستبدل الجدول كله دفعة وحدة) — لأن الملفات
+// تُرفع شعبة شعبة، فرفع شعبة واحدة مصححة لاحقًا يجب ألا يمسح بقية الشعب
+// المستوردة سابقًا.
+export async function commitScheduleFromPdfSections(sections) {
+  let totalRows = 0;
+  for (const { section, rows } of sections) {
+    const normalizedSection = normalizeSectionDigits(section);
+    const existing = await listWhere("teacherSchedule", "section", normalizedSection);
+    await Promise.all(existing.map((r) => remove("teacherSchedule", r.id)));
+    const withIds = rows.map((r, i) => ({ ...r, id: `sched-pdf-${normalizedSection}-${i}`, section: normalizedSection }));
+    if (withIds.length) await bulkPut("teacherSchedule", withIds);
+    totalRows += withIds.length;
+  }
+  return totalRows;
 }
 
 export async function getStudentSchedule(section) {

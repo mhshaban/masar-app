@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear } from "../src/services/cloud-runtime.js";
-import { normalizeSectionDigits, commitSchedule, getStudentSchedule, getOfficeHoursForTeachers, getScheduleSummary } from "../src/modules/schedule/schedule-service.js";
+import { normalizeSectionDigits, commitSchedule, commitScheduleFromPdfSections, getStudentSchedule, getOfficeHoursForTeachers, getScheduleSummary } from "../src/modules/schedule/schedule-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -39,6 +39,41 @@ test("getStudentSchedule matches by normalized section and sorts by day then ses
   const rows = await getStudentSchedule("٢تلم١");
   assert.equal(rows.length, 3);
   assert.deepEqual(rows.map((r) => r.subjectCode), ["أ", "ج", "ب"]);
+});
+
+test("commitScheduleFromPdfSections replaces only the uploaded sections, leaving other previously-imported sections untouched", async () => {
+  await commitSchedule({
+    scheduleRows: [
+      { section: "2تلم1", day: 1, period: 1, subjectCode: "قديم-1", session: 1 },
+      { section: "1تلم3", day: 1, period: 1, subjectCode: "لا يجب أن يتغيّر", session: 1 },
+    ],
+  });
+
+  const total = await commitScheduleFromPdfSections([
+    { section: "1تلم1", rows: [{ day: 1, period: 1, subjectCode: "جديد-من-PDF", teacher: "أحمد", room: "A1", session: 1 }] },
+  ]);
+  assert.equal(total, 1);
+
+  const untouched = await getStudentSchedule("1تلم3");
+  assert.equal(untouched.length, 1);
+  assert.equal(untouched[0].subjectCode, "لا يجب أن يتغيّر");
+
+  const imported = await getStudentSchedule("1تلم1");
+  assert.equal(imported.length, 1);
+  assert.equal(imported[0].subjectCode, "جديد-من-PDF");
+});
+
+test("commitScheduleFromPdfSections re-uploading the same section fully replaces its previous rows, not merges them", async () => {
+  await commitScheduleFromPdfSections([
+    { section: "1تلم1", rows: [{ day: 1, period: 1, subjectCode: "أ" }, { day: 2, period: 1, subjectCode: "ب" }] },
+  ]);
+  await commitScheduleFromPdfSections([
+    { section: "1تلم1", rows: [{ day: 1, period: 1, subjectCode: "أ-محدّث" }] },
+  ]);
+
+  const rows = await getStudentSchedule("1تلم1");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].subjectCode, "أ-محدّث");
 });
 
 test("getOfficeHoursForTeachers returns only the requested teachers' office hours", async () => {
