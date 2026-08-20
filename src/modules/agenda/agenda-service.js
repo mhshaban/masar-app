@@ -40,6 +40,16 @@ export async function groupByPeriod(entries) {
   return groups;
 }
 
+// إحصائية أجندة قابلة للحساب فعليًا للرئيسية — "فترة التنفيذ" بخطة القسم نص
+// حر (مثال حقيقي: "طوال العام الدراسي"، "الأسبوع الثاني من سبتمبر") لا
+// تواريخ فعلية، فـ"إجراءات قريبة من نهاية فترتها" غير قابل للحساب بموثوقية؛
+// حالة التنفيذ (progress.status) هي الحقل الحقيقي الوحيد القابل للعد هنا.
+export async function getAgendaProgressSummary() {
+  const entries = await listAgendaEntries();
+  const notStarted = entries.filter((e) => e.progress.status === "not_started").length;
+  return { total: entries.length, notStarted };
+}
+
 export async function listFollowUpItemOptions() {
   const items = await listAll("followUpItems");
   items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));

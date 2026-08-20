@@ -118,3 +118,27 @@ export async function deleteAction(projectId, no) {
   await save("departmentPlanProjects", { ...project, actions });
   await remove("actionProgress", `${projectId}-a${no}`);
 }
+
+// بحث نصي بسيط عبر كل الإجراءات بكل المحاور معًا (لا يتقيّد بالمحور
+// المعروض حاليًا بالشاشة) — يبحث بنص الإجراء والمستهدف والمنفذ والمتابع،
+// لتسهيل الوصول السريع لإجراء معيّن للتعديل بدل التصفح اليدوي بين المحاور.
+export async function searchActions(query) {
+  const q = (query || "").trim();
+  if (!q) return [];
+  const projects = await listAll("departmentPlanProjects");
+  const results = [];
+  for (const project of projects) {
+    for (const action of project.actions || []) {
+      const haystack = [action.action, action.target, action.executor, action.follower].filter(Boolean).join(" ");
+      if (haystack.includes(q)) {
+        results.push({
+          projectId: project.id,
+          pillar: project.pillar,
+          projectTitle: project.project_title,
+          action,
+        });
+      }
+    }
+  }
+  return results;
+}

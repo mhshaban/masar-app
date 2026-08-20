@@ -82,3 +82,25 @@ export async function listCandidates() {
   const [summaries, openIds] = await Promise.all([computeStudentGradeSummaries(), listCaseStudentIds()]);
   return summaries.filter((s) => !openIds.has(s.studentId));
 }
+
+// حالة مفتوحة بدون أي نشاط (جلسة متابعة، أو فتحها هي نفسها لو ما فيها
+// جلسات بعد) خلال آخر staleDays يوم — تنسى بسهولة بين الشاشات لأنها لا
+// تظهر بأي مكان إلا لو فتحت الحالة نفسها. lastActivity يُستخدم بدل openedDate
+// وحدها لأن حالة قديمة بجلسات حديثة ليست متعثرة فعليًا.
+export async function listStaleOpenCases(staleDays = 14) {
+  const [cases, sessions] = await Promise.all([listAll("guidanceCases"), listAll("caseSessions")]);
+  const lastSessionByCase = new Map();
+  for (const s of sessions) {
+    const prev = lastSessionByCase.get(s.caseId);
+    if (!prev || (s.date || "") > prev) lastSessionByCase.set(s.caseId, s.date || "");
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - staleDays);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  return cases
+    .filter((c) => c.status !== "closed")
+    .map((c) => ({ ...c, lastActivity: lastSessionByCase.get(c.id) || c.openedDate }))
+    .filter((c) => (c.lastActivity || "") < cutoffStr)
+    .sort((a, b) => (a.lastActivity || "").localeCompare(b.lastActivity || ""));
+}

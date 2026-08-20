@@ -97,3 +97,17 @@ export async function listCandidates() {
   const [summaries, activeIds] = await Promise.all([computeStudentGradeSummaries(), listActivePlanStudentIds()]);
   return summaries.filter((s) => !activeIds.has(s.studentId));
 }
+
+// إجراء له تاريخ استحقاق فات ولسا ما أُنجز، ضمن خطة نشطة (خطة مكتملة/ملغاة
+// لا تحتاج تنبيهًا). التاريخ حقل حقيقي هنا (dueDate)، بخلاف "فترة التنفيذ"
+// النصية الحرة بخطة القسم اللي ما تسمح بحساب مماثل.
+export async function listOverdueActions() {
+  const [plans, actions] = await Promise.all([listAll("supportPlans"), listAll("supportPlanActions")]);
+  const planById = new Map(plans.map((p) => [p.id, p]));
+  const today = new Date().toISOString().slice(0, 10);
+
+  return actions
+    .filter((a) => a.status !== "done" && a.dueDate && a.dueDate < today && planById.get(a.planId)?.status === "active")
+    .map((a) => ({ ...a, plan: planById.get(a.planId) }))
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+}

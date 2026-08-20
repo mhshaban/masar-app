@@ -10,6 +10,8 @@ import {
   addAction,
   updateAction,
   deleteAction,
+  searchActions,
+  getProject,
 } from "./department-plan-service.js";
 
 function esc(str) {
@@ -302,11 +304,41 @@ function renderProjects(root, projects, state, actions) {
   });
 }
 
+// بحث سريع عن إجراء عبر كل المحاور معًا (لا يتقيّد بالمحور المعروض حاليًا)
+// — بديل لتصفح يدوي بين المحاور والمشاريع لإيجاد إجراء معيّن للتعديل.
+function renderSearchResults(root, results, onPick) {
+  if (!results.length) {
+    root.innerHTML = '<p class="hint">لا يوجد إجراء مطابق.</p>';
+    return;
+  }
+  root.innerHTML = `
+    <ul class="plain" style="border:1px solid var(--border); border-radius:9px; padding:6px 10px; max-height:260px; overflow-y:auto;">
+      ${results.slice(0, 15).map((r) => `
+        <li class="row-item" data-project="${esc(r.projectId)}" data-no="${esc(r.action.no)}" style="cursor:pointer;">
+          <div class="body">
+            <div class="title">${esc(r.action.action)}</div>
+            <div class="meta">${esc(r.pillar)} — ${esc(r.projectTitle)}${r.action.executor ? ` · المنفذ: ${esc(r.action.executor)}` : ""}</div>
+          </div>
+        </li>
+      `).join("")}
+    </ul>
+    ${results.length > 15 ? `<p class="hint" style="margin-top:6px;">و${results.length - 15} نتيجة أخرى — دقّق البحث أكثر.</p>` : ""}
+  `;
+  root.querySelectorAll("[data-project]").forEach((li) => {
+    li.addEventListener("click", () => onPick(li.dataset.project, Number(li.dataset.no)));
+  });
+}
+
 export async function mountDepartmentPlanView(container) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>خطة القسم — الإرشاد الأكاديمي والتوجيه المهني</h1><div class="sub">العام الدراسي 2025/2026 — من ملف الخطة الموحدة الفعلي، قابلة للتعديل</div></div>
       <button class="btn btn-primary" id="plan-new-project-btn">+ مشروع جديد</button>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <label class="hint" style="display:block; margin-bottom:6px;">بحث سريع عن إجراء (بنص الإجراء، المستهدف، المنفذ، أو المتابع) — يبحث بكل المحاور للوصول السريع للتعديل</label>
+      <input id="plan-search-input" type="search" placeholder="ابحث عن إجراء..." style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+      <div id="plan-search-results" style="margin-top:8px;"></div>
     </div>
     <div id="plan-stats"></div>
     <div class="chip-row" id="plan-pillars"></div>
@@ -317,6 +349,8 @@ export async function mountDepartmentPlanView(container) {
 
   const pillarsRoot = container.querySelector("#plan-pillars");
   const projectsRoot = container.querySelector("#plan-projects");
+  const searchInput = container.querySelector("#plan-search-input");
+  const searchResultsRoot = container.querySelector("#plan-search-results");
   const state = createEditState();
   let currentPillar = null;
 
@@ -357,5 +391,27 @@ export async function mountDepartmentPlanView(container) {
     state.newProjectPillar = currentPillar || PILLARS[0];
     state.editingProjectId = null;
     draw();
+  });
+
+  const jumpToAction = async (projectId, no) => {
+    searchInput.value = "";
+    searchResultsRoot.innerHTML = "";
+    const project = await getProject(projectId);
+    if (!project) return;
+    await selectPillar(project.pillar);
+    state.editingAction = { projectId, no };
+    state.addingActionFor = null;
+    await draw();
+    projectsRoot.querySelector(`[data-project="${CSS.escape(projectId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  searchInput.addEventListener("input", async () => {
+    const query = searchInput.value;
+    if (!query.trim()) {
+      searchResultsRoot.innerHTML = "";
+      return;
+    }
+    const results = await searchActions(query);
+    renderSearchResults(searchResultsRoot, results, jumpToAction);
   });
 }

@@ -5,7 +5,7 @@ import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear, get, list } from "../src/services/cloud-runtime.js";
 import {
   createProject, updateProject, deleteProject, getProject,
-  addAction, updateAction, deleteAction,
+  addAction, updateAction, deleteAction, searchActions,
 } from "../src/modules/department-plan/department-plan-service.js";
 
 beforeEach(async () => {
@@ -70,6 +70,28 @@ test("deleteAction removes the action and its actionProgress record", async () =
   const fetched = await getProject(project.id);
   assert.equal(fetched.actions.length, 0);
   assert.equal(await get("actionProgress", `${project.id}-a${action.no}`), null);
+});
+
+test("searchActions matches by action text, target, executor, or follower across all pillars, not just one", async () => {
+  const p1 = await createProject({ pillar: "القيادة", project_title: "م1" });
+  const p2 = await createProject({ pillar: "التطور الشخصي", project_title: "م2" });
+  await addAction(p1.id, { action: "متابعة حالة الطالب الغائب", target: "الطلاب المتعثرون", executor: "أحمد" });
+  await addAction(p2.id, { action: "لا علاقة له بالبحث", target: "شي آخر", executor: "أحمد" });
+
+  const byActionText = await searchActions("الطالب الغائب");
+  assert.equal(byActionText.length, 1);
+  assert.equal(byActionText[0].projectId, p1.id);
+  assert.equal(byActionText[0].pillar, "القيادة");
+
+  const byExecutor = await searchActions("أحمد");
+  assert.equal(byExecutor.length, 2, "must search across every pillar, not just the currently viewed one");
+});
+
+test("searchActions returns nothing for an empty query instead of every action", async () => {
+  const project = await createProject({ pillar: "القيادة", project_title: "م" });
+  await addAction(project.id, { action: "أ" });
+  assert.deepEqual(await searchActions(""), []);
+  assert.deepEqual(await searchActions("   "), []);
 });
 
 test("deleteProject cascades to every one of its actions' actionProgress records", async () => {
