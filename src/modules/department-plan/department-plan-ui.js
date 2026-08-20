@@ -139,7 +139,7 @@ function actionFormHtml(action) {
             </div>
           </div>
           <p class="hint" style="margin:0;">تحديد التاريخين يرتّب هذا الإجراء زمنيًا بالأجندة التنفيذية تلقائيًا — بدونهما يبقى ضمن قسم "بلا تاريخ محدد".</p>
-          <div style="display:flex; gap:8px;">
+          <div data-role="form-actions" style="display:flex; gap:8px;">
             <button class="btn btn-primary" type="submit">حفظ الإجراء</button>
             <button class="btn btn-ghost" type="button" data-cancel="1">إلغاء</button>
           </div>
@@ -313,7 +313,7 @@ function renderProjects(root, projects, state, actions) {
       await deleteAction(projectId, state.editingAction.no);
       await actions.onProjectChanged();
     });
-    form.querySelector("div:last-child").appendChild(delBtn);
+    form.querySelector('[data-role="form-actions"]').appendChild(delBtn);
   });
 }
 
