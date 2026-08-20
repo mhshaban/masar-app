@@ -1,4 +1,6 @@
 import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js";
+import { count } from "../../services/cloud-runtime.js";
+import { COLLECTIONS } from "../../core/config.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -41,21 +43,51 @@ function renderSummary(counts) {
   `;
 }
 
+// كان فتح هذه الشاشة يجيب نسخة احتياطية كاملة (كل صفوف كل مجموعة، بما فيها
+// جدول الدرجات الضخم — 22,982+ صفًا فعليًا) فقط لعرض جدول أعداد صغير، ثم
+// الضغط على "تنزيل" يعيد نفس الجلب الكامل من جديد — فحصان كاملان بدون أي
+// مؤشر تحميل أو رسالة خطأ لو صار عطل شبكة بالمنتصف، فيبدو التصدير "معلّقًا"
+// أو "ما يشتغل" بصمت. الملخص الآن يستخدم count() (عدّ سريع من طرف الخادم،
+// بدون تنزيل الصفوف نفسها) بدل بناء نسخة كاملة، والتنزيل الفعلي وحده يبني
+// النسخة الكاملة — مع مؤشر تحميل ورسالة خطأ واضحة لو تعذّر.
 async function renderExportSection(root) {
   root.innerHTML = `
     <div class="card">
       <h3>تصدير نسخة احتياطية</h3>
       <p class="hint">يحمّل ملف JSON واحد يحتوي كل بيانات مسار (الخطة، الأجندة، سجل الطلبة، الدرجات، التذكيرات...) — احتفظ به في مكان آمن (بريدك، قرص خارجي).</p>
-      <div id="export-summary"></div>
-      <button class="btn btn-primary" id="export-btn" style="margin-top:12px;">تنزيل نسخة احتياطية الآن</button>
+      <div id="export-summary"><p class="hint">جارٍ حساب أعداد السجلات…</p></div>
+      <button class="btn btn-primary" id="export-btn" style="margin-top:12px;" disabled>تنزيل نسخة احتياطية الآن</button>
+      <div id="export-status" style="margin-top:8px;"></div>
     </div>
   `;
-  const backup = await buildBackup();
-  const counts = summarizeBackup(backup);
-  root.querySelector("#export-summary").innerHTML = renderSummary(counts);
-  root.querySelector("#export-btn").addEventListener("click", async () => {
-    const fresh = await buildBackup();
-    downloadBackup(fresh);
+
+  const summaryRoot = root.querySelector("#export-summary");
+  const exportBtn = root.querySelector("#export-btn");
+  const statusRoot = root.querySelector("#export-status");
+
+  try {
+    const counts = {};
+    for (const name of COLLECTIONS) counts[name] = await count(name);
+    summaryRoot.innerHTML = renderSummary(counts);
+  } catch (err) {
+    summaryRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر حساب أعداد السجلات: ${esc(err.message)}</p>`;
+  }
+  exportBtn.disabled = false;
+
+  exportBtn.addEventListener("click", async () => {
+    exportBtn.disabled = true;
+    const originalLabel = exportBtn.textContent;
+    exportBtn.textContent = "جارٍ التحضير… قد يستغرق دقيقة مع البيانات الكبيرة";
+    statusRoot.innerHTML = "";
+    try {
+      const fresh = await buildBackup();
+      downloadBackup(fresh);
+    } catch (err) {
+      statusRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر التصدير: ${esc(err.message)}</p>`;
+    } finally {
+      exportBtn.disabled = false;
+      exportBtn.textContent = originalLabel;
+    }
   });
 }
 
