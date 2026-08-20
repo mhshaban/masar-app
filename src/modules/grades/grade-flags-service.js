@@ -1,5 +1,9 @@
-import { list as listAll } from "../../services/cloud-runtime.js";
+import { list as listAll, rpc } from "../../services/cloud-runtime.js";
 import { gradeRowPct } from "./score-conventions.js";
+
+function testBackend() {
+  return typeof globalThis !== "undefined" ? globalThis.__MASAR_TEST_BACKEND__ : null;
+}
 
 // A student below this general average, or failing/barred in any subject,
 // is surfaced as a candidate for a guidance case or a support plan — this
@@ -34,7 +38,30 @@ export async function computeStudentGradeSummaries() {
   }
 }
 
+// مسار الإنتاج يفضّل حساب Postgres نفسه (masar_grade_summaries — راجع
+// supabase/migrations/20260821_masar_grade_summaries.sql): أجزاء من
+// الثانية بغض النظر عن حجم الجدول، بدل عشرات الطلبات المقسّمة صفحات لتنزيل
+// كل صفوف الدرجات للمتصفح. لو الدالة غير مطبَّقة بعد بمشروع Supabase
+// (الهجرة تحتاج تشغيلًا يدويًا من لوحة التحكم، رفعها لـ GitHub وحده لا
+// يكفي) أو صار خطأ شبكة عابر، نرجع تلقائيًا لنفس الحساب بجافاسكربت القديم
+// بدل ما تنكسر الشاشة كليًا لحد ما تُشغَّل الهجرة.
 async function computeFresh() {
+  if (!testBackend()) {
+    try {
+      const rows = await rpc("masar_grade_summaries", { p_fail_threshold_pct: FAIL_THRESHOLD_PCT });
+      return rows.map((r) => ({
+        studentId: r.student_id,
+        avgPct: r.avg_pct == null ? null : Number(r.avg_pct),
+        failingSubjectCodes: r.failing_subject_codes || [],
+        absentCount: r.absent_count,
+        barredCount: r.barred_count,
+        reasons: r.reasons || [],
+      }));
+    } catch {
+      // يتابع بالحساب المحلي أدناه.
+    }
+  }
+
   const grades = await listAll("grades");
   const byStudent = new Map();
   for (const g of grades) {

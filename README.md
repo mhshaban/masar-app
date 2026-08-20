@@ -65,7 +65,7 @@ python3 -m http.server 8080
 
 ## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
 
-135 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+140 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
 
 ```bash
 cd masar-app
@@ -139,6 +139,7 @@ src/
 data/            students.local.json (اختياري، محلي فقط، مستثنى من git — تسريع التطوير المحلي فقط؛ الاستيراد الفعلي من داخل التطبيق، انظر فقرة سجل الطلبة أعلاه)
 supabase/
   migrations/    20260804_masar_core_schema.sql — جدول عام (id + data jsonb) لكل مجموعة، profiles، RLS، دوال الدخول
+                 20260821_masar_grade_summaries.sql — دالة masar_grade_summaries: تجميع درجات الطلبة (المعدل/الرسوب/الحرمان) بجانب قاعدة البيانات بدل المتصفح
   functions/
     admin-users/ Edge Function (Deno) — إنشاء/تعطيل حساب، إعادة تعيين كلمة مرور، بمفتاح service_role من طرف الخادم فقط
 scripts/
@@ -152,6 +153,7 @@ scripts/
 1. **إنشاء مشروع Supabase جديد** على [supabase.com](https://supabase.com) — اسم مقترح `masar-app`. **منفصل تمامًا عن مشروع CCE** (لا يُستخدم نفس المشروع إطلاقًا — بيانات طلاب مدرسة حقيقية لا تُخلط ببيانات نادي فرسان).
 2. من Project Settings → **API Keys** (أو **Data API** حسب نسخة اللوحة): انسخ **Project URL**، و**anon public key** (بلوحات Supabase الأحدث اسمه **Publishable key**، يبدأ بـ `sb_publishable_...` — نفس الدور بالضبط). ضعهما في `src/services/supabase-config.js` مكان القيم النائبة (`SB_URL`/`SB_KEY`). آمن حفظهما بالكود مباشرة — نفس CCE بالضبط — الحماية الفعلية للبيانات عبر تسجيل الدخول + RLS، وليس بإخفاء هذا المفتاح.
 3. **تشغيل ملف الـ SQL**: افتح SQL Editor بلوحة تحكم المشروع، والصق محتوى `supabase/migrations/20260804_masar_core_schema.sql` بالكامل، ثم نفّذه. (رفع الملف لـ GitHub وحده لا يطبّقه — يجب تنفيذه يدويًا من لوحة التحكم.)
+   - **ثم كرّر نفس الخطوة لملف `supabase/migrations/20260821_masar_grade_summaries.sql`** (نفس SQL Editor، لصق وتنفيذ) — دالة تحسب مرشحي الحالات الإرشادية/خطط الدعم بجانب قاعدة البيانات بدل تنزيل جدول الدرجات كامل للمتصفح؛ أُضيفت لاحقًا لحل بطء ملموس رُصد فعليًا مع تراكم البيانات الحقيقية (22,982+ صف درجات). **التطبيق يشتغل بدونها** (يرجع تلقائيًا للحساب القديم الأبطأ بالمتصفح لو الدالة غير موجودة)، لكن تنفيذها يسرّع الرئيسية وشاشتي الحالات/الدعم بشكل كبير.
 4. **نشر Edge Function**: من تبويب Edge Functions بلوحة التحكم، أنشئ دالة باسم `admin-users` والصق محتوى `supabase/functions/admin-users/index.ts`، ثم Deploy. **لا حاجة لإضافة أي Secret يدويًا** — Supabase توفر `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` تلقائيًا كـ"Default secrets" جاهزة بكل مشروع (تظهر تحت Edge Functions → Secrets → "Default secrets"؛ الأسماء القديمة عليها علامة Deprecated لكنها لسا شغالة، والكود يتعامل مع الصيغة الأحدث JSON أيضًا احتياطًا).
 5. **Bootstrap أول حساب إدمن** (المشكلة الوحيدة الدائرية: إنشاء الحسابات يحتاج حساب إدمن موجود مسبقًا):
    - من تبويب Authentication بلوحة التحكم، أنشئ مستخدمًا واحدًا يدويًا (بريد إلكتروني حقيقي أو داخلي، وكلمة مرور).

@@ -102,6 +102,21 @@ export async function listWhere(collection, field, value) {
   return allRows.map(rowToRecord);
 }
 
+// يستدعي دالة SQL جاهزة بجانب قاعدة البيانات (Postgres RPC عبر PostgREST) —
+// للحسابات التجميعية اللي تكلف كثير لو صارت بالمتصفح بعد تنزيل كل الصفوف
+// (راجع masar_grade_summaries كمثال: supabase/migrations/20260821_*.sql).
+// بدون منفذ اختبار خاص عمدًا: أي كود يستدعي هذي الدالة بالاختبارات يتحمّل
+// مسؤولية موك globalThis.fetch مباشرة (نفس نمط cloud-runtime-pagination
+// test.mjs)، لأن هذي الدالة بطبيعتها استثناء (منطق عمل جاهز بجانب
+// الخادم)، لا عملية تخزين عامة متل بقية دوال هذا الملف.
+export async function rpc(name, args = {}) {
+  const res = await request(`rpc/${name}`, {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+  return res.json();
+}
+
 export async function get(collection, id) {
   const backend = testBackend();
   if (backend) return backend.get(collection, id);
