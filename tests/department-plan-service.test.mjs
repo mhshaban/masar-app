@@ -47,6 +47,17 @@ test("addAction requires non-empty action text", async () => {
   await assert.rejects(() => addAction(project.id, { action: "" }));
 });
 
+test("addAction stores periodStart/periodEnd when given, and defaults them to null when omitted (old free-text-only actions stay undated)", async () => {
+  const project = await createProject({ pillar: "القيادة", project_title: "م" });
+  const dated = await addAction(project.id, { action: "مؤرَّخ", period: "لاحقًا", periodStart: "2026-09-01", periodEnd: "2026-09-10" });
+  assert.equal(dated.periodStart, "2026-09-01");
+  assert.equal(dated.periodEnd, "2026-09-10");
+
+  const undated = await addAction(project.id, { action: "غير مؤرَّخ", period: "طوال العام" });
+  assert.equal(undated.periodStart, null);
+  assert.equal(undated.periodEnd, null);
+});
+
 test("updateAction patches one action by `no` without touching its `no` or other actions", async () => {
   const project = await createProject({ pillar: "القيادة", project_title: "م" });
   await addAction(project.id, { action: "أ", target: "قديم" });

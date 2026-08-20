@@ -101,11 +101,19 @@ async function mountEntries(root, entries, followUpOptions, refresh) {
   const groups = await groupByPeriod(entries);
   const followUpLabels = new Map(followUpOptions.map((o) => [o.id, o.label]));
 
-  root.innerHTML = [...groups.entries()].map(([period, items]) => `
+  root.innerHTML = [...groups.entries()].map(([period, items]) => {
+    const dates = items.map((e) => e.periodStart).filter(Boolean).sort();
+    const dateRange = dates.length
+      ? `<span class="pill pill-teal">${esc(dates[0])}${dates[dates.length - 1] !== dates[0] ? ` → ${esc(dates[dates.length - 1])}` : ""}</span>`
+      : "";
+    return `
     <div class="card" style="margin-bottom:14px;">
       <div class="card-head">
         <h3>${esc(period)}</h3>
-        <span class="pill pill-neutral">${items.length} إجراء</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${dateRange}
+          <span class="pill pill-neutral">${items.length} إجراء</span>
+        </div>
       </div>
       <ul class="plain">
         ${items.map((entry) => `
@@ -123,7 +131,8 @@ async function mountEntries(root, entries, followUpOptions, refresh) {
         `).join("")}
       </ul>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   root.querySelectorAll("li[data-id]").forEach((li) => {
     const id = li.dataset.id;
@@ -189,7 +198,7 @@ export async function mountAgendaView(container) {
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
     </div>
     <div class="sens" style="border-color: var(--warning); background: var(--warning-bg); color: var(--warning);">
-      فترات التنفيذ نص حر من الملف الأصلي (مثل "الأسبوع الثاني من سبتمبر")، ولم يتحول بعد إلى تواريخ فعلية للفرز الزمني الدقيق أو التذكير التلقائي — هذا موجود في خطة العمل القادمة، وليس مبنيًا الآن.
+      إجراءات هذه النسخة الأولى من الخطة نصّها الأصلي وصفي بلا تاريخ محدد (مثل "الأسبوع الثاني من سبتمبر")، فتظهر بقسم "بلا تاريخ محدد" بآخر القائمة. من شاشة "خطة القسم"، فتح أي إجراء للتعديل صار فيه حقلا "تاريخ بداية/نهاية التنفيذ" — أي إجراء تحدّد له تاريخين ينتقل تلقائيًا لترتيبه الزمني الصحيح هنا.
     </div>
     <div class="card" style="margin-bottom:16px;">
       <p class="hint" style="margin:0;">اضغط على أي إجراء لتسجيل حالته وعدد المستفيدين والثبوتية، ولربطه ببند من تقرير المتابعة الرسمي — هذا التحديث الوحيد الذي تحتاجه؛ تقرير المتابعة والإحصائيات يُحسبان منه تلقائيًا.</p>

@@ -126,8 +126,19 @@ function actionFormHtml(action) {
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <input name="evidence" placeholder="الثبوتية" value="${esc(action?.evidence) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="period" placeholder="فترة التنفيذ" value="${esc(action?.period) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="period" placeholder="وصف الفترة (مثال: طوال العام الدراسي)" value="${esc(action?.period) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
           </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:1; min-width:140px;">
+              <label class="hint" style="display:block;margin-bottom:4px;">تاريخ بداية التنفيذ (اختياري)</label>
+              <input name="periodStart" type="date" value="${esc(action?.periodStart) || ""}" style="width:100%; ${FIELD_STYLE}">
+            </div>
+            <div style="flex:1; min-width:140px;">
+              <label class="hint" style="display:block;margin-bottom:4px;">تاريخ نهاية التنفيذ (اختياري)</label>
+              <input name="periodEnd" type="date" value="${esc(action?.periodEnd) || ""}" style="width:100%; ${FIELD_STYLE}">
+            </div>
+          </div>
+          <p class="hint" style="margin:0;">تحديد التاريخين يرتّب هذا الإجراء زمنيًا بالأجندة التنفيذية تلقائيًا — بدونهما يبقى ضمن قسم "بلا تاريخ محدد".</p>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" type="submit">حفظ الإجراء</button>
             <button class="btn btn-ghost" type="button" data-cancel="1">إلغاء</button>
@@ -146,6 +157,8 @@ function readActionForm(form) {
     follower: form.follower.value,
     evidence: form.evidence.value,
     period: form.period.value,
+    periodStart: form.periodStart.value || null,
+    periodEnd: form.periodEnd.value || null,
   };
 }
 
@@ -190,7 +203,7 @@ function renderProjects(root, projects, state, actions) {
                     <td>${esc(a.action)}</td>
                     <td>${esc(a.target)}</td>
                     <td>${esc(a.executor)}</td>
-                    <td>${esc(a.period) || "—"}</td>
+                    <td>${a.periodStart ? `${esc(a.periodStart)}${a.periodEnd ? ` → ${esc(a.periodEnd)}` : ""}` : (esc(a.period) || "—")}</td>
                   </tr>
                 `
             )).join("")}

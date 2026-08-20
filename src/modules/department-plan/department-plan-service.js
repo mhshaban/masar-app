@@ -81,7 +81,12 @@ export async function deleteProject(id) {
 // an existing one — action ids downstream (execution progress, follow-up
 // links) are `${projectId}-a${no}`, so renumbering would silently sever
 // those links.
-export async function addAction(projectId, { action, target, executor, follower, evidence, period }) {
+// periodStart/periodEnd تاريخان حقيقيان (YYYY-MM-DD) للفرز الزمني الدقيق
+// بالأجندة التنفيذية — منفصلان عمدًا عن period (النص الحر الأصلي من ملف
+// الخطة، مثل "الأسبوع الثاني من سبتمبر" أو "طوال العام الدراسي") لأن بعض
+// الفترات وصفية وليست نطاق تاريخ محدد أصلًا، فيبقى period كوصف مقروء حتى
+// لو ما تحدَّد له تاريخ فعلي.
+export async function addAction(projectId, { action, target, executor, follower, evidence, period, periodStart, periodEnd }) {
   if (!action || !action.trim()) throw new Error("نص الإجراء مطلوب");
   const project = await get("departmentPlanProjects", projectId);
   if (!project) throw new Error("تعذّر إيجاد المشروع");
@@ -95,6 +100,8 @@ export async function addAction(projectId, { action, target, executor, follower,
     follower: follower || "",
     evidence: evidence || "",
     period: period || "",
+    periodStart: periodStart || null,
+    periodEnd: periodEnd || null,
   };
   await save("departmentPlanProjects", { ...project, actions: [...actions, newAction] });
   return newAction;

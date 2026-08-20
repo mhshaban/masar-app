@@ -23,6 +23,8 @@ export async function listAgendaEntries() {
         follower: action.follower,
         evidence: action.evidence,
         period: action.period,
+        periodStart: action.periodStart || null,
+        periodEnd: action.periodEnd || null,
         progress: progressById.get(id) || { id, ...DEFAULT_PROGRESS },
       });
     }
@@ -30,6 +32,13 @@ export async function listAgendaEntries() {
   return entries;
 }
 
+// إجراءات بنفس نص الفترة تُجمَّع بمجموعة وحدة كما هو معتاد، لكن ترتيب
+// المجموعات نفسها صار زمنيًا بحسب أقرب periodStart داخل كل مجموعة — بدل
+// ترتيب عشوائي (ترتيب ظهور الإجراءات بالملف الأصلي، اللي كان يخلي مثلًا
+// "الأسبوع الثاني من سبتمبر" يظهر بعد "20 سبتمبر" رغم إنه أبكر منه فعليًا).
+// مجموعة ما فيها ولا إجراء واحد له periodStart (كل الإجراءات القديمة قبل
+// إضافة حقلي التاريخ) تظهر بقسم "بلا تاريخ محدد" بآخر الترتيب دائمًا، لا
+// تختلط عشوائيًا بين المجموعات المؤرَّخة.
 export async function groupByPeriod(entries) {
   const groups = new Map();
   for (const entry of entries) {
@@ -37,7 +46,19 @@ export async function groupByPeriod(entries) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(entry);
   }
-  return groups;
+
+  const earliestStart = (items) => items.map((e) => e.periodStart).filter(Boolean).sort()[0] || null;
+
+  const sortedEntries = [...groups.entries()].sort(([, itemsA], [, itemsB]) => {
+    const a = earliestStart(itemsA);
+    const b = earliestStart(itemsB);
+    if (a && b) return a.localeCompare(b);
+    if (a) return -1;
+    if (b) return 1;
+    return 0;
+  });
+
+  return new Map(sortedEntries);
 }
 
 // إحصائية أجندة قابلة للحساب فعليًا للرئيسية — "فترة التنفيذ" بخطة القسم نص
