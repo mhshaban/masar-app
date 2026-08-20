@@ -7,11 +7,34 @@ import { gradeRowPct } from "./score-conventions.js";
 // passing threshold only needs updating here.
 const FAIL_THRESHOLD_PCT = 50;
 
+// The dashboard's "طلاب يحتاجون متابعة" widget calls the guidance-cases and
+// support-plan candidate lists together (Promise.all in
+// followup-needs-service.js), and each of those independently calls this
+// function — without sharing, that meant TWO full, separately-paginated
+// scans of the entire grades collection running concurrently on every
+// dashboard load (confirmed live: 22,982+ rows, ~23 sequential paginated
+// requests each). Sharing one in-flight computation across concurrent
+// callers halves that. The shared promise is cleared the instant it settles
+// (not cached on a timer) — a later call, even a second afterward, always
+// re-fetches fresh, so a just-imported batch of grades is never served
+// stale data.
+let inFlight = null;
+
 // Summarizes each student's grades into a flag with human-readable reasons,
 // for the "candidates" panel on the guidance-cases and support-plan screens.
 // Students with no grades imported yet, or with nothing below threshold,
 // are simply absent from the result — this is a suggestion list, not a roster.
 export async function computeStudentGradeSummaries() {
+  if (inFlight) return inFlight;
+  inFlight = computeFresh();
+  try {
+    return await inFlight;
+  } finally {
+    inFlight = null;
+  }
+}
+
+async function computeFresh() {
   const grades = await listAll("grades");
   const byStudent = new Map();
   for (const g of grades) {
