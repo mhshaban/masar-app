@@ -12,6 +12,7 @@ import {
   deleteAction,
   searchActions,
   getProject,
+  listProgressItems,
 } from "./department-plan-service.js";
 
 function esc(str) {
@@ -33,6 +34,29 @@ function statusPill(status) {
   return `<span class="pill dot ${cls}">${label}</span>`;
 }
 
+// عرض بنود تقرير المتابعة الرسمي (agendaStatus — لقطة تاريخية من التقرير
+// الرسمي المستورد، منفصلة عن تقرير المتابعة الحي بشاشة "تقرير المتابعة")
+// المطابقة لتصنيف "منجز" أو "متعثر/غير محدد" — كانت الأرقام معروضة بدون
+// أي طريقة لرؤية البنود نفسها خلفها.
+function progressItemRow(item) {
+  const map = {
+    done: ["pill-success", "منجز"],
+    ongoing: ["pill-warning", "قيد الإنجاز"],
+    not_done: ["pill-critical", "لم يُنجز"],
+    unknown: ["pill-neutral", "غير محدد"],
+  };
+  const [cls, label] = map[item.status] || map.unknown;
+  return `
+    <li class="row-item">
+      <div class="body">
+        <div class="title">${item.no !== "*" ? `${esc(item.no)}. ` : ""}${esc(item.item)}</div>
+        ${item.obstacles ? `<div class="meta">${esc(item.obstacles)}</div>` : ""}
+      </div>
+      <span class="pill dot ${cls}">${label}</span>
+    </li>
+  `;
+}
+
 async function renderStats(root) {
   const plan = await getPlanStats();
   const progress = await getProgressStats();
@@ -48,17 +72,18 @@ async function renderStats(root) {
         <div class="label">إجراءات الخطة الكلية</div>
         <div class="value">${plan.totalActions}</div>
       </div>
-      <div class="card stat">
+      <div class="card stat" id="stat-done" style="cursor:pointer;">
         <div class="label">إنجاز تقرير المتابعة الرسمي</div>
         <div class="value">${donePct}٪</div>
-        <div class="delta up">${progress.done} من ${progress.total} بند منجز</div>
+        <div class="delta up">${progress.done} من ${progress.total} بند منجز — اضغط للعرض</div>
       </div>
-      <div class="card stat">
+      <div class="card stat" id="stat-pending" style="cursor:pointer;">
         <div class="label">بنود متعثرة أو غير محددة</div>
         <div class="value">${progress.not_done + progress.unknown}</div>
-        <div class="delta down">${progress.not_done} لم يُنجز · ${progress.unknown} غير محدد</div>
+        <div class="delta down">${progress.not_done} لم يُنجز · ${progress.unknown} غير محدد — اضغط للعرض</div>
       </div>
     </div>
+    <div id="progress-items-list" style="margin-bottom:20px;"></div>
     <div class="card" style="margin-bottom:20px;">
       <h3>الإنجاز بحسب الخطة والمطلوب — لكل محور</h3>
       <p class="hint">عدد المشاريع والإجراءات المخطَّطة في كل محور من ملف الخطة الموحدة</p>
@@ -72,6 +97,33 @@ async function renderStats(root) {
       </table></div>
     </div>
   `;
+
+  const listRoot = root.querySelector("#progress-items-list");
+  let openFilter = null;
+
+  const draw = async () => {
+    if (!openFilter) { listRoot.innerHTML = ""; return; }
+    const items = await listProgressItems();
+    const filtered = openFilter === "done"
+      ? items.filter((i) => i.status === "done")
+      : items.filter((i) => i.status === "not_done" || i.status === "unknown");
+    const title = openFilter === "done" ? "البنود المنجزة" : "البنود المتعثرة أو غير المحددة";
+    listRoot.innerHTML = `
+      <div class="card">
+        <div class="card-head"><h3>${title}</h3><span class="pill pill-neutral">${filtered.length} بند</span></div>
+        ${filtered.length ? `<ul class="plain">${filtered.map(progressItemRow).join("")}</ul>` : '<div class="empty">لا يوجد بنود بهذا التصنيف</div>'}
+      </div>
+    `;
+  };
+
+  root.querySelector("#stat-done").addEventListener("click", () => {
+    openFilter = openFilter === "done" ? null : "done";
+    draw();
+  });
+  root.querySelector("#stat-pending").addEventListener("click", () => {
+    openFilter = openFilter === "pending" ? null : "pending";
+    draw();
+  });
 }
 
 async function renderPillarTabs(root, currentPillar, onSelect) {
