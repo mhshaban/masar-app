@@ -233,3 +233,31 @@ export async function getGradeStats() {
 
   return { total: grades.length, overallAvg, subjectStats };
 }
+
+const EXPORT_SCORE_STATUS_LABELS = { absent: "غائب", barred: "محروم" };
+
+// يبني صفوف تصدير الدرجات كإكسل — مُطابَقة باسم الطالب ومستواه وشعبته من
+// سجل الطلبة (بدل رقم أكاديمي مجرّد)، بمفاتيح عربية تصير عناوين الأعمدة
+// تلقائيًا عند تحويلها لملف xlsx (src/services/xlsx-export.js).
+export async function buildGradesExportRows() {
+  const [grades, students] = await Promise.all([listAll("grades"), listAll("students")]);
+  const studentById = new Map(students.map((s) => [String(s.academicId ?? s.id), s]));
+
+  return grades.map((g) => {
+    const student = studentById.get(String(g.studentId));
+    const pct = g.score != null ? Math.round(gradeRowPct(g) * 100) : null;
+    return {
+      "الرقم الأكاديمي": g.studentId ?? "",
+      "اسم الطالب": student?.name ?? "",
+      "المستوى": student?.level ?? "",
+      "الشعبة": student?.section ?? "",
+      "رمز المقرر": g.subjectCode ?? "",
+      "اسم المقرر": g.subjectName ?? "",
+      "الفصل الدراسي": g.term ?? "",
+      "الدرجة": g.score ?? "",
+      "النسبة": pct ?? "",
+      "الحالة": g.scoreStatus ? (EXPORT_SCORE_STATUS_LABELS[g.scoreStatus] ?? g.scoreStatus) : "",
+      "ملاحظات": g.notes ?? "",
+    };
+  });
+}

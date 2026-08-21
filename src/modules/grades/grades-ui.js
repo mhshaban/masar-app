@@ -5,9 +5,11 @@ import {
   listBatches,
   rollbackBatch,
   getGradeStats,
+  buildGradesExportRows,
 } from "./grades-import-service.js";
 import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
+import { downloadRowsAsXlsx } from "../../services/xlsx-export.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -313,6 +315,10 @@ async function renderAnalyticsTab(root) {
     return;
   }
   root.innerHTML = `
+    <div class="topbar" style="margin-bottom:16px;">
+      <div></div>
+      <button class="btn btn-ghost" id="grades-export-xlsx-btn">تصدير الدرجات كإكسل</button>
+    </div>
     <div class="grid g4" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">إجمالي الدرجات المستوردة</div><div class="value">${stats.total}</div></div>
       <div class="card stat"><div class="label">المعدل العام</div><div class="value">${stats.overallAvg}٪</div></div>
@@ -329,7 +335,26 @@ async function renderAnalyticsTab(root) {
         </tbody>
       </table></div>
     </div>
+    <div id="grades-export-status" style="margin-top:10px;"></div>
   `;
+
+  const exportBtn = root.querySelector("#grades-export-xlsx-btn");
+  const statusRoot = root.querySelector("#grades-export-status");
+  exportBtn.addEventListener("click", async () => {
+    exportBtn.disabled = true;
+    const originalLabel = exportBtn.textContent;
+    exportBtn.textContent = "جارٍ التحضير… قد يستغرق دقيقة مع البيانات الكبيرة";
+    statusRoot.innerHTML = "";
+    try {
+      const rows = await buildGradesExportRows();
+      downloadRowsAsXlsx(`درجات-مسار-${new Date().toISOString().slice(0, 10)}`, "الدرجات", rows);
+    } catch (err) {
+      statusRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر التصدير: ${esc(err.message)}</p>`;
+    } finally {
+      exportBtn.disabled = false;
+      exportBtn.textContent = originalLabel;
+    }
+  });
 }
 
 function tierPill(tier) {

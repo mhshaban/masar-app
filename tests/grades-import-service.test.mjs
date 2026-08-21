@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear, get, list } from "../src/services/cloud-runtime.js";
-import { commitImportBatch, rollbackBatch, listGradesForStudent, getGradeStats } from "../src/modules/grades/grades-import-service.js";
+import { commitImportBatch, rollbackBatch, listGradesForStudent, getGradeStats, buildGradesExportRows } from "../src/modules/grades/grades-import-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -71,4 +71,34 @@ test("getGradeStats on an empty collection returns zeroed-out stats, not NaN", a
   assert.equal(stats.total, 0);
   assert.equal(stats.overallAvg, 0);
   assert.deepEqual(stats.subjectStats, []);
+});
+
+test("buildGradesExportRows joins each grade with the student's name/level/section, and translates scoreStatus to Arabic", async () => {
+  await bulkPut("students", [{ id: "20254220", academicId: "20254220", name: "سجاد جاسم", level: "الأول", section: "٢تلم١" }]);
+  await bulkPut("grades", [
+    { id: "g1", studentId: "20254220", subjectCode: "ريض801", subjectName: "الرياضيات", term: "الفصل الأول", score: 85, maxScore: 100 },
+    { id: "g2", studentId: "20254220", subjectCode: "دين801", subjectName: "التربية الإسلامية", term: "الفصل الأول", score: null, scoreStatus: "absent" },
+  ]);
+
+  const rows = await buildGradesExportRows();
+  assert.equal(rows.length, 2);
+
+  const graded = rows.find((r) => r["رمز المقرر"] === "ريض801");
+  assert.equal(graded["اسم الطالب"], "سجاد جاسم");
+  assert.equal(graded["المستوى"], "الأول");
+  assert.equal(graded["الشعبة"], "٢تلم١");
+  assert.equal(graded["الدرجة"], 85);
+  assert.equal(graded["النسبة"], 85);
+  assert.equal(graded["الحالة"], "");
+
+  const absent = rows.find((r) => r["رمز المقرر"] === "دين801");
+  assert.equal(absent["الدرجة"], "");
+  assert.equal(absent["الحالة"], "غائب");
+});
+
+test("buildGradesExportRows leaves student fields blank instead of throwing when a grade has no matching student record", async () => {
+  await bulkPut("grades", [{ id: "g1", studentId: "99999999", subjectCode: "ريض801", score: 70 }]);
+  const rows = await buildGradesExportRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]["اسم الطالب"], "");
 });
