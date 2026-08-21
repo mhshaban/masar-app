@@ -47,13 +47,31 @@ function progressItemRow(item) {
   };
   const [cls, label] = map[item.status] || map.unknown;
   return `
-    <li class="row-item">
-      <div class="body">
-        <div class="title">${item.no !== "*" ? `${esc(item.no)}. ` : ""}${esc(item.item)}</div>
-        ${item.obstacles ? `<div class="meta">${esc(item.obstacles)}</div>` : ""}
+    <li class="row-item" data-progress-item="${esc(item.id)}" style="flex-direction:column; align-items:stretch; cursor:pointer;">
+      <div style="display:flex; align-items:center; gap:10px; width:100%;">
+        <div class="body">
+          <div class="title">${item.no !== "*" ? `${esc(item.no)}. ` : ""}${esc(item.item)}</div>
+          ${item.obstacles ? `<div class="meta">${esc(item.obstacles)}</div>` : ""}
+        </div>
+        <span class="pill dot ${cls}">${label}</span>
       </div>
-      <span class="pill dot ${cls}">${label}</span>
+      <div class="detail-slot"></div>
     </li>
+  `;
+}
+
+// يوضّح مصدر البند صراحةً — لقطة تاريخية مستوردة من تقرير المتابعة الرسمي
+// (agendaStatus)، بلا ربط حي بأي إجراء بخطة القسم أو مشروع، فحالته هنا لا
+// تتحدّث تلقائيًا ولا تتزامن مع أي حالة أخرى بنفس الاسم بالأجندة التنفيذية.
+function progressItemDetailHtml(item) {
+  return `
+    <div class="card" style="margin-top:8px; background:var(--paper-50);">
+      ${item.indicator ? `<p class="hint" style="margin:0 0 6px;"><strong>مؤشر الإنجاز:</strong> ${esc(item.indicator)}</p>` : ""}
+      ${item.parties ? `<p class="hint" style="margin:0 0 6px;"><strong>الجهات المعنية:</strong> ${esc(item.parties)}</p>` : ""}
+      ${item.obstacles ? `<p class="hint" style="margin:0 0 6px;"><strong>المعوقات:</strong> ${esc(item.obstacles)}</p>` : ""}
+      ${!item.indicator && !item.parties && !item.obstacles ? '<p class="hint" style="margin:0;">لا تفاصيل إضافية مسجَّلة لهذا البند.</p>' : ""}
+      <p class="hint" style="margin:8px 0 0; color:var(--ink-500);">هذا البند من تقرير المتابعة الرسمي المستورَد كلقطة تاريخية — <strong>غير مرتبط بأي إجراء حي بخطة القسم</strong>، فحالته هنا لا تتحدّث تلقائيًا ولا تعكس حالة أي إجراء مشابه بالاسم في الأجندة التنفيذية.</p>
+    </div>
   `;
 }
 
@@ -114,6 +132,15 @@ async function renderStats(root) {
         ${filtered.length ? `<ul class="plain">${filtered.map(progressItemRow).join("")}</ul>` : '<div class="empty">لا يوجد بنود بهذا التصنيف</div>'}
       </div>
     `;
+
+    listRoot.querySelectorAll("[data-progress-item]").forEach((li) => {
+      li.addEventListener("click", () => {
+        const slot = li.querySelector(".detail-slot");
+        if (slot.innerHTML) { slot.innerHTML = ""; return; }
+        const item = filtered.find((i) => i.id === li.dataset.progressItem);
+        slot.innerHTML = progressItemDetailHtml(item);
+      });
+    });
   };
 
   root.querySelector("#stat-done").addEventListener("click", () => {
