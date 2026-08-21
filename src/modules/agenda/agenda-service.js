@@ -44,6 +44,26 @@ export async function listAgendaEntries() {
 // مجموعة ما فيها ولا إجراء واحد له periodStart (كل الإجراءات القديمة قبل
 // إضافة حقلي التاريخ) تظهر بقسم "بلا تاريخ محدد" بآخر الترتيب دائمًا، لا
 // تختلط عشوائيًا بين المجموعات المؤرَّخة.
+// إجراءات المجموعة الواحدة نفسها تُرتَّب زمنيًا الآن أيضًا (تاريخ البداية،
+// وتاريخ النهاية عند تساوي البداية) — بدل ترتيب ظهورها الأصلي بالملف. إجراء
+// بلا periodStart يظل ضمن مجموعته لكن يُدفع لآخرها، لا يختلط عشوائيًا بين
+// الإجراءات المؤرَّخة (طلب حقيقي من المرشد بعد ملاحظة الترتيب العشوائي).
+function sortEntriesByDate(items) {
+  return [...items].sort((a, b) => {
+    if (a.periodStart && b.periodStart) {
+      const cmp = a.periodStart.localeCompare(b.periodStart);
+      if (cmp !== 0) return cmp;
+      if (a.periodEnd && b.periodEnd) return a.periodEnd.localeCompare(b.periodEnd);
+      if (a.periodEnd) return -1;
+      if (b.periodEnd) return 1;
+      return 0;
+    }
+    if (a.periodStart) return -1;
+    if (b.periodStart) return 1;
+    return 0;
+  });
+}
+
 export async function groupByPeriod(entries) {
   const groups = new Map();
   for (const entry of entries) {
@@ -61,7 +81,7 @@ export async function groupByPeriod(entries) {
     if (a) return -1;
     if (b) return 1;
     return 0;
-  });
+  }).map(([key, items]) => [key, sortEntriesByDate(items)]);
 
   return new Map(sortedEntries);
 }

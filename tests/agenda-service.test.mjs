@@ -76,6 +76,27 @@ test("groupByPeriod pushes every group with no dated action into a separate, alw
   assert.deepEqual(keys, ["لاحقًا", "طوال العام الدراسي"], "the dated group must sort before the undated one regardless of insertion order");
 });
 
+test("groupByPeriod also sorts the actions inside one group chronologically by periodStart (then periodEnd), not by their original order in the file", async () => {
+  await bulkPut("departmentPlanProjects", [
+    {
+      id: "p1",
+      pillar: "القيادة",
+      project_title: "م",
+      actions: [
+        { no: 1, action: "يظهر ثالثًا بالملف لكنه أبكرهم", period: "طوال العام الدراسي", periodStart: "2026-09-01" },
+        { no: 2, action: "يظهر أولًا بالملف لكنه أواخرهم", period: "طوال العام الدراسي", periodStart: "2026-11-01" },
+        { no: 3, action: "بلا تاريخ — يُدفع لآخر المجموعة", period: "طوال العام الدراسي" },
+        { no: 4, action: "يظهر رابعًا بالملف لكنه وسطهم", period: "طوال العام الدراسي", periodStart: "2026-10-01" },
+      ],
+    },
+  ]);
+
+  const entries = await listAgendaEntries();
+  const groups = await groupByPeriod(entries);
+  const order = groups.get("طوال العام الدراسي").map((e) => e.no);
+  assert.deepEqual(order, [1, 4, 2, 3]);
+});
+
 test("listAgendaEntries passes periodStart/periodEnd through from the action record", async () => {
   await bulkPut("departmentPlanProjects", [
     { id: "p1", pillar: "القيادة", project_title: "م", actions: [{ no: 1, action: "أ", periodStart: "2026-09-01", periodEnd: "2026-09-10" }] },
