@@ -1,8 +1,8 @@
-import { list as listAll, save } from "../../services/cloud-runtime.js";
+import { list as listAll } from "../../services/cloud-runtime.js";
 import { listAgendaEntries } from "../agenda/agenda-service.js";
 
 function aggregateStatus(entries) {
-  if (!entries.length) return null;
+  if (!entries.length) return "not_started";
   const statuses = entries.map((e) => e.progress.status);
   if (statuses.every((s) => s === "done")) return "done";
   if (statuses.some((s) => s === "done" || s === "ongoing")) return "ongoing";
@@ -13,30 +13,16 @@ export async function listFollowUpItems() {
   return listAll("followUpItems");
 }
 
-export async function setManualOverride(itemId, patch) {
-  const items = await listFollowUpItems();
-  const item = items.find((i) => i.id === itemId);
-  if (!item) return null;
-  const next = { ...item, ...patch };
-  await save("followUpItems", next);
-  return next;
-}
-
+// كل بند يُحسب حصريًا من الإجراءات الحية المرتبطة به بخطة القسم — لا يوجد
+// أي إدخال يدوي منفصل ولا اعتماد على الحالة التاريخية المستوردة
+// (importedStatus من dd784016.docx) بعد الآن؛ خطة القسم هي المصدر الوحيد.
+// بند بلا أي إجراء مرتبط يظهر "لم يبدأ" — وهذا يكشف فجوة حقيقية (بند رسمي
+// ما له نظير بالخطة بعد) بدل إخفائها برقم قديم أو تقدير يدوي منفصل.
 function toRow(item, linked) {
-  const computedStatus = aggregateStatus(linked);
+  const status = aggregateStatus(linked);
   const totalParticipants = linked.reduce((sum, e) => sum + (Number(e.progress.participantsCount) || 0), 0);
-  const status = computedStatus || item.manualStatus || item.importedStatus;
-  const summary = linked.length
-    ? linked.map((e) => e.progress.proofNote || e.action).join(" · ")
-    : (item.manualSummary || item.summary);
-  return {
-    ...item,
-    linkedActions: linked,
-    status,
-    isComputed: !!computedStatus,
-    totalParticipants: linked.length ? totalParticipants : (item.manualParticipants || 0),
-    summary,
-  };
+  const summary = linked.length ? linked.map((e) => e.progress.proofNote || e.action).join(" · ") : null;
+  return { ...item, linkedActions: linked, status, totalParticipants, summary };
 }
 
 export async function getFollowUpReport() {

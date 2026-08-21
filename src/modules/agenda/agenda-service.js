@@ -14,6 +14,11 @@ export async function listAgendaEntries() {
       const id = `${project.id}-a${action.no}`;
       entries.push({
         id,
+        // مخزَّنان صراحةً (لا تُشتَقّان من تفكيك id) — project.id نفسه قد
+        // يحتوي شرطة "-" (صيغة معرّفات cloud-runtime.js: طابع زمني-عشوائي)،
+        // فتفكيك id بحثًا عن "-a" غير موثوق أبدًا.
+        projectId: project.id,
+        no: action.no,
         pillar: project.pillar,
         project_title: project.project_title,
         program_name: project.program_name,
@@ -61,14 +66,20 @@ export async function groupByPeriod(entries) {
   return new Map(sortedEntries);
 }
 
-// إحصائية أجندة قابلة للحساب فعليًا للرئيسية — "فترة التنفيذ" بخطة القسم نص
-// حر (مثال حقيقي: "طوال العام الدراسي"، "الأسبوع الثاني من سبتمبر") لا
+// إحصائية أجندة قابلة للحساب فعليًا — "فترة التنفيذ" بخطة القسم نص حر
+// (مثال حقيقي: "طوال العام الدراسي"، "الأسبوع الثاني من سبتمبر") لا
 // تواريخ فعلية، فـ"إجراءات قريبة من نهاية فترتها" غير قابل للحساب بموثوقية؛
 // حالة التنفيذ (progress.status) هي الحقل الحقيقي الوحيد القابل للعد هنا.
+// هذا أيضًا مصدر الإنجاز الوحيد المعتمَد بشاشتَي الرئيسية وخطة القسم الآن
+// — بدل لقطة تقرير المتابعة الرسمي التاريخية (agendaStatus) اللي كانت
+// تعرض رقمًا مجمَّدًا لا علاقة له بحالة الإجراءات الفعلية هالعام، فيتناقض
+// أحيانًا مع نفس البند بالأجندة التنفيذية (مثال حقيقي أبلغ عنه المرشد).
 export async function getAgendaProgressSummary() {
   const entries = await listAgendaEntries();
+  const done = entries.filter((e) => e.progress.status === "done").length;
+  const ongoing = entries.filter((e) => e.progress.status === "ongoing").length;
   const notStarted = entries.filter((e) => e.progress.status === "not_started").length;
-  return { total: entries.length, notStarted };
+  return { total: entries.length, done, ongoing, notStarted };
 }
 
 export async function listFollowUpItemOptions() {

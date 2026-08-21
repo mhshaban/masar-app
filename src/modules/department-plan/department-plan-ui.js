@@ -2,7 +2,6 @@ import {
   listPillars,
   listProjectsByPillar,
   getPlanStats,
-  getProgressStats,
   PILLARS,
   createProject,
   updateProject,
@@ -12,8 +11,12 @@ import {
   deleteAction,
   searchActions,
   getProject,
-  listProgressItems,
 } from "./department-plan-service.js";
+import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js";
+import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js";
+import { saveProgress } from "../execution/execution-service.js";
+import { buildFollowUpReportHtml } from "../../services/report-builders.js";
+import { downloadAsWordDoc } from "../../services/word-export.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -23,62 +26,39 @@ function esc(str) {
 
 const FIELD_STYLE = "padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;";
 
-function statusPill(status) {
-  const map = {
-    done: ["pill-success", "منجز"],
-    ongoing: ["pill-warning", "قيد الإنجاز"],
-    not_done: ["pill-critical", "لم يُنجز"],
-    unknown: ["pill-neutral", "غير محدد"],
-  };
-  const [cls, label] = map[status] || map.unknown;
+const AGENDA_STATUS_LABEL = {
+  not_started: ["pill-neutral", "لم يبدأ"],
+  ongoing: ["pill-warning", "قيد الإنجاز"],
+  done: ["pill-success", "تم"],
+};
+
+function agendaStatusPill(status) {
+  const [cls, label] = AGENDA_STATUS_LABEL[status] || AGENDA_STATUS_LABEL.not_started;
   return `<span class="pill dot ${cls}">${label}</span>`;
 }
 
-// عرض بنود تقرير المتابعة الرسمي (agendaStatus — لقطة تاريخية من التقرير
-// الرسمي المستورد، منفصلة عن تقرير المتابعة الحي بشاشة "تقرير المتابعة")
-// المطابقة لتصنيف "منجز" أو "متعثر/غير محدد" — كانت الأرقام معروضة بدون
-// أي طريقة لرؤية البنود نفسها خلفها.
-function progressItemRow(item) {
-  const map = {
-    done: ["pill-success", "منجز"],
-    ongoing: ["pill-warning", "قيد الإنجاز"],
-    not_done: ["pill-critical", "لم يُنجز"],
-    unknown: ["pill-neutral", "غير محدد"],
-  };
-  const [cls, label] = map[item.status] || map.unknown;
+function agendaEntryRow(entry) {
   return `
-    <li class="row-item" data-progress-item="${esc(item.id)}" style="flex-direction:column; align-items:stretch; cursor:pointer;">
-      <div style="display:flex; align-items:center; gap:10px; width:100%;">
-        <div class="body">
-          <div class="title">${item.no !== "*" ? `${esc(item.no)}. ` : ""}${esc(item.item)}</div>
-          ${item.obstacles ? `<div class="meta">${esc(item.obstacles)}</div>` : ""}
-        </div>
-        <span class="pill dot ${cls}">${label}</span>
+    <li class="row-item" data-entry-project="${esc(entry.projectId)}" data-entry-no="${esc(entry.no)}" style="cursor:pointer;">
+      <div class="body">
+        <div class="title">${esc(entry.action)}</div>
+        <div class="meta">${esc(entry.pillar)}${entry.project_title ? ` · ${esc(entry.project_title)}` : ""}</div>
       </div>
-      <div class="detail-slot"></div>
+      ${agendaStatusPill(entry.progress.status)}
     </li>
   `;
 }
 
-// يوضّح مصدر البند صراحةً — لقطة تاريخية مستوردة من تقرير المتابعة الرسمي
-// (agendaStatus)، بلا ربط حي بأي إجراء بخطة القسم أو مشروع، فحالته هنا لا
-// تتحدّث تلقائيًا ولا تتزامن مع أي حالة أخرى بنفس الاسم بالأجندة التنفيذية.
-function progressItemDetailHtml(item) {
-  return `
-    <div class="card" style="margin-top:8px; background:var(--paper-50);">
-      ${item.indicator ? `<p class="hint" style="margin:0 0 6px;"><strong>مؤشر الإنجاز:</strong> ${esc(item.indicator)}</p>` : ""}
-      ${item.parties ? `<p class="hint" style="margin:0 0 6px;"><strong>الجهات المعنية:</strong> ${esc(item.parties)}</p>` : ""}
-      ${item.obstacles ? `<p class="hint" style="margin:0 0 6px;"><strong>المعوقات:</strong> ${esc(item.obstacles)}</p>` : ""}
-      ${!item.indicator && !item.parties && !item.obstacles ? '<p class="hint" style="margin:0;">لا تفاصيل إضافية مسجَّلة لهذا البند.</p>' : ""}
-      <p class="hint" style="margin:8px 0 0; color:var(--ink-500);">هذا البند من تقرير المتابعة الرسمي المستورَد كلقطة تاريخية — <strong>غير مرتبط بأي إجراء حي بخطة القسم</strong>، فحالته هنا لا تتحدّث تلقائيًا ولا تعكس حالة أي إجراء مشابه بالاسم في الأجندة التنفيذية.</p>
-    </div>
-  `;
-}
-
-async function renderStats(root) {
+// المصدر الوحيد لإنجاز الخطة صار actionProgress الحيّ (نفس ما تعرضه
+// الأجندة التنفيذية) — بدل لقطة تقرير المتابعة الرسمي التاريخية
+// (agendaStatus) اللي كانت تتناقض أحيانًا مع نفس البند بالأجندة. البطاقتان
+// قابلتان للضغط لعرض قائمة الإجراءات الحية نفسها، والضغط على أي إجراء
+// يوديك لتعديله مباشرة (jumpToAction).
+async function renderStats(root, jumpToAction) {
   const plan = await getPlanStats();
-  const progress = await getProgressStats();
+  const progress = await getAgendaProgressSummary();
   const donePct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  const remaining = progress.ongoing + progress.notStarted;
 
   root.innerHTML = `
     <div class="grid g4" style="margin-bottom:16px;">
@@ -90,18 +70,18 @@ async function renderStats(root) {
         <div class="label">إجراءات الخطة الكلية</div>
         <div class="value">${plan.totalActions}</div>
       </div>
-      <div class="card stat" id="stat-done" style="cursor:pointer;">
-        <div class="label">إنجاز تقرير المتابعة الرسمي</div>
+      <div class="card stat" data-stat-toggle="done" style="cursor:pointer;">
+        <div class="label">إنجاز الخطة الفعلي</div>
         <div class="value">${donePct}٪</div>
-        <div class="delta up">${progress.done} من ${progress.total} بند منجز — اضغط للعرض</div>
+        <div class="delta up">${progress.done} من ${progress.total} إجراء منجز · اضغط للتفاصيل</div>
       </div>
-      <div class="card stat" id="stat-pending" style="cursor:pointer;">
-        <div class="label">بنود متعثرة أو غير محددة</div>
-        <div class="value">${progress.not_done + progress.unknown}</div>
-        <div class="delta down">${progress.not_done} لم يُنجز · ${progress.unknown} غير محدد — اضغط للعرض</div>
+      <div class="card stat" data-stat-toggle="remaining" style="cursor:pointer;">
+        <div class="label">إجراءات متبقية</div>
+        <div class="value">${remaining}</div>
+        <div class="delta down">${progress.ongoing} قيد الإنجاز · ${progress.notStarted} لم يبدأ · اضغط للتفاصيل</div>
       </div>
     </div>
-    <div id="progress-items-list" style="margin-bottom:20px;"></div>
+    <div id="plan-stats-detail"></div>
     <div class="card" style="margin-bottom:20px;">
       <h3>الإنجاز بحسب الخطة والمطلوب — لكل محور</h3>
       <p class="hint">عدد المشاريع والإجراءات المخطَّطة في كل محور من ملف الخطة الموحدة</p>
@@ -116,40 +96,39 @@ async function renderStats(root) {
     </div>
   `;
 
-  const listRoot = root.querySelector("#progress-items-list");
-  let openFilter = null;
+  const detailRoot = root.querySelector("#plan-stats-detail");
+  let openStat = null;
 
-  const draw = async () => {
-    if (!openFilter) { listRoot.innerHTML = ""; return; }
-    const items = await listProgressItems();
-    const filtered = openFilter === "done"
-      ? items.filter((i) => i.status === "done")
-      : items.filter((i) => i.status === "not_done" || i.status === "unknown");
-    const title = openFilter === "done" ? "البنود المنجزة" : "البنود المتعثرة أو غير المحددة";
-    listRoot.innerHTML = `
-      <div class="card">
-        <div class="card-head"><h3>${title}</h3><span class="pill pill-neutral">${filtered.length} بند</span></div>
-        ${filtered.length ? `<ul class="plain">${filtered.map(progressItemRow).join("")}</ul>` : '<div class="empty">لا يوجد بنود بهذا التصنيف</div>'}
+  const closeDetail = () => {
+    openStat = null;
+    detailRoot.innerHTML = "";
+    root.querySelectorAll("[data-stat-toggle]").forEach((c) => c.classList.remove("on"));
+  };
+
+  const openDetail = async (which) => {
+    openStat = which;
+    root.querySelectorAll("[data-stat-toggle]").forEach((c) => c.classList.toggle("on", c.dataset.statToggle === which));
+    const entries = await listAgendaEntries();
+    const filtered = which === "done"
+      ? entries.filter((e) => e.progress.status === "done")
+      : entries.filter((e) => e.progress.status !== "done");
+    detailRoot.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <h3>${which === "done" ? "الإجراءات المنجزة" : "الإجراءات المتبقية"}</h3>
+        ${filtered.length ? `<ul class="plain">${filtered.map(agendaEntryRow).join("")}</ul>` : '<p class="hint">لا توجد إجراءات هنا.</p>'}
       </div>
     `;
-
-    listRoot.querySelectorAll("[data-progress-item]").forEach((li) => {
-      li.addEventListener("click", () => {
-        const slot = li.querySelector(".detail-slot");
-        if (slot.innerHTML) { slot.innerHTML = ""; return; }
-        const item = filtered.find((i) => i.id === li.dataset.progressItem);
-        slot.innerHTML = progressItemDetailHtml(item);
-      });
+    detailRoot.querySelectorAll("[data-entry-project]").forEach((li) => {
+      li.addEventListener("click", () => jumpToAction(li.dataset.entryProject, Number(li.dataset.entryNo)));
     });
   };
 
-  root.querySelector("#stat-done").addEventListener("click", () => {
-    openFilter = openFilter === "done" ? null : "done";
-    draw();
-  });
-  root.querySelector("#stat-pending").addEventListener("click", () => {
-    openFilter = openFilter === "pending" ? null : "pending";
-    draw();
+  root.querySelectorAll("[data-stat-toggle]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const which = card.dataset.statToggle;
+      if (openStat === which) closeDetail();
+      else openDetail(which);
+    });
   });
 }
 
@@ -192,7 +171,10 @@ function readProjectForm(form) {
   };
 }
 
-function actionFormHtml(action) {
+// followUpItemId عمدًا بنموذج تعديل الإجراء نفسه بخطة القسم — بدل شاشة
+// تقرير المتابعة المستقلة اللي اتحذفت — عشان يصير كل شي (نص الإجراء،
+// الجهات، وربطه ببند التقرير الرسمي) بمكان واحد بلا تنقل بين صفحات.
+function actionFormHtml(action, followUpOptions, currentFollowUpItemId) {
   return `
     <tr class="action-form-row">
       <td colspan="5">
@@ -218,6 +200,13 @@ function actionFormHtml(action) {
             </div>
           </div>
           <p class="hint" style="margin:0;">تحديد التاريخين يرتّب هذا الإجراء زمنيًا بالأجندة التنفيذية تلقائيًا — بدونهما يبقى ضمن قسم "بلا تاريخ محدد".</p>
+          <div>
+            <label class="hint" style="display:block;margin-bottom:4px;">بند تقرير المتابعة الرسمي</label>
+            <select name="followUpItemId" style="width:100%; ${FIELD_STYLE}">
+              <option value="">بدون ربط</option>
+              ${followUpOptions.map((o) => `<option value="${esc(o.id)}" ${currentFollowUpItemId === o.id ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+            </select>
+          </div>
           <div data-role="form-actions" style="display:flex; gap:8px;">
             <button class="btn btn-primary" type="submit">حفظ الإجراء</button>
             <button class="btn btn-ghost" type="button" data-cancel="1">إلغاء</button>
@@ -248,7 +237,7 @@ function createEditState() {
   return { editingProjectId: null, newProjectPillar: null, addingActionFor: null, editingAction: null };
 }
 
-function renderProjects(root, projects, state, actions) {
+function renderProjects(root, projects, state, actions, followUpOptions, progressByActionId) {
   if (!projects.length && state.newProjectPillar == null) {
     root.innerHTML = '<div class="card"><div class="empty">لا توجد مشاريع في هذا المحور</div></div>';
     return;
@@ -275,7 +264,7 @@ function renderProjects(root, projects, state, actions) {
           <tbody>
             ${(project.actions || []).map((a) => (
               state.editingAction && state.editingAction.projectId === project.id && state.editingAction.no === a.no
-                ? actionFormHtml(a)
+                ? actionFormHtml(a, followUpOptions, progressByActionId.get(`${project.id}-a${a.no}`)?.followUpItemId || null)
                 : `
                   <tr data-action="${esc(project.id)}:${esc(a.no)}" style="cursor:pointer;">
                     <td class="num">${esc(a.no)}</td>
@@ -286,7 +275,7 @@ function renderProjects(root, projects, state, actions) {
                   </tr>
                 `
             )).join("")}
-            ${state.addingActionFor === project.id ? actionFormHtml(null) : ""}
+            ${state.addingActionFor === project.id ? actionFormHtml(null, followUpOptions, null) : ""}
           </tbody>
         </table></div>
         ${state.addingActionFor !== project.id ? `<button class="btn btn-ghost" style="margin-top:10px;" data-add-action="${esc(project.id)}">+ إضافة إجراء</button>` : ""}
@@ -356,11 +345,16 @@ function renderProjects(root, projects, state, actions) {
       e.preventDefault();
       e.stopPropagation();
       try {
+        const followUpItemId = form.followUpItemId.value || null;
+        let actionNo;
         if (state.addingActionFor === projectId) {
-          await addAction(projectId, readActionForm(form));
+          const created = await addAction(projectId, readActionForm(form));
+          actionNo = created.no;
         } else if (state.editingAction && state.editingAction.projectId === projectId) {
           await updateAction(projectId, state.editingAction.no, readActionForm(form));
+          actionNo = state.editingAction.no;
         }
+        if (actionNo != null) await saveProgress(`${projectId}-a${actionNo}`, { followUpItemId });
         await actions.onProjectChanged();
       } catch (err) { alert(err.message); }
     });
@@ -421,11 +415,56 @@ function renderSearchResults(root, results, onPick) {
   });
 }
 
+// عرض بديل لـ#plan-projects: بدل التصفح حسب المحور، يجمّع كل الإجراءات
+// الحية حسب بند تقرير المتابعة الرسمي اللي رُبطت فيه — هذا هو "تقرير
+// المتابعة" نفسه الآن، معروض من داخل خطة القسم بدل شاشة مستقلة (كان
+// يسبب تنقّلًا وتشتتًا بلا داعٍ بين ثلاث شاشات لنفس البيانات). بند بلا أي
+// إجراء مرتبط يظهر بوضوح كفجوة، وقسم منفصل بالأسفل يجمع الإجراءات اللي
+// لسا ما ربطناها بأي بند.
+async function renderFollowUpGroupedView(root, jumpToAction) {
+  const [bySection, unlinked] = await Promise.all([getFollowUpReport(), listUnlinkedActions()]);
+  root.innerHTML = `
+    ${[...bySection.entries()].map(([section, items]) => `
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head"><h3>${esc(section)}</h3><span class="pill pill-neutral">${items.length} بند</span></div>
+        <ul class="plain">
+          ${items.map((item) => `
+            <li class="row-item" style="flex-direction:column; align-items:stretch;">
+              <div style="display:flex; align-items:center; gap:10px; width:100%;">
+                <span class="pill pill-neutral">${esc(item.no)}</span>
+                <div class="body">
+                  <div class="title">${esc(item.title)}</div>
+                  ${item.indicator ? `<div class="meta">مؤشر الإنجاز: ${esc(item.indicator)}</div>` : ""}
+                </div>
+                ${agendaStatusPill(item.status)}
+              </div>
+              ${item.linkedActions.length
+                ? `<ul class="plain" style="margin-right:34px;">${item.linkedActions.map(agendaEntryRow).join("")}</ul>`
+                : '<p class="hint" style="margin:4px 0 0 34px;">لا يوجد إجراء مرتبط بعد بخطة القسم</p>'}
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+    `).join("")}
+    <div class="card">
+      <div class="card-head"><h3>إجراءات غير مربوطة بأي بند</h3><span class="pill pill-warning">${unlinked.length}</span></div>
+      <p class="hint">إجراءات خطة القسم اللي ما اتحدد لها بعد بند من تقرير المتابعة الرسمي — اربطها من نموذج تعديل الإجراء.</p>
+      ${unlinked.length ? `<ul class="plain">${unlinked.map(agendaEntryRow).join("")}</ul>` : '<p class="hint">كل الإجراءات مربوطة.</p>'}
+    </div>
+  `;
+  root.querySelectorAll("[data-entry-project]").forEach((li) => {
+    li.addEventListener("click", () => jumpToAction(li.dataset.entryProject, Number(li.dataset.entryNo)));
+  });
+}
+
 export async function mountDepartmentPlanView(container) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>خطة القسم — الإرشاد الأكاديمي والتوجيه المهني</h1><div class="sub">العام الدراسي 2025/2026 — من ملف الخطة الموحدة الفعلي، قابلة للتعديل</div></div>
-      <button class="btn btn-primary" id="plan-new-project-btn">+ مشروع جديد</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" id="plan-export-followup-btn">تصدير تقرير المتابعة (Word)</button>
+        <button class="btn btn-primary" id="plan-new-project-btn">+ مشروع جديد</button>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px;">
       <label class="hint" style="display:block; margin-bottom:6px;">بحث سريع عن إجراء (بنص الإجراء، المستهدف، المنفذ، أو المتابع) — يبحث بكل المحاور للوصول السريع للتعديل</label>
@@ -433,11 +472,13 @@ export async function mountDepartmentPlanView(container) {
       <div id="plan-search-results" style="margin-top:8px;"></div>
     </div>
     <div id="plan-stats"></div>
+    <div class="chip-row" id="plan-view-mode">
+      <div class="chip on" data-view-mode="pillar">حسب المحور</div>
+      <div class="chip" data-view-mode="followup">حسب بند تقرير المتابعة</div>
+    </div>
     <div class="chip-row" id="plan-pillars"></div>
     <div id="plan-projects"></div>
   `;
-
-  await renderStats(container.querySelector("#plan-stats"));
 
   const pillarsRoot = container.querySelector("#plan-pillars");
   const projectsRoot = container.querySelector("#plan-projects");
@@ -445,18 +486,24 @@ export async function mountDepartmentPlanView(container) {
   const searchResultsRoot = container.querySelector("#plan-search-results");
   const state = createEditState();
   let currentPillar = null;
+  let viewMode = "pillar";
+  const followUpOptions = await listFollowUpItemOptions();
 
   const draw = async () => {
-    const projects = currentPillar ? await listProjectsByPillar(currentPillar) : [];
+    const [projects, entries] = await Promise.all([
+      currentPillar ? listProjectsByPillar(currentPillar) : Promise.resolve([]),
+      listAgendaEntries(),
+    ]);
+    const progressByActionId = new Map(entries.map((e) => [e.id, e.progress]));
     const actionsApi = {
       onProjectChanged: async () => {
         Object.assign(state, createEditState());
-        await renderStats(container.querySelector("#plan-stats"));
+        await renderStats(container.querySelector("#plan-stats"), jumpToAction);
         await draw();
       },
       onProjectCreated: async (pillar) => {
         Object.assign(state, createEditState());
-        await renderStats(container.querySelector("#plan-stats"));
+        await renderStats(container.querySelector("#plan-stats"), jumpToAction);
         await selectPillar(pillar);
       },
       editProject: (id) => { state.editingProjectId = id; draw(); },
@@ -466,7 +513,7 @@ export async function mountDepartmentPlanView(container) {
       editAction: (projectId, no) => { state.editingAction = { projectId, no }; state.addingActionFor = null; draw(); },
       cancelActionForm: () => { state.addingActionFor = null; state.editingAction = null; draw(); },
     };
-    renderProjects(projectsRoot, projects, state, actionsApi);
+    renderProjects(projectsRoot, projects, state, actionsApi, followUpOptions, progressByActionId);
   };
 
   const selectPillar = async (pillar) => {
@@ -475,6 +522,36 @@ export async function mountDepartmentPlanView(container) {
     await renderPillarTabs(pillarsRoot, currentPillar, selectPillar);
     await draw();
   };
+
+  // من قائمة الإجراءات المنجزة/المتبقية بالبطاقات أعلاه، أو العرض حسب بند
+  // تقرير المتابعة، أو نتائج البحث — كلها تصب هنا: نموذج تعديل الإجراء
+  // نفسه. يرجّع العرض لوضع "حسب المحور" ويبدّل المحور إن لزم.
+  const jumpToAction = async (projectId, no) => {
+    searchInput.value = "";
+    searchResultsRoot.innerHTML = "";
+    const project = await getProject(projectId);
+    if (!project) return;
+    if (viewMode !== "pillar") await setViewMode("pillar");
+    if (currentPillar !== project.pillar) await selectPillar(project.pillar);
+    state.editingAction = { projectId, no };
+    state.addingActionFor = null;
+    await draw();
+    projectsRoot.querySelector(`[data-project="${CSS.escape(projectId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const viewModeRoot = container.querySelector("#plan-view-mode");
+  const setViewMode = async (mode) => {
+    viewMode = mode;
+    viewModeRoot.querySelectorAll("[data-view-mode]").forEach((c) => c.classList.toggle("on", c.dataset.viewMode === mode));
+    pillarsRoot.style.display = mode === "pillar" ? "" : "none";
+    if (mode === "pillar") await draw();
+    else await renderFollowUpGroupedView(projectsRoot, jumpToAction);
+  };
+  viewModeRoot.querySelectorAll("[data-view-mode]").forEach((chip) => {
+    chip.addEventListener("click", () => setViewMode(chip.dataset.viewMode));
+  });
+
+  await renderStats(container.querySelector("#plan-stats"), jumpToAction);
 
   const pillars = await renderPillarTabs(pillarsRoot, null, selectPillar);
   if (pillars[0]) await selectPillar(pillars[0]);
@@ -485,17 +562,22 @@ export async function mountDepartmentPlanView(container) {
     draw();
   });
 
-  const jumpToAction = async (projectId, no) => {
-    searchInput.value = "";
-    searchResultsRoot.innerHTML = "";
-    const project = await getProject(projectId);
-    if (!project) return;
-    await selectPillar(project.pillar);
-    state.editingAction = { projectId, no };
-    state.addingActionFor = null;
-    await draw();
-    projectsRoot.querySelector(`[data-project="${CSS.escape(projectId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
+  container.querySelector("#plan-export-followup-btn").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "جارٍ التحضير...";
+    try {
+      const [bySection, stats] = await Promise.all([getFollowUpReport(), getStatsSummary()]);
+      const html = buildFollowUpReportHtml(bySection, stats, new Date().toLocaleString("ar-BH"));
+      downloadAsWordDoc("تقرير المتابعة والإحصائيات", html, `تقرير-المتابعة-${new Date().toISOString().slice(0, 10)}`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
 
   searchInput.addEventListener("input", async () => {
     const query = searchInput.value;

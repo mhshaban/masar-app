@@ -20,13 +20,21 @@ test("getAgendaProgressSummary counts total actions and how many have not been s
   ]);
 
   const summary = await getAgendaProgressSummary();
-  assert.equal(summary.total, 3);
-  assert.equal(summary.notStarted, 1);
+  assert.deepEqual(summary, { total: 3, done: 1, ongoing: 1, notStarted: 1 });
 });
 
 test("getAgendaProgressSummary returns zeros when there are no actions yet", async () => {
   const summary = await getAgendaProgressSummary();
-  assert.deepEqual(summary, { total: 0, notStarted: 0 });
+  assert.deepEqual(summary, { total: 0, done: 0, ongoing: 0, notStarted: 0 });
+});
+
+test("listAgendaEntries includes projectId/no explicitly on each entry, not just the combined id string (project ids can contain '-', making id-splitting unreliable)", async () => {
+  await bulkPut("departmentPlanProjects", [
+    { id: "abc-123-def", pillar: "القيادة", project_title: "م", actions: [{ no: 7, action: "أ" }] },
+  ]);
+  const entries = await listAgendaEntries();
+  assert.equal(entries[0].projectId, "abc-123-def");
+  assert.equal(entries[0].no, 7);
 });
 
 test("groupByPeriod orders groups chronologically by their earliest periodStart, not by the order actions appear in the file (real bug reported by the counselor)", async () => {

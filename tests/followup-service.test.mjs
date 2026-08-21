@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear } from "../src/services/cloud-runtime.js";
-import { getFollowUpReport, getStatsSummary, setManualOverride, listUnlinkedActions } from "../src/modules/followup/followup-service.js";
+import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../src/modules/followup/followup-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -26,7 +26,7 @@ beforeEach(async () => {
 
   await bulkPut("followUpItems", [
     { id: "item1", no: 1, title: "بند مرتبط بالكامل", section: "S1", order: 1 },
-    { id: "item2", no: 2, title: "بند بلا إجراءات مرتبطة", section: "S1", order: 2, manualStatus: "done", manualSummary: "يدوي", manualParticipants: 7 },
+    { id: "item2", no: 2, title: "بند بلا إجراءات مرتبطة", section: "S1", order: 2, importedStatus: "done", summary: "قديم مستورد" },
     { id: "item3", no: 3, title: "بند مرتبط جزئيًا", section: "S2", order: 3 },
   ]);
 
@@ -42,25 +42,24 @@ beforeEach(async () => {
 test("a follow-up item's status is computed as done only when every linked action is done", async () => {
   const bySection = await getFollowUpReport();
   const item1 = bySection.get("S1").find((r) => r.id === "item1");
-  assert.equal(item1.isComputed, true);
   assert.equal(item1.status, "done");
   assert.equal(item1.totalParticipants, 15);
   assert.equal(item1.summary, "p1 · p2");
 });
 
-test("a follow-up item with no linked actions falls back to its manual override", async () => {
+test("a follow-up item with no linked actions in خطة القسم shows not_started — no manual override, no fallback to the old imported status", async () => {
   const bySection = await getFollowUpReport();
   const item2 = bySection.get("S1").find((r) => r.id === "item2");
-  assert.equal(item2.isComputed, false);
-  assert.equal(item2.status, "done");
-  assert.equal(item2.totalParticipants, 7);
-  assert.equal(item2.summary, "يدوي");
+  assert.equal(item2.status, "not_started");
+  assert.equal(item2.totalParticipants, 0);
+  assert.equal(item2.summary, null);
+  // importedStatus data survives untouched on the raw record — just unused for the computed row
+  assert.equal(item2.importedStatus, "done");
 });
 
 test("a partially-done set of linked actions computes to ongoing, not done", async () => {
   const bySection = await getFollowUpReport();
   const item3 = bySection.get("S2").find((r) => r.id === "item3");
-  assert.equal(item3.isComputed, true);
   assert.equal(item3.status, "ongoing");
   assert.equal(item3.totalParticipants, 3);
   assert.equal(item3.summary, "p3 · a4");
@@ -69,34 +68,20 @@ test("a partially-done set of linked actions computes to ongoing, not done", asy
 test("getStatsSummary rolls up per-section and overall completion correctly", async () => {
   const stats = await getStatsSummary();
   assert.equal(stats.totalItems, 3);
-  assert.equal(stats.doneItems, 2);
-  assert.equal(stats.totalParticipants, 25);
+  assert.equal(stats.doneItems, 1);
+  assert.equal(stats.totalParticipants, 18);
   assert.equal(stats.actionsExecuted, 3);
-  assert.equal(stats.completionPct, 67);
+  assert.equal(stats.completionPct, 33);
 
   const s1 = stats.sections.find((s) => s.section === "S1");
   assert.equal(s1.total, 2);
-  assert.equal(s1.done, 2);
-  assert.equal(s1.completionPct, 100);
+  assert.equal(s1.done, 1);
+  assert.equal(s1.completionPct, 50);
 
   const s2 = stats.sections.find((s) => s.section === "S2");
   assert.equal(s2.total, 1);
   assert.equal(s2.done, 0);
   assert.equal(s2.completionPct, 0);
-});
-
-test("setManualOverride patches only the targeted follow-up item", async () => {
-  const updated = await setManualOverride("item2", { manualStatus: "ongoing" });
-  assert.equal(updated.manualStatus, "ongoing");
-  assert.equal(updated.manualSummary, "يدوي");
-
-  const bySection = await getFollowUpReport();
-  const item2 = bySection.get("S1").find((r) => r.id === "item2");
-  assert.equal(item2.status, "ongoing");
-});
-
-test("setManualOverride on a missing item id is a no-op that returns null", async () => {
-  assert.equal(await setManualOverride("does-not-exist", { manualStatus: "done" }), null);
 });
 
 test("listUnlinkedActions surfaces actions with no follow-up item assigned", async () => {

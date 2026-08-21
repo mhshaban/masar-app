@@ -27,19 +27,6 @@ export async function getPlanStats() {
   return { totalProjects, totalActions, byPillar };
 }
 
-export async function getProgressStats() {
-  const items = await listAll("agendaStatus");
-  const stats = { total: items.length, done: 0, ongoing: 0, not_done: 0, unknown: 0 };
-  for (const item of items) {
-    stats[item.status] = (stats[item.status] || 0) + 1;
-  }
-  return stats;
-}
-
-export async function listProgressItems() {
-  return listAll("agendaStatus");
-}
-
 export async function getProject(id) {
   return get("departmentPlanProjects", id);
 }

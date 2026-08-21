@@ -4,7 +4,6 @@ import { getSession, getCurrentProfile, refreshProfile, login, logout } from "./
 import { mountDashboardView } from "./modules/dashboard/dashboard-ui.js";
 import { mountDepartmentPlanView } from "./modules/department-plan/department-plan-ui.js";
 import { mountAgendaView } from "./modules/agenda/agenda-ui.js";
-import { mountFollowUpView } from "./modules/followup/followup-ui.js";
 import { mountStudentsView } from "./modules/students/students-ui.js";
 import { mountGradesView } from "./modules/grades/grades-ui.js";
 import { mountCasesView } from "./modules/cases/guidance-ui.js";
@@ -96,9 +95,6 @@ async function renderView(viewName) {
       break;
     case "agenda":
       await mountAgendaView(main);
-      break;
-    case "followup":
-      await mountFollowUpView(main);
       break;
     case "students":
       await mountStudentsView(main);
