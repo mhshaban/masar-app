@@ -1,4 +1,4 @@
-import { listAgendaEntries, groupByPeriod, listFollowUpItemOptions } from "./agenda-service.js";
+import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
 import { saveProgress, addAttachment, removeAttachment } from "../execution/execution-service.js";
 import { buildAgendaReportHtml } from "../../services/report-builders.js";
 import { downloadAsWordDoc } from "../../services/word-export.js";
@@ -97,8 +97,8 @@ function editForm(entry, followUpOptions) {
   `;
 }
 
-async function mountEntries(root, entries, followUpOptions, refresh) {
-  const groups = await groupByPeriod(entries);
+async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
+  const groups = sortMode === "text" ? await groupByPeriod(entries) : await groupByMonth(entries);
   const followUpLabels = new Map(followUpOptions.map((o) => [o.id, o.label]));
 
   root.innerHTML = [...groups.entries()].map(([period, items]) => {
@@ -194,7 +194,7 @@ async function mountEntries(root, entries, followUpOptions, refresh) {
 export async function mountAgendaView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الأجندة التنفيذية</h1><div class="sub">كل إجراءات خطة القسم مجمّعة بحسب فترة التنفيذ الفعلية في الملف</div></div>
+      <div><h1>الأجندة التنفيذية</h1><div class="sub">كل إجراءات خطة القسم — مجمّعة افتراضيًا بحسب تاريخ التنفيذ، أو بحسب نص الفترة الأصلي من الملف</div></div>
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
     </div>
     <div class="sens" style="border-color: var(--warning); background: var(--warning-bg); color: var(--warning);">
@@ -203,10 +203,15 @@ export async function mountAgendaView(container) {
     <div class="card" style="margin-bottom:16px;">
       <p class="hint" style="margin:0;">اضغط على أي إجراء لتسجيل حالته وعدد المستفيدين والثبوتية، ولربطه ببند من تقرير المتابعة الرسمي — هذا التحديث الوحيد الذي تحتاجه؛ تقرير المتابعة والإحصائيات يُحسبان منه تلقائيًا.</p>
     </div>
+    <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
+      <div class="tab active" data-sort="date" role="tab" aria-selected="true">حسب التاريخ</div>
+      <div class="tab" data-sort="text" role="tab" aria-selected="false">حسب نص الفترة</div>
+    </div>
     <div id="agenda-groups"></div>
   `;
 
   const root = container.querySelector("#agenda-groups");
+  let sortMode = "date";
 
   const refresh = async () => {
     const [entries, followUpOptions] = await Promise.all([listAgendaEntries(), listFollowUpItemOptions()]);
@@ -214,8 +219,20 @@ export async function mountAgendaView(container) {
       root.innerHTML = '<div class="card"><div class="empty">لا توجد بيانات أجندة بعد</div></div>';
       return;
     }
-    await mountEntries(root, entries, followUpOptions, refresh);
+    await mountEntries(root, entries, followUpOptions, refresh, sortMode);
   };
+
+  container.querySelectorAll("[data-sort]").forEach((tab) => {
+    tab.addEventListener("click", async () => {
+      if (tab.dataset.sort === sortMode) return;
+      sortMode = tab.dataset.sort;
+      container.querySelectorAll("[data-sort]").forEach((t) => {
+        t.classList.toggle("active", t === tab);
+        t.setAttribute("aria-selected", String(t === tab));
+      });
+      await refresh();
+    });
+  });
 
   await refresh();
 

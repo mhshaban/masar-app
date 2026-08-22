@@ -86,6 +86,40 @@ export async function groupByPeriod(entries) {
   return new Map(sortedEntries);
 }
 
+const NO_DATE_LABEL = "بلا تاريخ محدد";
+
+// اسم شهر عربي كامل (مثال: "سبتمبر 2025") من مفتاح "YYYY-MM" — يبني
+// التاريخ محليًا بيوم 1 صراحةً (لا تحليل ISO عبر Date مباشرة) لتفادي
+// انزياح المنطقة الزمنية اللي ممكن يحوّل يوم 1 لنهاية الشهر السابق.
+function monthLabel(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("ar-BH", { month: "long", year: "numeric" });
+}
+
+// تجميع بحسب فترة التنفيذ الرقمية (periodStart) — الترتيب الافتراضي
+// الآن بطلب المرشد، بديل عن التجميع بنص الفترة الحر (groupByPeriod أعلاه،
+// لا يزال متاحًا كخيار ثانٍ من الواجهة). كل إجراءات نفس الشهر (بحسب
+// periodStart) تُجمَّع ببطاقة واحدة، والأشهر مرتَّبة زمنيًا تصاعديًا؛
+// إجراء بلا periodStart إطلاقًا يظهر بمجموعة "بلا تاريخ محدد" الوحيدة
+// دائمًا بآخر الترتيب — نفس مكانه بالضبط بالتجميع النصي، لنفس السبب
+// (لا تاريخ فعلي يُرتَّب بحسبه).
+export async function groupByMonth(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = entry.periodStart ? entry.periodStart.slice(0, 7) : NO_DATE_LABEL;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+
+  const sortedKeys = [...groups.keys()].filter((k) => k !== NO_DATE_LABEL).sort();
+  const orderedEntries = sortedKeys.map((key) => [monthLabel(key), sortEntriesByDate(groups.get(key))]);
+  if (groups.has(NO_DATE_LABEL)) {
+    orderedEntries.push([NO_DATE_LABEL, sortEntriesByDate(groups.get(NO_DATE_LABEL))]);
+  }
+
+  return new Map(orderedEntries);
+}
+
 // إحصائية أجندة قابلة للحساب فعليًا — "فترة التنفيذ" بخطة القسم نص حر
 // (مثال حقيقي: "طوال العام الدراسي"، "الأسبوع الثاني من سبتمبر") لا
 // تواريخ فعلية، فـ"إجراءات قريبة من نهاية فترتها" غير قابل للحساب بموثوقية؛
