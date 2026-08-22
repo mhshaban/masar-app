@@ -24,12 +24,33 @@ export function ratingForPct(pct) {
 
 export const TIER_LABELS = { high: "متفوقون", medium: "متوسطو التحصيل", low: "متدنو التحصيل" };
 
+async function loadGradesAndStudents() {
+  const [grades, students] = await Promise.all([listAll("grades"), listStudents()]);
+  return { grades, students };
+}
+
+// Both classification views (overall + per-subject) need the same full
+// grades+students fetch — calling them separately (as the classification
+// tab used to) downloaded the entire school's grades table twice in
+// parallel for one screen. Same class of bug as the dashboard's old
+// double-fetch; this fetches once and reuses it for both.
+export async function computeAchievement() {
+  const data = await loadGradesAndStudents();
+  return {
+    studentAchievement: await computeStudentAchievement(data),
+    subjectAchievement: await computeSubjectAchievement(data),
+  };
+}
+
 // One row per student who has at least one graded (non-absent/barred) row —
 // overall average, official-scale rating, and any subject averaging under
 // 50% by name (so a strong-average student with one failing subject still
 // surfaces it). Sorted worst-average-first since that's the actionable end.
-export async function computeStudentAchievement() {
-  const [grades, students] = await Promise.all([listAll("grades"), listStudents()]);
+// Accepts already-fetched {grades, students} to avoid a redundant fetch when
+// called alongside computeSubjectAchievement (see computeAchievement above);
+// fetches its own when called standalone.
+export async function computeStudentAchievement(preloaded) {
+  const { grades, students } = preloaded || (await loadGradesAndStudents());
   const studentById = new Map(students.map((s) => [String(s.id), s]));
 
   const byStudent = new Map();
@@ -82,9 +103,10 @@ export async function computeStudentAchievement() {
 // student can be an overall "متفوق" and still be "متدني التحصيل" in one
 // specific subject, which the overall view alone can't surface as its own
 // list. One entry per subject name, each holding every student's rating in
-// that subject only.
-export async function computeSubjectAchievement() {
-  const [grades, students] = await Promise.all([listAll("grades"), listStudents()]);
+// that subject only. Accepts already-fetched {grades, students} — see
+// computeStudentAchievement above.
+export async function computeSubjectAchievement(preloaded) {
+  const { grades, students } = preloaded || (await loadGradesAndStudents());
   const studentById = new Map(students.map((s) => [String(s.id), s]));
 
   const bySubject = new Map();
