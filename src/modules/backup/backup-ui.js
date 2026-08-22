@@ -1,6 +1,7 @@
 import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js";
 import { count } from "../../services/cloud-runtime.js";
 import { COLLECTIONS } from "../../core/config.js";
+import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -55,7 +56,7 @@ async function renderExportSection(root) {
     <div class="card">
       <h2>تصدير نسخة احتياطية</h2>
       <p class="hint">يحمّل ملف JSON واحد يحتوي كل بيانات مسار (الخطة، الأجندة، سجل الطلبة، الدرجات، التذكيرات...) — احتفظ به في مكان آمن (بريدك، قرص خارجي).</p>
-      <div id="export-summary"><p class="hint">جارٍ حساب أعداد السجلات…</p></div>
+      <div id="export-summary">${loadingHtml("جارٍ حساب أعداد السجلات…")}</div>
       <button class="btn btn-primary" id="export-btn" style="margin-top:12px;" disabled>تنزيل نسخة احتياطية الآن</button>
       <div id="export-status" style="margin-top:8px;"></div>
     </div>
@@ -70,7 +71,7 @@ async function renderExportSection(root) {
     for (const name of COLLECTIONS) counts[name] = await count(name);
     summaryRoot.innerHTML = renderSummary(counts);
   } catch (err) {
-    summaryRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر حساب أعداد السجلات: ${esc(err.message)}</p>`;
+    summaryRoot.innerHTML = errorHtml(`تعذّر حساب أعداد السجلات: ${err.message}`);
   }
   exportBtn.disabled = false;
 
@@ -82,8 +83,10 @@ async function renderExportSection(root) {
     try {
       const fresh = await buildBackup();
       downloadBackup(fresh);
+      showToast("تم تنزيل النسخة الاحتياطية بنجاح");
     } catch (err) {
-      statusRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر التصدير: ${esc(err.message)}</p>`;
+      statusRoot.innerHTML = errorHtml(`تعذّر التصدير: ${err.message}`);
+      showToast(`تعذّر التصدير: ${err.message}`, { type: "error" });
     } finally {
       exportBtn.disabled = false;
       exportBtn.textContent = originalLabel;
@@ -107,10 +110,21 @@ function renderImportSection(root, onRestored) {
   const fileInput = root.querySelector("#import-file");
   const previewRoot = root.querySelector("#import-preview");
 
+  const MAX_BACKUP_BYTES = 100 * 1024 * 1024; // نسخة كاملة حقيقية بأكبر جدول حالي (~23 ألف صف درجات) أقل من هذا بكثير — أي ملف أكبر غالبًا تالف أو ليس نسخة مسار
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files[0];
     if (!file) return;
-    previewRoot.innerHTML = '<p class="hint">جارٍ القراءة…</p>';
+    if (!/\.json$/i.test(file.name)) {
+      previewRoot.innerHTML = errorHtml("الملف يجب أن يكون بصيغة JSON (.json)");
+      fileInput.value = "";
+      return;
+    }
+    if (file.size > MAX_BACKUP_BYTES) {
+      previewRoot.innerHTML = errorHtml(`حجم الملف كبير جدًا (${(file.size / 1024 / 1024).toFixed(1)} م.ب) — تأكد أنه نسخة احتياطية حقيقية من مسار`);
+      fileInput.value = "";
+      return;
+    }
+    previewRoot.innerHTML = loadingHtml("جارٍ القراءة…");
     try {
       const text = await file.text();
       const data = parseBackupFile(text);
@@ -121,13 +135,19 @@ function renderImportSection(root, onRestored) {
         <button class="btn btn-primary" id="restore-btn" style="margin-top:12px; background:var(--critical);">استبدال كل البيانات الحالية بهذه النسخة</button>
       `;
       previewRoot.querySelector("#restore-btn").addEventListener("click", async () => {
-        if (!confirm("سيُستبدل كل بيانات مسار المشتركة (لكل المرشدين، وليس هذا الجهاز فقط) بمحتوى الملف نهائيًا. هل أنت متأكد؟")) return;
-        await restoreBackup(data);
-        previewRoot.innerHTML = '<p class="hint">تم الاستعادة بنجاح. جارٍ إعادة التحميل…</p>';
-        await onRestored();
+        if (!confirmDialog("سيُستبدل كل بيانات مسار المشتركة (لكل المرشدين، وليس هذا الجهاز فقط) بمحتوى الملف نهائيًا. هل أنت متأكد؟")) return;
+        previewRoot.innerHTML = loadingHtml("جارٍ الاستعادة…");
+        try {
+          await restoreBackup(data);
+          previewRoot.innerHTML = '<p class="hint" role="status">تم الاستعادة بنجاح. جارٍ إعادة التحميل…</p>';
+          await onRestored();
+        } catch (err) {
+          previewRoot.innerHTML = errorHtml(`تعذّرت الاستعادة: ${err.message}`);
+          showToast(`تعذّرت الاستعادة: ${err.message}`, { type: "error" });
+        }
       });
     } catch (err) {
-      previewRoot.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(err.message)}</p>`;
+      previewRoot.innerHTML = errorHtml(err.message);
     }
   });
 }

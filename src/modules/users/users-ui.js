@@ -3,6 +3,7 @@
 // admin-users Edge Function بمفتاح service_role من طرف الخادم — لا صلاحيات
 // إدارية تُتحقق أو تُمنح من الواجهة نفسها.
 import { listUsers, createAccount, setAccountActive, resetAccountPassword } from "../../services/auth-service.js";
+import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -12,18 +13,18 @@ function esc(str) {
 
 async function renderList(container) {
   const listRoot = container.querySelector("#users-list");
-  listRoot.innerHTML = '<div class="empty">جارٍ التحميل…</div>';
+  listRoot.innerHTML = loadingHtml();
 
   let users;
   try {
     ({ users } = await listUsers());
   } catch (err) {
-    listRoot.innerHTML = `<div class="empty">تعذّر تحميل الحسابات: ${esc(err.message)}</div>`;
+    listRoot.innerHTML = errorHtml(`تعذّر تحميل الحسابات: ${err.message}`);
     return;
   }
 
   if (!users.length) {
-    listRoot.innerHTML = '<div class="empty">لا يوجد حسابات بعد</div>';
+    listRoot.innerHTML = emptyHtml("لا يوجد حسابات بعد");
     return;
   }
 
@@ -55,12 +56,13 @@ async function renderList(container) {
       const row = btn.closest("[data-id]");
       const userId = row.dataset.id;
       const currentlyActive = btn.dataset.active === "true";
-      if (currentlyActive && !confirm("تعطيل هذا الحساب يمنعه من الدخول فورًا — متأكد؟")) return;
+      if (currentlyActive && !confirmDialog("تعطيل هذا الحساب يمنعه من الدخول فورًا — متأكد؟")) return;
       try {
         await setAccountActive(userId, !currentlyActive);
+        showToast(currentlyActive ? "تم تعطيل الحساب" : "تم تفعيل الحساب");
         await renderList(container);
       } catch (err) {
-        alert(err.message);
+        showToast(err.message, { type: "error" });
       }
     });
   });
@@ -73,9 +75,9 @@ async function renderList(container) {
       if (!password) return;
       try {
         await resetAccountPassword(userId, password);
-        alert("تم تغيير كلمة المرور.");
+        showToast("تم تغيير كلمة المرور");
       } catch (err) {
-        alert(err.message);
+        showToast(err.message, { type: "error" });
       }
     });
   });
@@ -121,9 +123,10 @@ export async function mountUsersView(container) {
         isAdmin: form.isAdmin.checked,
       });
       form.reset();
+      showToast("تم إنشاء الحساب");
       await renderList(container);
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, { type: "error" });
     }
   });
 
