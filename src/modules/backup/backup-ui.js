@@ -53,7 +53,7 @@ function renderSummary(counts) {
 async function renderExportSection(root) {
   root.innerHTML = `
     <div class="card">
-      <h3>تصدير نسخة احتياطية</h3>
+      <h2>تصدير نسخة احتياطية</h2>
       <p class="hint">يحمّل ملف JSON واحد يحتوي كل بيانات مسار (الخطة، الأجندة، سجل الطلبة، الدرجات، التذكيرات...) — احتفظ به في مكان آمن (بريدك، قرص خارجي).</p>
       <div id="export-summary"><p class="hint">جارٍ حساب أعداد السجلات…</p></div>
       <button class="btn btn-primary" id="export-btn" style="margin-top:12px;" disabled>تنزيل نسخة احتياطية الآن</button>
@@ -94,12 +94,12 @@ async function renderExportSection(root) {
 function renderImportSection(root, onRestored) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
-      <h3>استيراد نسخة احتياطية</h3>
+      <h2>استيراد نسخة احتياطية</h2>
       <div class="sens">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
         <div><strong>تنبيه:</strong> البيانات مشتركة سحابيًا لكل الحسابات النشطة — هذا الاستيراد يستبدل بيانات الجميع (كل المرشدين، من أي جهاز)، وليس بيانات هذا الجهاز فقط. لا يوجد دمج. صدّر نسخة من البيانات الحالية أولًا إن أردت الاحتفاظ بها.</div>
       </div>
-      <input type="file" id="import-file" accept="application/json,.json" style="margin-bottom:12px;">
+      <input type="file" id="import-file" aria-label="ملف النسخة الاحتياطية (JSON)" accept="application/json,.json" style="margin-bottom:12px;">
       <div id="import-preview"></div>
     </div>
   `;

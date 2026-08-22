@@ -56,28 +56,28 @@ function editForm(entry, followUpOptions) {
     <div class="card" style="margin-top:8px; background:var(--paper-50);">
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
-          <label class="hint" style="display:block;margin-bottom:4px;">الحالة</label>
-          <select data-field="status" style="padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <label class="hint" for="agenda-edit-status" style="display:block;margin-bottom:4px;">الحالة</label>
+          <select id="agenda-edit-status" data-field="status" style="padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
             <option value="not_started" ${p.status === "not_started" ? "selected" : ""}>لم يبدأ</option>
             <option value="ongoing" ${p.status === "ongoing" ? "selected" : ""}>قيد الإنجاز</option>
             <option value="done" ${p.status === "done" ? "selected" : ""}>تم</option>
           </select>
         </div>
         <div>
-          <label class="hint" style="display:block;margin-bottom:4px;">عدد المستفيدين</label>
-          <input data-field="participantsCount" type="number" min="0" value="${p.participantsCount ?? ""}" style="width:110px; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <label class="hint" for="agenda-edit-participants" style="display:block;margin-bottom:4px;">عدد المستفيدين</label>
+          <input id="agenda-edit-participants" data-field="participantsCount" type="number" min="0" value="${p.participantsCount ?? ""}" style="width:110px; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:180px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">الثبوتية الفعلية</label>
-          <input data-field="proofNote" type="text" value="${esc(p.proofNote ?? "")}" placeholder="ما الدليل الذي تم توثيقه فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <label class="hint" for="agenda-edit-proof" style="display:block;margin-bottom:4px;">الثبوتية الفعلية</label>
+          <input id="agenda-edit-proof" data-field="proofNote" type="text" value="${esc(p.proofNote ?? "")}" placeholder="ما الدليل الذي تم توثيقه فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:160px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">معوقات التنفيذ</label>
-          <input data-field="obstacles" type="text" value="${esc(p.obstacles ?? "")}" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <label class="hint" for="agenda-edit-obstacles" style="display:block;margin-bottom:4px;">معوقات التنفيذ</label>
+          <input id="agenda-edit-obstacles" data-field="obstacles" type="text" value="${esc(p.obstacles ?? "")}" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:200px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">ربط ببند تقرير المتابعة</label>
-          <select data-field="followUpItemId" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <label class="hint" for="agenda-edit-followup" style="display:block;margin-bottom:4px;">ربط ببند تقرير المتابعة</label>
+          <select id="agenda-edit-followup" data-field="followUpItemId" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
             <option value="">بدون ربط</option>
             ${followUpOptions.map((o) => `<option value="${esc(o.id)}" ${p.followUpItemId === o.id ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
           </select>
@@ -85,13 +85,13 @@ function editForm(entry, followUpOptions) {
         <button class="btn btn-primary" data-action="save-progress" style="padding:8px 16px;">حفظ</button>
       </div>
       <div style="margin-top:12px;">
-        <label class="hint" style="display:block;margin-bottom:4px;">تقرير الفعالية</label>
-        <textarea data-field="effectivenessReport" rows="3" placeholder="ما مدى فعالية هذا الإجراء؟ ماذا تحقق فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; resize:vertical;">${esc(p.effectivenessReport ?? "")}</textarea>
+        <label class="hint" for="agenda-edit-effectiveness" style="display:block;margin-bottom:4px;">تقرير الفعالية</label>
+        <textarea id="agenda-edit-effectiveness" data-field="effectivenessReport" rows="3" placeholder="ما مدى فعالية هذا الإجراء؟ ماذا تحقق فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; resize:vertical;">${esc(p.effectivenessReport ?? "")}</textarea>
       </div>
       <div style="margin-top:12px;">
-        <label class="hint" style="display:block;margin-bottom:4px;">الثبوتيات المرفَقة (صور، مستندات...)</label>
+        <label class="hint" for="agenda-edit-attachment" style="display:block;margin-bottom:4px;">الثبوتيات المرفَقة (صور، مستندات...)</label>
         <div class="attachments-list">${attachmentsListHtml(p.attachments)}</div>
-        <input type="file" data-role="attachment-input" style="margin-top:8px;">
+        <input id="agenda-edit-attachment" type="file" data-role="attachment-input" style="margin-top:8px;">
       </div>
     </div>
   `;
@@ -109,7 +109,7 @@ async function mountEntries(root, entries, followUpOptions, refresh) {
     return `
     <div class="card" style="margin-bottom:14px;">
       <div class="card-head">
-        <h3>${esc(period)}</h3>
+        <h2>${esc(period)}</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           ${dateRange}
           <span class="pill pill-neutral">${items.length} إجراء</span>

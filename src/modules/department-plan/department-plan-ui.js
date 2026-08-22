@@ -83,7 +83,7 @@ async function renderStats(root, jumpToAction) {
     </div>
     <div id="plan-stats-detail"></div>
     <div class="card" style="margin-bottom:20px;">
-      <h3>الإنجاز بحسب الخطة والمطلوب — لكل محور</h3>
+      <h2>الإنجاز بحسب الخطة والمطلوب — لكل محور</h2>
       <p class="hint">عدد المشاريع والإجراءات المخطَّطة في كل محور من ملف الخطة الموحدة</p>
       <div class="tablewrap"><table>
         <thead><tr><th>المحور</th><th>عدد المشاريع</th><th>عدد الإجراءات</th></tr></thead>
@@ -114,7 +114,7 @@ async function renderStats(root, jumpToAction) {
       : entries.filter((e) => e.progress.status !== "done");
     detailRoot.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
-        <h3>${which === "done" ? "الإجراءات المنجزة" : "الإجراءات المتبقية"}</h3>
+        <h2>${which === "done" ? "الإجراءات المنجزة" : "الإجراءات المتبقية"}</h2>
         ${filtered.length ? `<ul class="plain">${filtered.map(agendaEntryRow).join("")}</ul>` : '<p class="hint">لا توجد إجراءات هنا.</p>'}
       </div>
     `;
@@ -191,18 +191,18 @@ function actionFormHtml(action, followUpOptions, currentFollowUpItemId) {
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
             <div style="flex:1; min-width:140px;">
-              <label class="hint" style="display:block;margin-bottom:4px;">تاريخ بداية التنفيذ (اختياري)</label>
-              <input name="periodStart" type="date" value="${esc(action?.periodStart) || ""}" style="width:100%; ${FIELD_STYLE}">
+              <label class="hint" for="plan-action-period-start" style="display:block;margin-bottom:4px;">تاريخ بداية التنفيذ (اختياري)</label>
+              <input id="plan-action-period-start" name="periodStart" type="date" value="${esc(action?.periodStart) || ""}" style="width:100%; ${FIELD_STYLE}">
             </div>
             <div style="flex:1; min-width:140px;">
-              <label class="hint" style="display:block;margin-bottom:4px;">تاريخ نهاية التنفيذ (اختياري)</label>
-              <input name="periodEnd" type="date" value="${esc(action?.periodEnd) || ""}" style="width:100%; ${FIELD_STYLE}">
+              <label class="hint" for="plan-action-period-end" style="display:block;margin-bottom:4px;">تاريخ نهاية التنفيذ (اختياري)</label>
+              <input id="plan-action-period-end" name="periodEnd" type="date" value="${esc(action?.periodEnd) || ""}" style="width:100%; ${FIELD_STYLE}">
             </div>
           </div>
           <p class="hint" style="margin:0;">تحديد التاريخين يرتّب هذا الإجراء زمنيًا بالأجندة التنفيذية تلقائيًا — بدونهما يبقى ضمن قسم "بلا تاريخ محدد".</p>
           <div>
-            <label class="hint" style="display:block;margin-bottom:4px;">بند تقرير المتابعة الرسمي</label>
-            <select name="followUpItemId" style="width:100%; ${FIELD_STYLE}">
+            <label class="hint" for="plan-action-followup" style="display:block;margin-bottom:4px;">بند تقرير المتابعة الرسمي</label>
+            <select id="plan-action-followup" name="followUpItemId" style="width:100%; ${FIELD_STYLE}">
               <option value="">بدون ربط</option>
               ${followUpOptions.map((o) => `<option value="${esc(o.id)}" ${currentFollowUpItemId === o.id ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
             </select>
@@ -249,7 +249,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
       <div class="card" style="margin-bottom:16px;" data-project="${esc(project.id)}">
         ${state.editingProjectId === project.id ? projectFormHtml(project) : `
           <div class="card-head">
-            <h3>${esc(project.project_title || "بلا عنوان")}${project.program_name ? ` — ${esc(project.program_name)}` : ""}</h3>
+            <h2>${esc(project.project_title || "بلا عنوان")}${project.program_name ? ` — ${esc(project.program_name)}` : ""}</h2>
             <div style="display:flex; gap:10px; align-items:center;">
               <span class="pill pill-teal">${(project.actions || []).length} إجراء</span>
               <button class="link-btn" data-edit-project="${esc(project.id)}">تعديل</button>
@@ -426,7 +426,7 @@ async function renderFollowUpGroupedView(root, jumpToAction) {
   root.innerHTML = `
     ${[...bySection.entries()].map(([section, items]) => `
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-head"><h3>${esc(section)}</h3><span class="pill pill-neutral">${items.length} بند</span></div>
+        <div class="card-head"><h2>${esc(section)}</h2><span class="pill pill-neutral">${items.length} بند</span></div>
         <ul class="plain">
           ${items.map((item) => `
             <li class="row-item" style="flex-direction:column; align-items:stretch;">
@@ -447,7 +447,7 @@ async function renderFollowUpGroupedView(root, jumpToAction) {
       </div>
     `).join("")}
     <div class="card">
-      <div class="card-head"><h3>إجراءات غير مربوطة بأي بند</h3><span class="pill pill-warning">${unlinked.length}</span></div>
+      <div class="card-head"><h2>إجراءات غير مربوطة بأي بند</h2><span class="pill pill-warning">${unlinked.length}</span></div>
       <p class="hint">إجراءات خطة القسم اللي ما اتحدد لها بعد بند من تقرير المتابعة الرسمي — اربطها من نموذج تعديل الإجراء.</p>
       ${unlinked.length ? `<ul class="plain">${unlinked.map(agendaEntryRow).join("")}</ul>` : '<p class="hint">كل الإجراءات مربوطة.</p>'}
     </div>
@@ -467,7 +467,7 @@ export async function mountDepartmentPlanView(container) {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px;">
-      <label class="hint" style="display:block; margin-bottom:6px;">بحث سريع عن إجراء (بنص الإجراء، المستهدف، المنفذ، أو المتابع) — يبحث بكل المحاور للوصول السريع للتعديل</label>
+      <label class="hint" for="plan-search-input" style="display:block; margin-bottom:6px;">بحث سريع عن إجراء (بنص الإجراء، المستهدف، المنفذ، أو المتابع) — يبحث بكل المحاور للوصول السريع للتعديل</label>
       <input id="plan-search-input" type="search" placeholder="ابحث عن إجراء..." style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
       <div id="plan-search-results" style="margin-top:8px;"></div>
     </div>

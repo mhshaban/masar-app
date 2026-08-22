@@ -22,13 +22,13 @@ function statusPill(status) {
 async function renderCandidates(root, onOpenNewCase) {
   const candidates = await listCandidates();
   if (!candidates.length) {
-    root.innerHTML = '<div class="card"><h3>مرشحون من الدرجات</h3><div class="empty">لا يوجد طلاب مرشَّحون حاليًا — يعتمد هذا على الدرجات المستوردة</div></div>';
+    root.innerHTML = '<div class="card"><h2>مرشحون من الدرجات</h2><div class="empty">لا يوجد طلاب مرشَّحون حاليًا — يعتمد هذا على الدرجات المستوردة</div></div>';
     return;
   }
   const enriched = await Promise.all(candidates.slice(0, 15).map(async (c) => ({ ...c, student: await getStudent(c.studentId) })));
   root.innerHTML = `
     <div class="card">
-      <h3>مرشحون من الدرجات (${candidates.length})</h3>
+      <h2>مرشحون من الدرجات (${candidates.length})</h2>
       <p class="hint">طلاب معدلهم العام أو إحدى موادهم أقل من الحد الأدنى، وليس لديهم حالة إرشادية مفتوحة بعد.</p>
       <ul class="plain">
         ${enriched.map((c) => `
@@ -54,13 +54,13 @@ async function renderCandidates(root, onOpenNewCase) {
 function renderNewCaseForm(root, prefill, onCreated) {
   root.innerHTML = `
     <div class="card">
-      <h3>حالة إرشادية جديدة</h3>
+      <h2>حالة إرشادية جديدة</h2>
       <div id="new-case-picker"></div>
       <input type="hidden" id="new-case-student-id" value="${esc(prefill?.student?.id) || ""}">
       <div id="new-case-selected" class="hint">${prefill?.student ? `الطالب المحدد: ${esc(prefill.student.name)} (${esc(prefill.student.academicId)})` : ""}</div>
       <form id="new-case-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <select name="category" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <select name="category" aria-label="فئة الحالة" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
             ${CASE_CATEGORIES.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}
           </select>
           <input name="title" placeholder="عنوان مختصر للحالة" style="flex:1; min-width:200px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -132,19 +132,19 @@ async function renderSessions(root, caseId, refreshDetail) {
   const sessions = await listSessions(caseId);
   root.innerHTML = `
     <div class="card">
-      <h3>جلسات المتابعة</h3>
+      <h2>جلسات المتابعة</h2>
       <form id="session-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
         <div>
-          <label class="hint" style="display:block;margin-bottom:4px;">التاريخ</label>
-          <input name="date" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="case-session-date" style="display:block;margin-bottom:4px;">التاريخ</label>
+          <input id="case-session-date" name="date" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:220px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">ملاحظة الجلسة</label>
-          <input name="note" required style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="case-session-note" style="display:block;margin-bottom:4px;">ملاحظة الجلسة</label>
+          <input id="case-session-note" name="note" required style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:180px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">الخطوة التالية</label>
-          <input name="nextStep" style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="case-session-next" style="display:block;margin-bottom:4px;">الخطوة التالية</label>
+          <input id="case-session-next" name="nextStep" style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <button class="btn btn-primary" type="submit">إضافة جلسة</button>
       </form>
@@ -210,7 +210,7 @@ async function renderCaseDetail(container, id, onBack) {
         <button class="btn btn-ghost" id="case-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
-    ${item.notes ? `<div class="card" style="margin-bottom:16px;"><h3>ملاحظات</h3><p class="hint" style="margin:0;">${esc(item.notes)}</p></div>` : ""}
+    ${item.notes ? `<div class="card" style="margin-bottom:16px;"><h2>ملاحظات</h2><p class="hint" style="margin:0;">${esc(item.notes)}</p></div>` : ""}
     <div id="case-sessions"></div>
   `;
 

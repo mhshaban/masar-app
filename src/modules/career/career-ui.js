@@ -14,12 +14,12 @@ function topicOptionsHtml() {
 async function renderCandidates(root, onOpenNewSession) {
   const candidates = await listCandidates();
   if (!candidates.length) {
-    root.innerHTML = '<div class="card"><h3>طلاب السنة النهائية بلا جلسة توجيه</h3><div class="empty">لا يوجد طلاب مرشَّحون حاليًا</div></div>';
+    root.innerHTML = '<div class="card"><h2>طلاب السنة النهائية بلا جلسة توجيه</h2><div class="empty">لا يوجد طلاب مرشَّحون حاليًا</div></div>';
     return;
   }
   root.innerHTML = `
     <div class="card">
-      <h3>طلاب السنة النهائية بلا جلسة توجيه (${candidates.length})</h3>
+      <h2>طلاب السنة النهائية بلا جلسة توجيه (${candidates.length})</h2>
       <p class="hint">طلاب المستوى الثالث الذين لم يُسجَّل لهم أي جلسة توجيه مهني بعد.</p>
       <ul class="plain">
         ${candidates.slice(0, 15).map((s) => `
@@ -46,14 +46,14 @@ async function renderCandidates(root, onOpenNewSession) {
 function renderNewSessionForm(root, prefill, onCreated) {
   root.innerHTML = `
     <div class="card">
-      <h3>جلسة توجيه مهني جديدة</h3>
+      <h2>جلسة توجيه مهني جديدة</h2>
       <div id="new-session-picker"></div>
       <div id="new-session-selected" class="hint">${prefill ? `الطالب المحدد: ${esc(prefill.name)} (${esc(prefill.academicId)})` : ""}</div>
       <form id="new-session-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <input name="topic" list="career-topics" required placeholder="موضوع الجلسة" style="flex:1; min-width:220px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
           <datalist id="career-topics">${topicOptionsHtml()}</datalist>
-          <input name="date" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <input name="date" type="date" aria-label="تاريخ الجلسة" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <textarea name="notes" rows="2" placeholder="ملاحظات الجلسة (اختياري)" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit; resize:vertical;"></textarea>
         <textarea name="recommendation" rows="2" placeholder="التوصية النهائية (اختياري — إن انتهت الجلسة بتوصية محددة)" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit; resize:vertical;"></textarea>
@@ -132,12 +132,12 @@ async function renderStudentDetail(container, studentId, onBack) {
       <div><h1>${esc(studentName)}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div>
     </div>
     <div class="card" style="margin-bottom:16px;">
-      <h3>جلسة جديدة لهذا الطالب</h3>
+      <h2>جلسة جديدة لهذا الطالب</h2>
       <form id="session-form" style="display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <input name="topic" list="career-topics-detail" required placeholder="موضوع الجلسة" style="flex:1; min-width:220px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
           <datalist id="career-topics-detail">${topicOptionsHtml()}</datalist>
-          <input name="date" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <input name="date" type="date" aria-label="تاريخ الجلسة" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <textarea name="notes" rows="2" placeholder="ملاحظات الجلسة (اختياري)" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit; resize:vertical;"></textarea>
         <textarea name="recommendation" rows="2" placeholder="التوصية النهائية (اختياري)" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit; resize:vertical;"></textarea>
@@ -145,7 +145,7 @@ async function renderStudentDetail(container, studentId, onBack) {
       </form>
     </div>
     <div class="card">
-      <h3>سجل الجلسات</h3>
+      <h2>سجل الجلسات</h2>
       <ul class="plain">
         ${sessions.map((s) => `
           <li class="row-item" data-session-id="${esc(s.id)}">

@@ -29,7 +29,7 @@ async function renderList(container) {
 
   listRoot.innerHTML = `
     <table class="table">
-      <thead><tr><th>الاسم</th><th>الإيميل</th><th>الحالة</th><th>صلاحية</th><th></th></tr></thead>
+      <thead><tr><th>الاسم</th><th>الإيميل</th><th>الحالة</th><th>صلاحية</th><th><span class="sr-only">إجراءات</span></th></tr></thead>
       <tbody>
         ${users.map((u) => {
           const profile = u.profile || {};
@@ -87,19 +87,19 @@ export async function mountUsersView(container) {
       <div><h1>إدارة المستخدمين</h1><div class="sub">إنشاء حسابات المرشدين وتعطيلها — كل حساب نشط له وصول كامل لبيانات الطلاب</div></div>
     </div>
     <div class="card" style="margin-bottom:16px;">
-      <h3>حساب جديد</h3>
+      <h2>حساب جديد</h2>
       <form id="user-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div style="flex:1; min-width:160px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">الاسم الكامل</label>
-          <input name="fullName" required style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="user-form-fullname" style="display:block;margin-bottom:4px;">الاسم الكامل</label>
+          <input id="user-form-fullname" name="fullName" required style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:140px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">اسم المستخدم</label>
-          <input name="username" required placeholder="مثال: m.ahmed" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="user-form-username" style="display:block;margin-bottom:4px;">اسم المستخدم</label>
+          <input id="user-form-username" name="username" required placeholder="مثال: m.ahmed" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <div style="flex:1; min-width:140px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">كلمة المرور</label>
-          <input name="password" type="password" required minlength="8" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="user-form-password" style="display:block;margin-bottom:4px;">كلمة المرور</label>
+          <input id="user-form-password" name="password" type="password" required minlength="8" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
           <input type="checkbox" name="isAdmin"> صلاحية إدمن

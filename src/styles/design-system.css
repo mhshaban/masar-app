@@ -10,7 +10,7 @@
     --paper-200: #e3d9c6;
     --ink-800: #1a2744;
     --ink-600: #5b6579;
-    --ink-500: #7a8399;
+    --ink-500: #66708c;
     --surface: #ffffff;
     --border: var(--paper-200);
     --success: #1e7d4e;
@@ -23,6 +23,13 @@
     --radius: 12px;
     --font-ui: "Cairo", "Segoe UI", Tahoma, Roboto, Arial, sans-serif;
     color-scheme: light dark;
+    /* ثابت عمدًا عبر الوضعين الفاتح والداكن (لا يُعاد تعريفه بأي من كتل
+       [data-theme]/@media أدناه) — نص فوق خلفيات ذهبية/كحلية فاتحة
+       (.btn-primary، .navitem.active) يحتاج تباينًا كافيًا (WCAG AA
+       4.5:1) في كلا الوضعين معًا؛ --teal-900 نفسه ينعكس بالوضع الداكن
+       (يصير كريمي فاتح) فيفشل التباين هناك تحديدًا — رُصد هذا فعليًا
+       بحساب نسبة التباين يدويًا (~1.8:1 بالوضع الداكن قبل هذا الإصلاح). */
+    --on-gold: #1a2744;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -85,7 +92,7 @@
     --paper-200: #e3d9c6;
     --ink-800: #1a2744;
     --ink-600: #5b6579;
-    --ink-500: #7a8399;
+    --ink-500: #66708c;
     --surface: #ffffff;
     --border: var(--paper-200);
     --success: #1e7d4e;
@@ -164,7 +171,7 @@
   }
   .navitem svg { width: 19px; height: 19px; flex: 0 0 auto; }
   .navitem:hover { background: rgba(247,245,239,0.08); opacity: 1; }
-  .navitem.active { background: var(--clay-500); color: var(--teal-900); opacity: 1; font-weight: 700; }
+  .navitem.active { background: var(--clay-500); color: var(--on-gold); opacity: 1; font-weight: 700; }
 
   .navsplit { height: 1px; background: rgba(247,245,239,0.14); margin: 12px 4px; }
 
@@ -205,10 +212,10 @@
     box-shadow: var(--shadow);
     padding: 18px 18px;
   }
-  .card h3 { margin: 0 0 4px; font-size: 14.5px; font-weight: 700; }
+  .card h2 { margin: 0 0 4px; font-size: 14.5px; font-weight: 700; }
   .card .hint { font-size: 12px; color: var(--ink-500); margin: 0 0 14px; }
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .card-head h3 { margin: 0; }
+  .card-head h2 { margin: 0; }
   .link-btn { font-size: 12.5px; color: var(--teal-600); background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 600; padding: 0; }
 
   /* stat tile */
@@ -252,7 +259,7 @@
   tbody tr:hover { background: var(--paper-50); }
 
   .btn { font-family: inherit; font-size: 13px; font-weight: 700; padding: 9px 16px; border-radius: 9px; border: none; cursor: pointer; }
-  .btn-primary { background: var(--clay-500); color: #fff5ec; }
+  .btn-primary { background: var(--clay-500); color: var(--on-gold); }
   .btn-primary:hover { background: var(--clay-600); }
   .btn-ghost { background: transparent; color: var(--teal-600); border: 1px solid var(--border); }
   .btn-ghost:hover { background: var(--paper-100); }
@@ -436,6 +443,14 @@
     .navsplit { display: block; }
     .portal-toggle { display: block; }
     .main { padding: 18px 16px 50px; }
+
+    /* أزرار وحقول لمس مريحة (~44px) على الهاتف — بدون المساس بكثافة
+       سطح المكتب. الحقول عبر التطبيق مصمَّمة أصلًا بـstyle مضمَّن
+       (padding فقط، بلا height) بدل صنف CSS مشترك؛ min-height هنا
+       خاصية غير موجودة بذاك الـstyle المضمَّن، فتُطبَّق فوقه بلا تعارض
+       تخصيص — تغطي كل الحقول عبر الشاشات دون تعديل كل ملف على حدة. */
+    .btn { min-height: 44px; }
+    input, select, textarea { min-height: 44px; }
   }
 
   @media (prefers-reduced-motion: reduce) {

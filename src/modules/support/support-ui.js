@@ -22,13 +22,13 @@ function planStatusPill(status) {
 async function renderCandidates(root, onOpenNewPlan) {
   const candidates = await listCandidates();
   if (!candidates.length) {
-    root.innerHTML = '<div class="card"><h3>مرشحون من الدرجات</h3><div class="empty">لا يوجد طلاب مرشَّحون حاليًا — يعتمد هذا على الدرجات المستوردة</div></div>';
+    root.innerHTML = '<div class="card"><h2>مرشحون من الدرجات</h2><div class="empty">لا يوجد طلاب مرشَّحون حاليًا — يعتمد هذا على الدرجات المستوردة</div></div>';
     return;
   }
   const enriched = await Promise.all(candidates.slice(0, 15).map(async (c) => ({ ...c, student: await getStudent(c.studentId) })));
   root.innerHTML = `
     <div class="card">
-      <h3>مرشحون من الدرجات (${candidates.length})</h3>
+      <h2>مرشحون من الدرجات (${candidates.length})</h2>
       <p class="hint">طلاب معدلهم العام أو إحدى موادهم أقل من الحد الأدنى، وليس لديهم خطة دعم نشطة بعد.</p>
       <ul class="plain">
         ${enriched.map((c) => `
@@ -54,7 +54,7 @@ async function renderCandidates(root, onOpenNewPlan) {
 function renderNewPlanForm(root, prefill, onCreated) {
   root.innerHTML = `
     <div class="card">
-      <h3>خطة دعم جديدة</h3>
+      <h2>خطة دعم جديدة</h2>
       <div id="new-plan-picker"></div>
       <div id="new-plan-selected" class="hint">${prefill?.student ? `الطالب المحدد: ${esc(prefill.student.name)} (${esc(prefill.student.academicId)})` : ""}</div>
       <form id="new-plan-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
@@ -122,17 +122,17 @@ async function renderActions(root, planId, refreshDetail) {
   root.innerHTML = `
     <div class="card">
       <div class="card-head">
-        <h3>إجراءات الخطة</h3>
+        <h2>إجراءات الخطة</h2>
         ${actions.length ? `<span class="pill pill-neutral">${doneCount} / ${actions.length}</span>` : ""}
       </div>
       <form id="action-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
         <div style="flex:1; min-width:220px;">
-          <label class="hint" style="display:block;margin-bottom:4px;">إجراء جديد</label>
-          <input name="action" required style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="support-action-text" style="display:block;margin-bottom:4px;">إجراء جديد</label>
+          <input id="support-action-text" name="action" required style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <div>
-          <label class="hint" style="display:block;margin-bottom:4px;">تاريخ الاستحقاق</label>
-          <input name="dueDate" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          <label class="hint" for="support-action-due" style="display:block;margin-bottom:4px;">تاريخ الاستحقاق</label>
+          <input id="support-action-due" name="dueDate" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
         <button class="btn btn-primary" type="submit">إضافة</button>
       </form>
@@ -198,7 +198,7 @@ async function renderPlanDetail(container, id, onBack) {
         <button class="btn btn-ghost" id="plan-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
-    ${plan.goal ? `<div class="card" style="margin-bottom:16px;"><h3>الهدف</h3><p class="hint" style="margin:0;">${esc(plan.goal)}</p></div>` : ""}
+    ${plan.goal ? `<div class="card" style="margin-bottom:16px;"><h2>الهدف</h2><p class="hint" style="margin:0;">${esc(plan.goal)}</p></div>` : ""}
     <div id="plan-actions"></div>
   `;
 

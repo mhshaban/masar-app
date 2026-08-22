@@ -24,15 +24,15 @@ async function renderRemindersCard(root) {
   const reminders = await listReminders();
 
   root.innerHTML = `
-    <div class="card-head"><h3>التذكيرات</h3></div>
+    <div class="card-head"><h2>التذكيرات</h2></div>
     <form id="dashboard-reminder-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
       <div style="flex:2; min-width:180px;">
-        <label class="hint" style="display:block;margin-bottom:4px;">عنوان تذكير جديد</label>
-        <input name="title" required placeholder="مثال: متابعة حالة الطالب..." style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+        <label class="hint" for="dashboard-reminder-title" style="display:block;margin-bottom:4px;">عنوان تذكير جديد</label>
+        <input id="dashboard-reminder-title" name="title" required placeholder="مثال: متابعة حالة الطالب..." style="width:100%; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
       </div>
       <div>
-        <label class="hint" style="display:block;margin-bottom:4px;">تاريخ الاستحقاق</label>
-        <input name="dueDate" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+        <label class="hint" for="dashboard-reminder-due" style="display:block;margin-bottom:4px;">تاريخ الاستحقاق</label>
+        <input id="dashboard-reminder-due" name="dueDate" type="date" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
       </div>
       <button class="btn btn-primary" type="submit">إضافة</button>
     </form>
@@ -120,7 +120,7 @@ export async function mountDashboardView(container, { onGoto }) {
 
     <div class="card" style="margin-bottom:16px;">
       <div class="card-head">
-        <h3>طلاب يحتاجون متابعة</h3>
+        <h2>طلاب يحتاجون متابعة</h2>
         <span class="pill pill-critical">${attentionRows.length}</span>
       </div>
       <p class="hint">مُجمَّعة من ثلاث شاشات مستقلة (الحالات الإرشادية، خطط الدعم، التوجيه المهني) بحسب الطالب — قد يحتاج نفس الطالب أكثر من واحدة معًا.</p>
@@ -144,7 +144,7 @@ export async function mountDashboardView(container, { onGoto }) {
 
     <div class="grid g2" style="margin-bottom:16px;">
       <div class="card">
-        <div class="card-head"><h3>حالات إرشادية بلا متابعة حديثة</h3><button class="link-btn" data-goto="cases">فتح المتابعات والحالات</button></div>
+        <div class="card-head"><h2>حالات إرشادية بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح المتابعات والحالات</button></div>
         ${staleCases.length ? `
           <ul class="plain">
             ${staleCases.slice(0, 6).map((c) => `
@@ -161,7 +161,7 @@ export async function mountDashboardView(container, { onGoto }) {
         ` : '<p class="hint">كل الحالات المفتوحة تمت متابعتها مؤخرًا.</p>'}
       </div>
       <div class="card">
-        <div class="card-head"><h3>إجراءات دعم متأخرة</h3><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
+        <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
         ${overdueSupportActions.length ? `
           <ul class="plain">
             ${overdueSupportActions.slice(0, 6).map((a) => `

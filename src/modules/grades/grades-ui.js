@@ -134,7 +134,7 @@ function renderFileSummaries(root, fileSummaries) {
   if (!failed.length) return;
   root.innerHTML = `
     <div class="card" style="margin-top:12px; border-color:var(--critical);">
-      <h3>ملفات تعذّرت قراءتها (${failed.length})</h3>
+      <h2>ملفات تعذّرت قراءتها (${failed.length})</h2>
       <ul class="plain">
         ${failed.map((f) => `<li class="row-item"><div class="body"><div class="title">${esc(f.fileName)}</div><div class="meta">${esc(f.error)}</div></div></li>`).join("")}
       </ul>
@@ -206,7 +206,7 @@ async function renderBatchHistory(root) {
   }
   root.innerHTML = `
     <div class="card">
-      <h3>سجل الاستيراد</h3>
+      <h2>سجل الاستيراد</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>الملف</th><th>الفترة</th><th>التاريخ</th><th>مطابق/غير مطابق</th><th>الحالة</th><th></th></tr></thead>
         <tbody>
@@ -245,13 +245,13 @@ async function renderImportTab(root) {
       <input type="file" id="grades-file-input" accept=".xlsx" style="display:none;">
     </div>
     <div class="card" style="margin-bottom:16px;">
-      <label class="hint" style="display:block;margin-bottom:6px;">تسمية الفترة (تُحفظ مع كل درجة، مثال: الوقفة التقويمية الأولى)</label>
+      <label class="hint" for="grades-term-input" style="display:block;margin-bottom:6px;">تسمية الفترة (تُحفظ مع كل درجة، مثال: الوقفة التقويمية الأولى)</label>
       <input id="grades-term-input" type="text" placeholder="مثال: الوقفة التقويمية الأولى — الفصل الأول 2025/2026" style="width:100%; max-width:420px; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
     </div>
     <div id="grades-review"></div>
 
     <div class="card" style="margin:24px 0 16px; background:transparent; border:none; box-shadow:none; padding:0;">
-      <h3 style="margin-bottom:2px;">استيراد شهادات الطلبة (PDF)</h3>
+      <h2 style="margin-bottom:2px;">استيراد شهادات الطلبة (PDF)</h2>
       <p class="hint">مسار ثانوي أقل دقة من الإكسل حسب التصميم — استخراج نصي من قالب "سجل الطالب الدراسي" الرسمي.</p>
     </div>
     <div id="cert-import-root"></div>
@@ -324,7 +324,7 @@ async function renderAnalyticsTab(root) {
       <div class="card stat"><div class="label">المعدل العام</div><div class="value">${stats.overallAvg}٪</div></div>
     </div>
     <div class="card">
-      <h3>المعدل حسب المقرر</h3>
+      <h2>المعدل حسب المقرر</h2>
       <p class="hint">مرتبة من الأضعف إلى الأعلى لتحديد المقررات التي تحتاج دعمًا أولًا.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>رمز المقرر</th><th>عدد الدرجات</th><th>المعدل</th></tr></thead>
@@ -385,7 +385,7 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
 
     <div class="card" style="margin-top:20px;">
       <div class="card-head">
-        <h3>يحتاجون تدخل (دعم أكاديمي)</h3>
+        <h2>يحتاجون تدخل (دعم أكاديمي)</h2>
         <button class="link-btn" data-goto="support">فتح شاشة خطط الدعم</button>
       </div>
       <p class="hint">المعدل العام أو إحدى المواد أقل من 50٪ — نفس القائمة المستخدمة لمرشّحي الحالات الإرشادية وخطط الدعم، فلا تختلف الأرقام بين الشاشات.</p>
@@ -449,7 +449,7 @@ function renderSubjectClassification(root, subjectAchievement) {
 
   root.innerHTML = `
     <div class="card" style="margin-bottom:16px;">
-      <label class="hint" style="display:block;margin-bottom:6px;">اختر مقررًا</label>
+      <label class="hint" for="subject-select" style="display:block;margin-bottom:6px;">اختر مقررًا</label>
       <select id="subject-select" style="width:100%; max-width:320px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         ${subjectAchievement.map((s) => `<option value="${esc(s.subject)}">${esc(s.subject)} (${s.students.length} طالبًا)</option>`).join("")}
       </select>
@@ -467,7 +467,7 @@ function renderSubjectClassification(root, subjectAchievement) {
         <div class="card stat"><div class="label">${TIER_LABELS.low} (أقل من 60٪)</div><div class="value">${subject.counts.low}</div></div>
       </div>
       <div class="card">
-        <h3>${esc(subject.subject)}</h3>
+        <h2>${esc(subject.subject)}</h2>
         <p class="hint">مرتبة من الأضعف إلى الأعلى.</p>
         <div class="tablewrap"><table>
           <thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>التقدير</th></tr></thead>

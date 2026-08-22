@@ -117,12 +117,12 @@ export async function renderAcademicPath(container, studentId) {
 
   container.innerHTML = `
     <div class="card" style="margin-bottom:16px;">
-      <h3>المعدل الفصلي عبر الزمن</h3>
+      <h2>المعدل الفصلي عبر الزمن</h2>
       <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب المستوردة فقط — لا يشمل درجات الوقفة التقويمية.</p>
       <div id="term-chart-root"></div>
     </div>
     <div class="card">
-      <h3>الدرجات حسب المقرر عبر الفترات</h3>
+      <h2>الدرجات حسب المقرر عبر الفترات</h2>
       <p class="hint">كل صف مقرر واحد بحسب اسمه (لا رمزه، لأن الرمز يتغيّر بين الفصول لنفس المقرر) — كل عمود فترة دراسية.</p>
       <div id="subject-pivot-root"></div>
     </div>

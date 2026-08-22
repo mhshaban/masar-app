@@ -47,9 +47,9 @@ function resizeImageToDataUrl(file) {
 function renderImportSection(root, { onImported, isUpdate }) {
   root.innerHTML = `
     <div class="card">
-      <h3>${isUpdate ? "تحديث سجل الطلبة" : "استيراد سجل الطلبة"}</h3>
+      <h2>${isUpdate ? "تحديث سجل الطلبة" : "استيراد سجل الطلبة"}</h2>
       <p class="hint">ارفع ملف كشف الطلاب الكامل (شيت "كشف الطلاب") — يستبدل السجل الحالي بالكامل بمحتوى الملف.</p>
-      <input type="file" id="students-import-file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
+      <input type="file" id="students-import-file" aria-label="ملف كشف الطلاب" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
       <div id="students-import-preview"></div>
     </div>
   `;
@@ -93,7 +93,7 @@ const PHOTO_COMMIT_BATCH = 40;
 function renderPhotoImportSection(root, { onImported }) {
   root.innerHTML = `
     <div class="card">
-      <h3>استيراد صور الطلبة</h3>
+      <h2>استيراد صور الطلبة</h2>
       <p class="hint">اختر كل ملفات الصور دفعة واحدة — لازم يكون اسم كل ملف هو الرقم الأكاديمي للطالب (مثال: 20254220.jpg). تتم المطابقة تلقائيًا ويظهر تقرير قبل الحفظ.</p>
       <input type="file" id="photos-import-input" accept="image/*" multiple style="margin-bottom:12px;">
       <div id="photos-import-preview"></div>
@@ -316,7 +316,7 @@ async function renderDetailedSchedule(root, section, weekSchedule) {
   root.innerHTML = `
     <div class="grid g2">
       <div class="card">
-        <h3>الجدول الدراسي الأسبوعي</h3>
+        <h2>الجدول الدراسي الأسبوعي</h2>
         ${rows.length ? scheduleGridTable(rows) : hasWeekFallback ? `
           <ul class="plain">
             ${scheduleRow("الأحد", weekSchedule.sunday)}
@@ -328,7 +328,7 @@ async function renderDetailedSchedule(root, section, weekSchedule) {
         ` : '<div class="empty">لا يوجد جدول دراسي مستورَد بعد لهذه الشعبة — استورده من شاشة "الطلاب المرفعين"</div>'}
       </div>
       <div class="card">
-        <h3>الساعات المكتبية لمعلمي الطالب</h3>
+        <h2>الساعات المكتبية لمعلمي الطالب</h2>
         ${teachers.length ? `
           <ul class="plain">
             ${teachers.map((t) => {
@@ -395,7 +395,7 @@ async function renderDetail(container, id, onBack) {
 
     <div class="grid g2">
       <div class="card">
-        <h3>بيانات الاتصال</h3>
+        <h2>بيانات الاتصال</h2>
         <div class="tablewrap"><table>
           <tbody>
             <tr><td>الاسم بالإنجليزية</td><td>${esc(s.nameEn) || "—"}</td></tr>
@@ -408,7 +408,7 @@ async function renderDetail(container, id, onBack) {
         </table></div>
       </div>
       <div class="card">
-        <h3>مرشد الشعبة</h3>
+        <h2>مرشد الشعبة</h2>
         <div class="tablewrap"><table>
           <tbody>
             <tr><td>الاسم</td><td>${esc(s.counselor?.name) || "—"}</td></tr>
@@ -421,7 +421,7 @@ async function renderDetail(container, id, onBack) {
     </div>
 
     <div class="card" style="margin-top:16px;">
-      <h3>ملاحظات إضافية</h3>
+      <h2>ملاحظات إضافية</h2>
       <div class="tablewrap"><table>
         <tbody>
           <tr><td>الإرشاد الاجتماعي</td><td>${esc(s.socialGuidance) || "—"}</td></tr>

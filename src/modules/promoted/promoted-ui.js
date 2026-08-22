@@ -119,7 +119,7 @@ async function renderBatchHistory(root) {
   }
   root.innerHTML = `
     <div class="card">
-      <h3>سجل الاستيراد</h3>
+      <h2>سجل الاستيراد</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>الملف</th><th>التاريخ</th><th>مطابق/غير مطابق</th><th>الحالة</th><th></th></tr></thead>
         <tbody>
@@ -151,12 +151,12 @@ async function renderBatchHistory(root) {
 async function renderPendingList(root) {
   const rows = await listStudentsWithPendingSubjects();
   if (!rows.length) {
-    root.innerHTML = '<div class="card"><h3>طلاب لديهم مقررات لم تُجتَز بعد</h3><div class="empty">لا يوجد طلاب حاليًا (أو لم يُستورَد كشف المرفعين بعد)</div></div>';
+    root.innerHTML = '<div class="card"><h2>طلاب لديهم مقررات لم تُجتَز بعد</h2><div class="empty">لا يوجد طلاب حاليًا (أو لم يُستورَد كشف المرفعين بعد)</div></div>';
     return;
   }
   root.innerHTML = `
     <div class="card">
-      <h3>طلاب لديهم مقررات لم تُجتَز بعد (${rows.length})</h3>
+      <h2>طلاب لديهم مقررات لم تُجتَز بعد (${rows.length})</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>الطالب</th><th>الصف</th><th>المقررات المتبقية</th></tr></thead>
         <tbody>
@@ -186,10 +186,10 @@ async function renderScheduleSummary(root) {
 async function renderScheduleImportSection(root, onCommitted) {
   root.innerHTML = `
     <div class="card">
-      <h3>الجدول الدراسي والساعات المكتبية</h3>
+      <h2>الجدول الدراسي والساعات المكتبية</h2>
       <p class="hint">من نفس ملف كشف الطلاب الكامل — شيتَي "جداول المعلمين" و"الساعات المكتبية". كل استيراد يستبدل البيانات السابقة بالكامل (بيانات مرجعية، لا حاجة لتراجع تدريجي).</p>
       <div id="schedule-summary"></div>
-      <input type="file" id="schedule-file-input" accept=".xlsx" style="margin-bottom:10px;">
+      <input type="file" id="schedule-file-input" aria-label="ملف كشف الطلاب (جداول المعلمين والساعات المكتبية)" accept=".xlsx" style="margin-bottom:10px;">
       <div id="schedule-parse-result"></div>
     </div>
   `;
@@ -232,9 +232,9 @@ async function renderScheduleImportSection(root, onCommitted) {
 async function renderSchedulePdfImportSection(root, onCommitted) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
-      <h3>استيراد جدول شعب (PDF)</h3>
+      <h2>استيراد جدول شعب (PDF)</h2>
       <p class="hint">اختر عدة ملفات PDF دفعة واحدة — ملف "جدول حصص الفصل الدراسي" الرسمي لكل شعبة على حِدة. كل شعبة تُستبدل بياناتها بالكامل دون التأثير على بقية الشعب المستوردة مسبقًا.</p>
-      <input type="file" id="schedule-pdf-input" accept="application/pdf,.pdf" multiple style="margin-bottom:12px;">
+      <input type="file" id="schedule-pdf-input" aria-label="ملفات جدول حصص الشعب (PDF)" accept="application/pdf,.pdf" multiple style="margin-bottom:12px;">
       <div id="schedule-pdf-preview"></div>
     </div>
   `;
