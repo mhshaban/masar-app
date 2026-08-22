@@ -17,8 +17,8 @@ export function getSession() {
   return token ? { accessToken: token } : null;
 }
 
-const AUTH_FAILURE_MESSAGE = "تعذر تسجيل الدخول. تحقق من بياناتك أو تواصل مع مسؤول النظام.";
-const NETWORK_FAILURE_MESSAGE = "تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.";
+const AUTH_FAILURE_MESSAGE = "تعذر تسجيل الدخول. تحقق من بياناتك أو تواصل مع مسؤول النظام";
+const NETWORK_FAILURE_MESSAGE = "تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى";
 
 // خطأ فشل الشبكة (fetch نفسه رمى استثناء — انقطاع اتصال، DNS، إلخ) مميَّز
 // بـ code صراحةً عن فشل المصادقة (401/بيانات خاطئة) — الواجهة (app.js)

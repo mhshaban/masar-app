@@ -79,7 +79,7 @@ function showLoginScreen() {
       const identifier = identifierInput.value.trim();
       const password = passwordInput.value;
       if (!identifier || !password) {
-        showError("يرجى إدخال اسم المستخدم وكلمة المرور.");
+        showError("يرجى إدخال اسم المستخدم وكلمة المرور");
         return;
       }
       clearError();
