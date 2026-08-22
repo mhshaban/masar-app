@@ -1,4 +1,4 @@
-import { list as listAll, bulkPut, clear } from "./cloud-runtime.js";
+import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js";
 import { COLLECTIONS, DB_VERSION } from "../core/config.js";
 
 export async function buildBackup() {
@@ -53,6 +53,7 @@ export function summarizeBackup(data) {
 // merge with an unrelated existing DB would silently mix two datasets with
 // no way to tell which record came from where.
 export async function restoreBackup(data) {
+  const counts = summarizeBackup(data);
   for (const name of COLLECTIONS) {
     await clear(name);
     const records = data.collections[name];
@@ -60,4 +61,11 @@ export async function restoreBackup(data) {
       await bulkPut(name, records);
     }
   }
+  // تسجيل تدقيق فقط — بدون await عمدًا: البيانات نفسها استُعيدت فعليًا
+  // بهذي اللحظة، فلا مبرر يخلي المستخدم ينتظر رسالة النجاح/إعادة التحميل
+  // لمجرد بطء أو تعذّر شبكي بطلب التسجيل وحده (مثلًا الدالة SQL لسه ما
+  // نُفِّذت بقاعدة بيانات محمد، أو مهلة اتصال طويلة) — يعمل بالخلفية ولا
+  // يُفشل ولا يُبطئ الاستعادة نفسها، نفس أسلوب audit() الاختياري بـ
+  // admin-users Edge Function.
+  rpc("masar_log_backup_restore", { p_summary: counts }).catch(() => {});
 }
