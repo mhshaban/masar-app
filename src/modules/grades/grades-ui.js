@@ -7,7 +7,7 @@ import {
   getGradeStats,
   buildGradesExportRows,
 } from "./grades-import-service.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
+import { computeAchievement, TIER_LABELS } from "./achievement-service.js";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
 import { downloadRowsAsXlsx } from "../../services/xlsx-export.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
@@ -499,9 +499,8 @@ function renderSubjectClassification(root, subjectAchievement) {
 }
 
 async function renderClassificationTab(root, onGoto) {
-  const [achievement, subjectAchievement, needsSupport] = await Promise.all([
-    computeStudentAchievement(),
-    computeSubjectAchievement(),
+  const [{ studentAchievement: achievement, subjectAchievement }, needsSupport] = await Promise.all([
+    computeAchievement(),
     computeStudentGradeSummaries(),
   ]);
   if (!achievement.length) {
