@@ -1,6 +1,6 @@
 import { seedIfEmpty } from "./services/seed-runtime.js";
 import { setActiveView } from "./core/store.js";
-import { getSession, getCurrentProfile, refreshProfile, login, logout } from "./services/auth-service.js";
+import { getSession, getCurrentProfile, refreshProfile, login, logout, consumeSessionExpiredNotice } from "./services/auth-service.js";
 import { mountDashboardView } from "./modules/dashboard/dashboard-ui.js";
 import { mountDepartmentPlanView } from "./modules/department-plan/department-plan-ui.js";
 import { mountAgendaView } from "./modules/agenda/agenda-ui.js";
@@ -16,57 +16,89 @@ import { mountUsersView } from "./modules/users/users-ui.js";
 const STUB_LABELS = {};
 
 // شاشة دخول حقيقية (Supabase Auth) — تحل محل قفل الـ PIN المحلي القديم.
-// تُرجع بروفايل المستخدم بعد دخول ناجح لحساب نشط (auth-service.login ترفض
-// الحسابات المعطّلة تلقائيًا).
+// واجهة مستقلة تمامًا: تُبنى داخل #login-root (خارج #app-shell المخفي
+// بـ hidden منذ التحميل الأول)، فلا تظهر أي عناصر من القائمة/المحتوى قبل
+// نجاح الدخول ولا تقدر تستقبل تركيز أو نقر (hidden = خارج شجرة الوصولية
+// تمامًا، ليس مجرد إخفاء بصري). تُرجع بروفايل المستخدم بعد دخول ناجح
+// لحساب نشط (auth-service.login ترفض الحسابات المعطّلة تلقائيًا).
 function showLoginScreen() {
   return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.id = "login-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:var(--teal-900);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;";
-    overlay.innerHTML = `
-      <div style="background:var(--surface);color:var(--ink-800);padding:28px 26px;border-radius:16px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow);font-family:var(--font-ui);">
-        <div style="width:44px;height:44px;border-radius:12px;background:var(--clay-500);display:flex;align-items:center;justify-content:center;color:var(--teal-900);font-weight:800;font-size:18px;margin:0 auto 14px;">م</div>
-        <h2 style="margin:0 0 6px;font-size:16px;">تسجيل الدخول</h2>
-        <p class="hint" style="margin:0 0 16px;">مسار — قسم الإرشاد الأكاديمي والتوجيه المهني</p>
-        <input id="login-identifier" type="text" autocomplete="username" placeholder="اسم المستخدم أو الإيميل" style="width:100%;box-sizing:border-box;padding:12px;border-radius:9px;border:1px solid var(--border);font-size:14px;margin-bottom:10px;background:var(--surface);color:inherit;font-family:inherit;">
-        <input id="login-password" type="password" autocomplete="current-password" placeholder="كلمة المرور" style="width:100%;box-sizing:border-box;padding:12px;border-radius:9px;border:1px solid var(--border);font-size:14px;margin-bottom:10px;background:var(--surface);color:inherit;font-family:inherit;">
-        <div id="login-error" style="color:var(--critical);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
-        <button id="login-submit" class="btn btn-primary" style="width:100%;">دخول</button>
-      </div>
+    const root = document.getElementById("login-root");
+    const sessionExpired = consumeSessionExpiredNotice();
+
+    root.innerHTML = `
+      <main class="login-screen" aria-labelledby="login-title">
+        <form class="login-card" id="login-form" novalidate>
+          <div class="login-mark" aria-hidden="true">م</div>
+          <h1 id="login-title">تسجيل الدخول</h1>
+          <p class="login-sub">تابع أداء الطلبة، خطط الدعم، والحالات الأكاديمية من مساحة واحدة</p>
+          ${sessionExpired ? `
+            <div class="login-notice info" role="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+              <span>انتهت جلستك السابقة — سجّل الدخول من جديد للمتابعة.</span>
+            </div>
+          ` : ""}
+          <div class="login-field">
+            <label for="login-identifier">اسم المستخدم أو البريد الإلكتروني</label>
+            <input id="login-identifier" name="identifier" type="text" autocomplete="username" required aria-describedby="login-error">
+          </div>
+          <div class="login-field">
+            <label for="login-password">كلمة المرور</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required aria-describedby="login-error">
+          </div>
+          <div id="login-error" class="login-notice error" role="status" aria-live="polite" hidden></div>
+          <button type="submit" class="btn btn-primary login-submit" id="login-submit">دخول</button>
+          <p class="login-forgot">هل نسيت كلمة المرور؟ لا يوجد استرجاع ذاتي حاليًا — تواصل مع مسؤول النظام بالقسم لإعادة تعيينها.</p>
+        </form>
+      </main>
     `;
-    document.body.appendChild(overlay);
-    const identifierInput = overlay.querySelector("#login-identifier");
-    const passwordInput = overlay.querySelector("#login-password");
-    const errorEl = overlay.querySelector("#login-error");
-    const submitBtn = overlay.querySelector("#login-submit");
+
+    const form = root.querySelector("#login-form");
+    const identifierInput = root.querySelector("#login-identifier");
+    const passwordInput = root.querySelector("#login-password");
+    const errorEl = root.querySelector("#login-error");
+    const submitBtn = root.querySelector("#login-submit");
     identifierInput.focus();
 
-    const submit = async () => {
+    const showError = (message) => {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+      identifierInput.setAttribute("aria-invalid", "true");
+      passwordInput.setAttribute("aria-invalid", "true");
+    };
+    const clearError = () => {
+      errorEl.textContent = "";
+      errorEl.hidden = true;
+      identifierInput.removeAttribute("aria-invalid");
+      passwordInput.removeAttribute("aria-invalid");
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (submitBtn.disabled) return; // يمنع إرسال متكرر لو ضُغط الزر أو Enter مرتين بسرعة
       const identifier = identifierInput.value.trim();
       const password = passwordInput.value;
       if (!identifier || !password) {
-        errorEl.textContent = "أدخل اسم المستخدم وكلمة المرور";
+        showError("يرجى إدخال اسم المستخدم وكلمة المرور.");
         return;
       }
+      clearError();
       submitBtn.disabled = true;
-      errorEl.textContent = "";
+      const originalLabel = submitBtn.textContent;
+      submitBtn.textContent = "جارٍ تسجيل الدخول…";
       try {
+        // لا نسجّل identifier ولا password هنا ولا بأي مكان آخر — لا console،
+        // لا localStorage. التوكن نفسه يُخزَّن بـ sessionStorage فقط (راجع
+        // supabase-config.js)، وكلمة المرور لا تُخزَّن إطلاقًا بعد هذي النقطة.
         const profile = await login(identifier, password);
-        overlay.remove();
         resolve(profile);
       } catch (err) {
-        errorEl.textContent = err.message || "تعذّر تسجيل الدخول";
+        showError(err.message || "تعذر تسجيل الدخول. تحقق من بياناتك أو تواصل مع مسؤول النظام.");
         passwordInput.value = "";
         passwordInput.focus();
-      } finally {
         submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
       }
-    };
-    submitBtn.addEventListener("click", submit);
-    [identifierInput, passwordInput].forEach((input) => {
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") submit();
-      });
     });
   });
 }
@@ -81,10 +113,21 @@ function mountStub(container, viewName) {
 
 const main = document.getElementById("main-view");
 const navButtons = Array.from(document.querySelectorAll(".navitem"));
+const KNOWN_VIEWS = new Set(navButtons.map((b) => b.dataset.view));
 
+// يحفظ الصفحة الحالية بـ location.hash (replaceState، بلا تراكم سجلّ تصفّح
+// لكل ضغطة تنقّل داخلية) — فقط عشان تبقى نفس الصفحة لو المستخدم عمل
+// تحديث (F5) للمتصفح، بدون بناء نظام توجيه كامل جديد غير موجود أصلًا.
 async function renderView(viewName) {
-  navButtons.forEach((b) => b.classList.toggle("active", b.dataset.view === viewName));
+  navButtons.forEach((b) => {
+    const active = b.dataset.view === viewName;
+    b.classList.toggle("active", active);
+    if (active) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
   setActiveView(viewName);
+  history.replaceState(null, "", `#${viewName}`);
+  main.setAttribute("aria-busy", "true");
 
   switch (viewName) {
     case "dashboard":
@@ -123,7 +166,12 @@ async function renderView(viewName) {
     default:
       mountStub(main, viewName);
   }
+  main.removeAttribute("aria-busy");
   window.scrollTo(0, 0);
+  // يرجّع التركيز لأعلى المحتوى الرئيسي بعد كل تنقّل — يفيد مستخدمي لوحة
+  // المفاتيح وقارئات الشاشة، بدل ما يضل التركيز على زر بالقائمة الجانبية
+  // بعيدًا عن المحتوى الجديد فعليًا.
+  main.focus({ preventScroll: true });
 }
 
 navButtons.forEach((btn) => {
@@ -148,10 +196,19 @@ async function boot() {
   if (!profile) {
     profile = await showLoginScreen();
   }
+
+  // دخول ناجح فعليًا من هنا — نظهر هيكل التطبيق (كان hidden منذ التحميل
+  // الأول، خارج شجرة الوصولية تمامًا) ونحذف شاشة الدخول نهائيًا من الصفحة.
+  document.getElementById("app-shell").hidden = false;
+  document.getElementById("login-root").innerHTML = "";
+
   applyProfileToChrome(profile);
 
   await seedIfEmpty();
-  await renderView("dashboard");
+  // يحافظ على الصفحة الحالية بعد تحديث المتصفح (F5) لو كان الهاش يطابق
+  // صفحة معروفة فعليًا — وإلا يرجع للرئيسية كسلوك افتراضي آمن.
+  const initialView = KNOWN_VIEWS.has(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard";
+  await renderView(initialView);
 
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {

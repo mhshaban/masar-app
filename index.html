@@ -10,7 +10,8 @@
 <link rel="stylesheet" href="src/styles/design-system.css">
 </head>
 <body>
-<div class="app">
+<a href="#main-view" class="skip-link">تخطَّ إلى المحتوى الرئيسي</a>
+<div class="app" id="app-shell" hidden>
   <nav class="nav" aria-label="التنقل الرئيسي">
     <div class="brand">
       <div class="mark">م</div>
@@ -75,10 +76,11 @@
     </div>
   </nav>
 
-  <main class="main" id="main-view">
+  <main class="main" id="main-view" aria-live="polite" aria-busy="true" tabindex="-1">
     <div class="empty">جارٍ التحميل…</div>
   </main>
 </div>
+<div id="login-root"></div>
 
 <script src="src/vendor/xlsx.core.min.js"></script>
 <script src="src/vendor/pdfjs/pdf.min.js"></script>

@@ -2,6 +2,7 @@
 // اسم مستخدم يترجم لإيميل عبر دالة SQL عامة (masar_resolve_login_identifier)،
 // ثم /auth/v1/token?grant_type=password مباشرة — بدون أي SDK.
 import { SB_URL, SB_KEY, getAccessToken, setAccessToken, clearAccessToken } from "./supabase-config.js";
+export { consumeSessionExpiredNotice } from "./supabase-config.js";
 
 const PROFILE_CACHE_KEY = "masar_profile_cache";
 
@@ -16,25 +17,54 @@ export function getSession() {
   return token ? { accessToken: token } : null;
 }
 
+const AUTH_FAILURE_MESSAGE = "تعذر تسجيل الدخول. تحقق من بياناتك أو تواصل مع مسؤول النظام.";
+const NETWORK_FAILURE_MESSAGE = "تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.";
+
+// خطأ فشل الشبكة (fetch نفسه رمى استثناء — انقطاع اتصال، DNS، إلخ) مميَّز
+// بـ code صراحةً عن فشل المصادقة (401/بيانات خاطئة) — الواجهة (app.js)
+// تحتاج تفرّق بين الحالتين برسالتين مختلفتين تمامًا حسب طلب المرشد، بدل
+// رسالة عامة واحدة تخلط "بياناتك خطأ" مع "ما فيه إنترنت".
+function networkError() {
+  const err = new Error(NETWORK_FAILURE_MESSAGE);
+  err.code = "network";
+  return err;
+}
+
+function authError() {
+  const err = new Error(AUTH_FAILURE_MESSAGE);
+  err.code = "auth";
+  return err;
+}
+
 export async function login(identifier, password) {
   const backend = testBackend();
   if (backend) return backend.login(identifier, password);
 
-  const resolveRes = await fetch(`${SB_URL}/rest/v1/rpc/masar_resolve_login_identifier`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-    body: JSON.stringify({ p_identifier: identifier }),
-  });
-  if (!resolveRes.ok) throw new Error("تعذّر التحقق من اسم المستخدم.");
+  let resolveRes;
+  try {
+    resolveRes = await fetch(`${SB_URL}/rest/v1/rpc/masar_resolve_login_identifier`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ p_identifier: identifier }),
+    });
+  } catch {
+    throw networkError();
+  }
+  if (!resolveRes.ok) throw authError();
   const email = await resolveRes.json();
-  if (!email) throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
+  if (!email) throw authError();
 
-  const tokenRes = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: SB_KEY },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!tokenRes.ok) throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
+  let tokenRes;
+  try {
+    tokenRes = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw networkError();
+  }
+  if (!tokenRes.ok) throw authError();
   const tokenData = await tokenRes.json();
   setAccessToken(tokenData.access_token, tokenData.expires_in);
 
@@ -42,7 +72,11 @@ export async function login(identifier, password) {
   if (!profile || !profile.is_active) {
     clearAccessToken();
     sessionStorage.removeItem(PROFILE_CACHE_KEY);
-    throw new Error("هذا الحساب معطّل — راجع مدير النظام.");
+    // هذا الحساب متحقَّق منه فعليًا (كلمة المرور صحيحة) لكنه معطَّل — رسالة
+    // أدق من الرسالة العامة تفيد المرشد فعليًا هنا، لا تكشف شي عن حساب غيره.
+    const err = new Error("هذا الحساب معطّل — راجع مدير النظام.");
+    err.code = "auth";
+    throw err;
   }
   return profile;
 }

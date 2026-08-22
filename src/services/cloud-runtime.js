@@ -11,7 +11,7 @@
 // tests/helpers/fake-cloud-backend.mjs قبل استيراد أي ملف خدمة، بنفس
 // أسلوب fake-indexeddb/auto القديم بالضبط)، كل دالة تُفوَّض له مباشرة
 // بدون أي fetch حقيقي — يخلي اختبارات Node تشتغل بدون شبكة ولا متصفح.
-import { SB_URL, SB_KEY, getAccessToken } from "./supabase-config.js";
+import { SB_URL, SB_KEY, getAccessToken, clearAccessToken, markSessionExpired } from "./supabase-config.js";
 
 function genId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -31,11 +31,28 @@ function buildHeaders(extra = {}) {
   };
 }
 
+// نقطة العبور الوحيدة لكل طلبات REST (كل الـ18 ملف خدمة تمر من هنا) — أفضل
+// مكان مركزي للتعامل مع انتهاء الجلسة: 401 يعني التوكن رفضه الخادم فعليًا
+// (منتهي فعلًا، أو الحساب عُطِّل بالمنتصف)، مو بالضرورة نفس حالة الانتهاء
+// الاستباقي اللي getAccessToken يتعامل معه بالتوقيت وحده. نظّف الجلسة
+// وأعد تحميل الصفحة فورًا — شاشة الدخول (app.js) تعرض حينها "انتهت جلستك"
+// بدل شاشة دخول عادية بلا سياق، بدل ما يشوف المستخدم خطأ REST خام.
 async function request(path, options = {}) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: { ...buildHeaders(), ...(options.headers || {}) },
-  });
+  let res;
+  try {
+    res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: { ...buildHeaders(), ...(options.headers || {}) },
+    });
+  } catch {
+    throw new Error("تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.");
+  }
+  if (res.status === 401) {
+    clearAccessToken();
+    markSessionExpired();
+    window.location.reload();
+    throw new Error("انتهت الجلسة — يُعاد تحميل الصفحة.");
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `Supabase request failed: ${res.status}`);

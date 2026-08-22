@@ -109,6 +109,12 @@
   body { direction: rtl; }
 
   .app { display: flex; min-height: 100vh; }
+  /* [hidden] الافتراضي من المتصفح (display:none) يتساوى بالتخصيص مع .app
+     (display:flex) — وقاعدة صفحتنا تكسبه عادةً لأنها ليست UA stylesheet.
+     هذا يفرض display:none فعليًا طالما hidden موجود، بغض النظر عن ترتيب
+     القواعد — حرج هنا لأن شاشة الدخول تعتمد عليه لإخفاء القائمة/المحتوى
+     بالكامل (خارج شجرة الوصولية، بلا تركيز ولا نقر) قبل نجاح الدخول. */
+  .app[hidden] { display: none; }
 
   /* ---------- Nav rail ---------- */
   .nav {
@@ -324,8 +330,61 @@
   .portal-header .avatar-lg { width: 46px; height: 46px; border-radius: 50%; background: var(--teal-600); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; }
 
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
-  a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible, tr:focus-visible {
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible, tr:focus-visible {
     outline: 2px solid var(--clay-500); outline-offset: 2px;
+  }
+
+  .skip-link {
+    position: absolute; right: 10px; top: -100px; z-index: 10000;
+    background: var(--clay-500); color: var(--teal-900); font-weight: 700; font-size: 13px;
+    padding: 10px 16px; border-radius: 9px; text-decoration: none; transition: top 0.15s ease;
+  }
+  .skip-link:focus { top: 10px; }
+  @media (prefers-reduced-motion: reduce) { .skip-link { transition: none; } }
+
+  /* ---------- Login screen ---------- */
+  .login-screen {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--teal-900);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; box-sizing: border-box;
+    overflow-y: auto;
+  }
+  .login-card {
+    background: var(--surface); color: var(--ink-800);
+    padding: 32px 28px; border-radius: 16px;
+    max-width: 380px; width: 100%;
+    box-shadow: var(--shadow);
+    font-family: var(--font-ui);
+  }
+  .login-mark {
+    width: 46px; height: 46px; border-radius: 12px; background: var(--clay-500);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--teal-900); font-weight: 800; font-size: 19px; margin: 0 auto 16px;
+  }
+  .login-card h1 { margin: 0 0 6px; font-size: 18px; text-align: center; }
+  .login-card .login-sub { color: var(--ink-500); font-size: 12.5px; text-align: center; margin: 0 0 22px; line-height: 1.6; }
+  .login-field { margin-bottom: 14px; text-align: right; }
+  .login-field label { display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px; color: var(--ink-600); }
+  .login-field input {
+    width: 100%; box-sizing: border-box; padding: 12px; border-radius: 9px;
+    border: 1px solid var(--border); font-size: 14px; background: var(--surface);
+    color: inherit; font-family: inherit; min-height: 44px;
+  }
+  .login-field input[aria-invalid="true"] { border-color: var(--critical); }
+  .login-notice {
+    font-size: 12.5px; padding: 10px 12px; border-radius: 9px; margin-bottom: 14px;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .login-notice.info { background: var(--warning-bg); color: var(--warning); }
+  .login-notice.error { background: var(--critical-bg); color: var(--critical); }
+  .login-notice svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
+  .login-submit { width: 100%; min-height: 44px; margin-top: 4px; }
+  .login-forgot { display: block; text-align: center; margin-top: 16px; font-size: 12.5px; color: var(--ink-500); line-height: 1.6; }
+  .login-forgot a { color: var(--teal-600); font-weight: 600; }
+
+  @media (max-width: 420px) {
+    .login-card { padding: 26px 20px; border-radius: 14px; }
   }
 
   @media (max-width: 860px) {

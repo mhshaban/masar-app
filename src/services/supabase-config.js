@@ -30,3 +30,23 @@ export function clearAccessToken() {
   sessionStorage.removeItem(SESSION_TOKEN_KEY);
   sessionStorage.removeItem(SESSION_EXPIRY_KEY);
 }
+
+// علم مؤقت (يُقرأ مرة وحدة ثم يُمسح) — يخلي شاشة الدخول تعرض "انتهت
+// جلستك" بدل شاشة دخول عادية بلا سياق، لما يُنهي cloud-runtime.js الجلسة
+// فجأة بسبب رفض الخادم لطلب أثناء الاستخدام (401)، لا بسبب انتهاء الوقت
+// المتوقَّع فقط (اللي getAccessToken already يتعامل معه استباقيًا أعلاه).
+const SESSION_EXPIRED_FLAG = "masar_session_expired";
+
+export function markSessionExpired() {
+  try { sessionStorage.setItem(SESSION_EXPIRED_FLAG, "1"); } catch { /* استخدام خاص/تخزين معطّل — نتجاهل، ليست حرجة */ }
+}
+
+export function consumeSessionExpiredNotice() {
+  try {
+    const wasSet = sessionStorage.getItem(SESSION_EXPIRED_FLAG) === "1";
+    sessionStorage.removeItem(SESSION_EXPIRED_FLAG);
+    return wasSet;
+  } catch {
+    return false;
+  }
+}
