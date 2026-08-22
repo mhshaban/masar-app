@@ -115,6 +115,29 @@ const main = document.getElementById("main-view");
 const navButtons = Array.from(document.querySelectorAll(".navitem"));
 const KNOWN_VIEWS = new Set(navButtons.map((b) => b.dataset.view));
 
+// درج القائمة الجانبية على الهاتف: زر بالشريط العلوي يفتحه، وخلفية شفّافة
+// (backdrop) خلفه — النقر عليها أو Escape أو اختيار صفحة يغلقه تلقائيًا.
+// على سطح المكتب هذي العناصر مخفية بالـCSS أصلًا (.nav-toggle display:none
+// خارج media query الهاتف)، فـtoggleMobileNav هنا بلا أي أثر مرئي هناك.
+const navToggleBtn = document.getElementById("nav-toggle");
+const navBackdrop = document.getElementById("nav-backdrop");
+const mainNav = document.getElementById("main-nav");
+
+function setMobileNavOpen(open) {
+  mainNav.classList.toggle("open", open);
+  navBackdrop.hidden = !open;
+  navToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function closeMobileNav() { setMobileNavOpen(false); }
+
+if (navToggleBtn) {
+  navToggleBtn.addEventListener("click", () => setMobileNavOpen(!mainNav.classList.contains("open")));
+  navBackdrop.addEventListener("click", closeMobileNav);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && mainNav.classList.contains("open")) closeMobileNav();
+  });
+}
+
 // يحفظ الصفحة الحالية بـ location.hash (replaceState، بلا تراكم سجلّ تصفّح
 // لكل ضغطة تنقّل داخلية) — فقط عشان تبقى نفس الصفحة لو المستخدم عمل
 // تحديث (F5) للمتصفح، بدون بناء نظام توجيه كامل جديد غير موجود أصلًا.
@@ -128,6 +151,7 @@ async function renderView(viewName) {
   setActiveView(viewName);
   history.replaceState(null, "", `#${viewName}`);
   main.setAttribute("aria-busy", "true");
+  closeMobileNav();
 
   switch (viewName) {
     case "dashboard":

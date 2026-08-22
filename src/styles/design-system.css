@@ -387,18 +387,59 @@
     .login-card { padding: 26px 20px; border-radius: 14px; }
   }
 
+  /* ---------- Nav groups (تجميع منطقي — يظهر كعناوين فرعية صغيرة على
+     سطح المكتب، ويبقى نفس التجميع داخل الدرج على الهاتف) ---------- */
+  .nav-group { display: flex; flex-direction: column; gap: 4px; }
+  .nav-group-label {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px;
+    opacity: 0.55; padding: 8px 12px 2px;
+  }
+
+  /* ---------- شريط علوي + زر قائمة للهاتف (مخفيان على سطح المكتب) ---------- */
+  .mobile-topbar { display: none; }
+  .nav-toggle {
+    display: none; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 9px; flex: 0 0 auto;
+    background: rgba(247,245,239,0.12); border: none; color: inherit; cursor: pointer;
+  }
+  .nav-toggle svg { width: 20px; height: 20px; }
+  .nav-backdrop[hidden] { display: none; }
+
   @media (max-width: 860px) {
     .app { flex-direction: column; }
-    .nav { width: 100%; height: auto; flex-direction: row; align-items: center; position: sticky; padding: 10px 12px; overflow-x: auto; }
-    .brand { padding: 4px 8px; }
+
+    .mobile-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--teal-900); color: var(--paper-50);
+      padding: 10px 14px; position: sticky; top: 0; z-index: 500;
+    }
+    .mobile-topbar .brand { padding: 0; gap: 8px; }
+    .mobile-topbar .brand .name { font-size: 15px; font-weight: 700; }
+    .nav-toggle { display: flex; }
+
+    .nav-backdrop { position: fixed; inset: 0; background: rgba(15,20,35,0.55); z-index: 899; }
+
+    /* الدرج الجانبي: خارج الشاشة افتراضيًا (يمين، يتماشى مع RTL)، ينزلق
+       للداخل بإضافة .open (يضبطها app.js عند فتح/إغلاق القائمة). */
+    .nav {
+      position: fixed; top: 0; bottom: 0; right: 0;
+      width: min(280px, 85vw); height: 100vh;
+      flex-direction: column; align-items: stretch;
+      padding: 18px 14px; gap: 4px; overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.22s ease;
+      z-index: 900;
+    }
+    .nav.open { transform: translateX(0); }
     .brand .tagline { display: none; }
-    .navitem { flex-direction: column; gap: 4px; font-size: 10.5px; padding: 7px 10px; white-space: nowrap; }
-    .navsplit { display: none; }
-    .portal-toggle { display: none; }
+    .navitem { flex-direction: row; gap: 12px; font-size: 14px; padding: 11px 12px; min-height: 44px; white-space: normal; }
+    .navsplit { display: block; }
+    .portal-toggle { display: block; }
     .main { padding: 18px 16px 50px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .view { animation: none; }
+    .nav { transition: none; }
   }
 </style>
