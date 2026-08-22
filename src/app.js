@@ -12,6 +12,7 @@ import { mountCareerView } from "./modules/career/career-ui.js";
 import { mountPromotedView } from "./modules/promoted/promoted-ui.js";
 import { mountBackupView } from "./modules/backup/backup-ui.js";
 import { mountUsersView } from "./modules/users/users-ui.js";
+import { mountImportsView } from "./modules/imports/imports-ui.js";
 
 const STUB_LABELS = {};
 
@@ -164,7 +165,7 @@ async function renderView(viewName) {
       await mountAgendaView(main);
       break;
     case "students":
-      await mountStudentsView(main);
+      await mountStudentsView(main, { onGoto: renderView });
       break;
     case "grades":
       await mountGradesView(main, { onGoto: renderView });
@@ -179,13 +180,16 @@ async function renderView(viewName) {
       await mountCareerView(main);
       break;
     case "promoted":
-      await mountPromotedView(main);
+      await mountPromotedView(main, { onGoto: renderView });
       break;
     case "backup":
       await mountBackupView(main);
       break;
     case "users":
       await mountUsersView(main);
+      break;
+    case "imports":
+      await mountImportsView(main);
       break;
     default:
       mountStub(main, viewName);
@@ -207,6 +211,8 @@ function applyProfileToChrome(profile) {
   if (nameEl) nameEl.textContent = profile.full_name || profile.email || "مساحة المرشد";
   const usersNavItem = document.getElementById("users-nav-item");
   if (usersNavItem) usersNavItem.style.display = profile.is_admin ? "" : "none";
+  const importsNavItem = document.getElementById("imports-nav-item");
+  if (importsNavItem) importsNavItem.style.display = profile.is_admin ? "" : "none";
 }
 
 async function boot() {

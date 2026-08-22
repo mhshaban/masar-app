@@ -94,7 +94,7 @@ async function renderExportSection(root) {
   });
 }
 
-function renderImportSection(root, onRestored) {
+export function renderImportSection(root, onRestored) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
       <h2>استيراد نسخة احتياطية</h2>
@@ -155,14 +155,10 @@ function renderImportSection(root, onRestored) {
 export async function mountBackupView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>النسخ الاحتياطي</h1><div class="sub">بيانات مسار مخزّنة سحابيًا ومشتركة لكل الحسابات النشطة — هذه الشاشة لتصدير نسخة JSON للأرشفة، أو لاستيراد بيانات قديمة/محلية إلى السحابة</div></div>
+      <div><h1>النسخ الاحتياطي</h1><div class="sub">بيانات مسار مخزّنة سحابيًا ومشتركة لكل الحسابات النشطة — تصدير نسخة JSON للأرشفة (الاستيراد/الاستعادة صار من تبويب الاستيراد بالإدارة)</div></div>
     </div>
     <div id="backup-export"></div>
-    <div id="backup-import"></div>
   `;
 
   await renderExportSection(container.querySelector("#backup-export"));
-  renderImportSection(container.querySelector("#backup-import"), async () => {
-    window.location.reload();
-  });
 }

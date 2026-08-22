@@ -3,6 +3,7 @@ import {
 } from "./promoted-service.js";
 import { parseScheduleWorkbook, commitSchedule, commitScheduleFromPdfSections, getScheduleSummary } from "../schedule/schedule-service.js";
 import { extractPdfSectionSchedule } from "../../services/schedule-pdf-parser.js";
+import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -63,7 +64,7 @@ function renderReviewTable(root, rows, visibleCount, onLoadMore, onCommit) {
   root.querySelector("#promoted-commit").addEventListener("click", onCommit);
 }
 
-async function renderImportSection(root, onCommitted) {
+export async function renderImportSection(root, onCommitted) {
   root.innerHTML = `
     <div class="upload-zone" id="promoted-dropzone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
@@ -111,7 +112,7 @@ async function renderImportSection(root, onCommitted) {
   });
 }
 
-async function renderBatchHistory(root) {
+export async function renderBatchHistory(root) {
   const batches = await listPromotedBatches();
   if (!batches.length) {
     root.innerHTML = '<div class="card"><div class="empty">لا توجد دفعات استيراد بعد</div></div>';
@@ -148,10 +149,20 @@ async function renderBatchHistory(root) {
   });
 }
 
-async function renderPendingList(root) {
+async function renderPendingList(root, onGoto) {
   const rows = await listStudentsWithPendingSubjects();
   if (!rows.length) {
-    root.innerHTML = '<div class="card"><h2>طلاب لديهم مقررات لم تُجتَز بعد</h2><div class="empty">لا يوجد طلاب حاليًا (أو لم يُستورَد كشف المرفعين بعد)</div></div>';
+    const isAdmin = !!getCurrentProfile()?.is_admin;
+    root.innerHTML = `
+      <div class="card"><h2>طلاب لديهم مقررات لم تُجتَز بعد</h2>
+        <div class="empty">
+          لا يوجد طلاب حاليًا (أو لم يُستورَد كشف المرفعين بعد)
+          ${isAdmin ? '<div style="margin-top:12px;"><button class="btn btn-primary" id="promoted-goto-imports">الذهاب لتبويب الاستيراد</button></div>' : ""}
+        </div>
+      </div>
+    `;
+    const gotoBtn = root.querySelector("#promoted-goto-imports");
+    if (gotoBtn && onGoto) gotoBtn.addEventListener("click", () => onGoto("imports"));
     return;
   }
   root.innerHTML = `
@@ -183,7 +194,7 @@ async function renderScheduleSummary(root) {
   `;
 }
 
-async function renderScheduleImportSection(root, onCommitted) {
+export async function renderScheduleImportSection(root, onCommitted) {
   root.innerHTML = `
     <div class="card">
       <h2>الجدول الدراسي والساعات المكتبية</h2>
@@ -229,7 +240,7 @@ async function renderScheduleImportSection(root, onCommitted) {
 // المدرسة ترفع ملف PDF "جدول حصص الفصل الدراسي" الرسمي منفصلًا لكل شعبة.
 // يقبل عدة ملفات دفعة واحدة (شعبة واحدة لكل ملف)، ويعرض تقرير الشعب
 // المستخرجة قبل أي اعتماد فعلي — نفس فلسفة استيراد صور الطلبة.
-async function renderSchedulePdfImportSection(root, onCommitted) {
+export async function renderSchedulePdfImportSection(root, onCommitted) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
       <h2>استيراد جدول شعب (PDF)</h2>
@@ -295,29 +306,14 @@ async function renderSchedulePdfImportSection(root, onCommitted) {
   });
 }
 
-export async function mountPromotedView(container) {
+export async function mountPromotedView(container, { onGoto } = {}) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>الطلاب المرفعين</h1><div class="sub">طلاب انتقلوا من الإعدادية بمقررات لم تُستوفَ بعد — من شيت "المرفعين" في كشف الطلاب</div></div>
     </div>
     <div id="promoted-pending" style="margin-bottom:16px;"></div>
-    <div id="promoted-import"></div>
-    <div id="promoted-history" style="margin-top:20px;"></div>
-    <div id="schedule-import" style="margin-top:20px;"></div>
-    <div id="schedule-pdf-import"></div>
   `;
 
   const pendingRoot = container.querySelector("#promoted-pending");
-  const historyRoot = container.querySelector("#promoted-history");
-
-  await renderPendingList(pendingRoot);
-  await renderBatchHistory(historyRoot);
-  await renderImportSection(container.querySelector("#promoted-import"), async () => {
-    await renderPendingList(pendingRoot);
-    await renderBatchHistory(historyRoot);
-  });
-  await renderScheduleImportSection(container.querySelector("#schedule-import"), async () => {});
-  await renderSchedulePdfImportSection(container.querySelector("#schedule-pdf-import"), async () => {
-    await renderScheduleSummary(container.querySelector("#schedule-summary"));
-  });
+  await renderPendingList(pendingRoot, onGoto);
 }

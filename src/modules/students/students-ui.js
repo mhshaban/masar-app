@@ -4,6 +4,7 @@ import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
 import { matchPhotoFiles, commitPhotoMatches } from "../../services/photos-import-service.js";
+import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -44,7 +45,7 @@ function resizeImageToDataUrl(file) {
 // يستورد شيت "كشف الطلاب" من نفس ملف كشف الطلاب الكامل المستخدم لبقية
 // الاستيرادات — عبر cloud-runtime.js، خلف تسجيل الدخول + RLS، بدل ملف ثابت
 // بالمستودع العام (كان يعني أي زائر يقدر يجلب بيانات الطلبة مباشرة).
-function renderImportSection(root, { onImported, isUpdate }) {
+export function renderImportSection(root, { onImported, isUpdate }) {
   root.innerHTML = `
     <div class="card">
       <h2>${isUpdate ? "تحديث سجل الطلبة" : "استيراد سجل الطلبة"}</h2>
@@ -90,12 +91,12 @@ function renderImportSection(root, { onImported, isUpdate }) {
 // نفس درس أزمة رفع شهادات PDF الكبيرة سابقًا.
 const PHOTO_COMMIT_BATCH = 40;
 
-function renderPhotoImportSection(root, { onImported }) {
+export function renderPhotoImportSection(root, { onImported }) {
   root.innerHTML = `
     <div class="card">
       <h2>استيراد صور الطلبة</h2>
       <p class="hint">اختر كل ملفات الصور دفعة واحدة — لازم يكون اسم كل ملف هو الرقم الأكاديمي للطالب (مثال: 20254220.jpg). تتم المطابقة تلقائيًا ويظهر تقرير قبل الحفظ.</p>
-      <input type="file" id="photos-import-input" accept="image/*" multiple style="margin-bottom:12px;">
+      <input type="file" id="photos-import-input" aria-label="صور الطلبة" accept="image/*" multiple style="margin-bottom:12px;">
       <div id="photos-import-preview"></div>
     </div>
   `;
@@ -155,17 +156,19 @@ function renderPhotoImportSection(root, { onImported }) {
   });
 }
 
-function renderEmptyState(container) {
+function renderEmptyState(container, { isAdmin, onGoto } = {}) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>سجل الطلبة</h1><div class="sub">لا يوجد سجل طلبة مستورَد بعد</div></div>
     </div>
-    <div id="students-import-root"></div>
+    <div class="card"><div class="empty">
+      ${isAdmin
+        ? '<p style="margin:0 0 12px;">استورد كشف الطلاب من تبويب الاستيراد بالإدارة.</p><button class="btn btn-primary" id="students-goto-imports">الذهاب لتبويب الاستيراد</button>'
+        : "تواصل مع مسؤول النظام لاستيراد سجل الطلبة."}
+    </div></div>
   `;
-  renderImportSection(container.querySelector("#students-import-root"), {
-    isUpdate: false,
-    onImported: () => mountStudentsView(container),
-  });
+  const gotoBtn = container.querySelector("#students-goto-imports");
+  if (gotoBtn && onGoto) gotoBtn.addEventListener("click", () => onGoto("imports"));
 }
 
 // onQueryChange is kept separate from onChange (level/department/track) and
@@ -471,10 +474,11 @@ async function renderDetail(container, id, onBack) {
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
 
-export async function mountStudentsView(container) {
+export async function mountStudentsView(container, { onGoto } = {}) {
   const status = await getRosterStatus();
   if (!status.available) {
-    renderEmptyState(container);
+    const profile = getCurrentProfile();
+    renderEmptyState(container, { isAdmin: !!profile?.is_admin, onGoto });
     return;
   }
 
@@ -484,35 +488,11 @@ export async function mountStudentsView(container) {
     <div class="topbar">
       <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي — بيانات مشتركة سحابيًا بين الحسابات النشطة، لا تُدفع إلى git</div></div>
       <div class="meta" id="students-count"></div>
-      <button class="btn btn-ghost" id="students-toggle-photos" style="margin-inline-start:8px;">استيراد صور الطلبة</button>
-      <button class="btn btn-ghost" id="students-toggle-import" style="margin-inline-start:8px;">تحديث سجل الطلبة</button>
     </div>
-    <div id="students-photos-root" style="display:none;margin-bottom:16px;"></div>
-    <div id="students-import-root" style="display:none;margin-bottom:16px;"></div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>
     <div id="students-results"></div>
   `;
-
-  const importRoot = container.querySelector("#students-import-root");
-  container.querySelector("#students-toggle-import").addEventListener("click", () => {
-    const hidden = importRoot.style.display === "none";
-    importRoot.style.display = hidden ? "" : "none";
-    if (hidden && !importRoot.dataset.mounted) {
-      importRoot.dataset.mounted = "1";
-      renderImportSection(importRoot, { isUpdate: true, onImported: () => mountStudentsView(container) });
-    }
-  });
-
-  const photosRoot = container.querySelector("#students-photos-root");
-  container.querySelector("#students-toggle-photos").addEventListener("click", () => {
-    const hidden = photosRoot.style.display === "none";
-    photosRoot.style.display = hidden ? "" : "none";
-    if (hidden && !photosRoot.dataset.mounted) {
-      photosRoot.dataset.mounted = "1";
-      renderPhotoImportSection(photosRoot, { onImported: () => mountStudentsView(container) });
-    }
-  });
 
   const stats = await getRosterStats();
   const topLevels = Object.entries(stats.byLevel);

@@ -10,6 +10,7 @@ import {
 import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
 import { downloadRowsAsXlsx } from "../../services/xlsx-export.js";
+import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -236,7 +237,7 @@ async function renderBatchHistory(root) {
   });
 }
 
-async function renderImportTab(root) {
+export async function renderImportTab(root) {
   root.innerHTML = `
     <div class="upload-zone" id="grades-dropzone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
@@ -308,10 +309,18 @@ async function renderImportTab(root) {
   });
 }
 
-async function renderAnalyticsTab(root) {
+async function renderAnalyticsTab(root, onGoto) {
   const stats = await getGradeStats();
   if (!stats.total) {
-    root.innerHTML = '<div class="card"><div class="empty">لا توجد درجات مستوردة بعد</div></div>';
+    const isAdmin = !!getCurrentProfile()?.is_admin;
+    root.innerHTML = `
+      <div class="card"><div class="empty">
+        لا توجد درجات مستوردة بعد
+        ${isAdmin ? '<div style="margin-top:12px;"><button class="btn btn-primary" id="grades-goto-imports">الذهاب لتبويب الاستيراد</button></div>' : ""}
+      </div></div>
+    `;
+    const gotoBtn = root.querySelector("#grades-goto-imports");
+    if (gotoBtn && onGoto) gotoBtn.addEventListener("click", () => onGoto("imports"));
     return;
   }
   root.innerHTML = `
@@ -527,25 +536,21 @@ async function renderClassificationTab(root, onGoto) {
 export async function mountGradesView(container, { onGoto } = {}) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الدرجات والتحليلات</h1><div class="sub">استيراد كشوف الدرجات من إكسل ومراجعتها قبل الاعتماد</div></div>
+      <div><h1>الدرجات والتحليلات</h1><div class="sub">تحليلات ومعدلات الطلبة من الدرجات المستوردة</div></div>
     </div>
     <div class="tabs">
-      <div class="tab active" data-tab="import">استيراد</div>
-      <div class="tab" data-tab="analytics">التحليلات</div>
+      <div class="tab active" data-tab="analytics">التحليلات</div>
       <div class="tab" data-tab="classification">تصنيف الطلاب</div>
     </div>
-    <div id="grades-import-root"></div>
-    <div id="grades-analytics-root" style="display:none;"></div>
+    <div id="grades-analytics-root"></div>
     <div id="grades-classification-root" style="display:none;"></div>
   `;
 
-  const importRoot = container.querySelector("#grades-import-root");
   const analyticsRoot = container.querySelector("#grades-analytics-root");
   const classificationRoot = container.querySelector("#grades-classification-root");
-  const roots = { import: importRoot, analytics: analyticsRoot, classification: classificationRoot };
+  const roots = { analytics: analyticsRoot, classification: classificationRoot };
 
-  await renderImportTab(importRoot);
-  await renderAnalyticsTab(analyticsRoot);
+  await renderAnalyticsTab(analyticsRoot, onGoto);
 
   container.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", async () => {
@@ -553,7 +558,7 @@ export async function mountGradesView(container, { onGoto } = {}) {
       tab.classList.add("active");
       const active = tab.dataset.tab;
       Object.entries(roots).forEach(([key, root]) => { root.style.display = key === active ? "" : "none"; });
-      if (active === "analytics") await renderAnalyticsTab(analyticsRoot);
+      if (active === "analytics") await renderAnalyticsTab(analyticsRoot, onGoto);
       if (active === "classification") await renderClassificationTab(classificationRoot, onGoto);
     });
   });
