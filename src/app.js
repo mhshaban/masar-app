@@ -1,20 +1,43 @@
-import { seedIfEmpty } from "./services/seed-runtime.js";
 import { setActiveView } from "./core/store.js";
-import { getSession, getCurrentProfile, refreshProfile, login, logout, consumeSessionExpiredNotice } from "./services/auth-service.js";
-import { mountDashboardView } from "./modules/dashboard/dashboard-ui.js";
-import { mountDepartmentPlanView } from "./modules/department-plan/department-plan-ui.js";
-import { mountAgendaView } from "./modules/agenda/agenda-ui.js";
-import { mountStudentsView } from "./modules/students/students-ui.js";
-import { mountGradesView } from "./modules/grades/grades-ui.js";
-import { mountCasesView } from "./modules/cases/guidance-ui.js";
-import { mountSupportView } from "./modules/support/support-ui.js";
-import { mountCareerView } from "./modules/career/career-ui.js";
-import { mountPromotedView } from "./modules/promoted/promoted-ui.js";
-import { mountBackupView } from "./modules/backup/backup-ui.js";
-import { mountUsersView } from "./modules/users/users-ui.js";
-import { mountImportsView } from "./modules/imports/imports-ui.js";
+import {
+  getSession,
+  getCurrentProfile,
+  refreshProfile,
+  login,
+  logout,
+  consumeSessionExpiredNotice,
+  requestPasswordReset,
+  consumeRecoverySession,
+  updateRecoveredPassword,
+} from "./services/auth-service.js";
 
-const STUB_LABELS = {};
+const VIEW_LOADERS = {
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js")).mountDashboardView,
+  plan: async () => (await import("./modules/department-plan/department-plan-ui.js")).mountDepartmentPlanView,
+  agenda: async () => (await import("./modules/agenda/agenda-ui.js")).mountAgendaView,
+  students: async () => (await import("./modules/students/students-ui.js")).mountStudentsView,
+  grades: async () => (await import("./modules/grades/grades-ui.js")).mountGradesView,
+  cases: async () => (await import("./modules/cases/guidance-ui.js")).mountCasesView,
+  support: async () => (await import("./modules/support/support-ui.js")).mountSupportView,
+  career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
+  promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
+  backup: async () => (await import("./modules/backup/backup-ui.js")).mountBackupView,
+  users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
+  imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
+};
+const VIEW_OPTIONS = {
+  dashboard: () => ({ onGoto: renderView }),
+  students: () => ({ onGoto: renderView }),
+  grades: () => ({ onGoto: renderView }),
+  promoted: () => ({ onGoto: renderView }),
+};
+const ADMIN_VIEWS = new Set(["imports", "backup", "users"]);
+const loadedViews = new Map();
+let currentProfile = null;
+
+function isAdmin(profile) {
+  return profile?.role === "admin" || profile?.is_admin === true;
+}
 
 // شاشة دخول حقيقية (Supabase Auth) — تحل محل قفل الـ PIN المحلي القديم.
 // واجهة مستقلة تمامًا: تُبنى داخل #login-root (خارج #app-shell المخفي
@@ -45,11 +68,14 @@ function showLoginScreen() {
           </div>
           <div class="login-field">
             <label for="login-password">كلمة المرور</label>
-            <input id="login-password" name="password" type="password" autocomplete="current-password" required aria-describedby="login-error">
+            <div class="password-control">
+              <input id="login-password" name="password" type="password" autocomplete="current-password" required aria-describedby="login-error">
+              <button type="button" class="password-toggle" id="password-toggle" aria-label="إظهار كلمة المرور" aria-pressed="false">إظهار</button>
+            </div>
           </div>
           <div id="login-error" class="login-notice error" role="status" aria-live="polite" hidden></div>
           <button type="submit" class="btn btn-primary login-submit" id="login-submit">دخول</button>
-          <p class="login-forgot">هل نسيت كلمة المرور؟ لا يوجد استرجاع ذاتي حاليًا — تواصل مع مسؤول النظام بالقسم لإعادة تعيينها.</p>
+          <p class="login-forgot"><button type="button" class="link-btn" id="forgot-password">هل نسيت كلمة المرور؟</button></p>
         </form>
       </main>
     `;
@@ -59,20 +85,57 @@ function showLoginScreen() {
     const passwordInput = root.querySelector("#login-password");
     const errorEl = root.querySelector("#login-error");
     const submitBtn = root.querySelector("#login-submit");
+    const passwordToggle = root.querySelector("#password-toggle");
+    const forgotPassword = root.querySelector("#forgot-password");
     identifierInput.focus();
 
+    passwordToggle.addEventListener("click", () => {
+      const show = passwordInput.type === "password";
+      passwordInput.type = show ? "text" : "password";
+      passwordToggle.textContent = show ? "إخفاء" : "إظهار";
+      passwordToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
+      passwordToggle.setAttribute("aria-pressed", show ? "true" : "false");
+      passwordInput.focus();
+    });
+
     const showError = (message) => {
+      errorEl.classList.remove("info");
+      errorEl.classList.add("error");
       errorEl.textContent = message;
       errorEl.hidden = false;
       identifierInput.setAttribute("aria-invalid", "true");
       passwordInput.setAttribute("aria-invalid", "true");
     };
     const clearError = () => {
+      errorEl.classList.remove("info");
+      errorEl.classList.add("error");
       errorEl.textContent = "";
       errorEl.hidden = true;
       identifierInput.removeAttribute("aria-invalid");
       passwordInput.removeAttribute("aria-invalid");
     };
+
+    forgotPassword.addEventListener("click", async () => {
+      const identifier = identifierInput.value.trim();
+      if (!identifier) {
+        showError("أدخل اسم المستخدم أو البريد الإلكتروني أولًا.");
+        identifierInput.focus();
+        return;
+      }
+      clearError();
+      forgotPassword.disabled = true;
+      try {
+        await requestPasswordReset(identifier);
+        errorEl.classList.remove("error");
+        errorEl.classList.add("info");
+        errorEl.textContent = "إذا كان الحساب مرتبطًا ببريد صالح فسيصلك رابط استرجاع كلمة المرور.";
+        errorEl.hidden = false;
+      } catch (error) {
+        showError(error.message || "تعذر إرسال رابط الاسترجاع. حاول لاحقًا.");
+      } finally {
+        forgotPassword.disabled = false;
+      }
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -104,12 +167,78 @@ function showLoginScreen() {
   });
 }
 
-function mountStub(container, viewName) {
-  const info = STUB_LABELS[viewName] || { title: viewName, note: "" };
-  container.innerHTML = `
-    <div class="topbar"><div><h1>${info.title}</h1><div class="sub">قيد الإنشاء</div></div></div>
-    <div class="card"><div class="empty">${info.note}</div></div>
-  `;
+function showPasswordRecoveryScreen() {
+  return new Promise((resolve) => {
+    const root = document.getElementById("login-root");
+    root.innerHTML = `
+      <main class="login-screen" aria-labelledby="recovery-title">
+        <form class="login-card" id="recovery-form" novalidate>
+          <div class="login-mark" aria-hidden="true">م</div>
+          <h1 id="recovery-title">تعيين كلمة مرور جديدة</h1>
+          <p class="login-sub">اختر كلمة مرور قوية لا تقل عن 8 أحرف.</p>
+          <div class="login-field">
+            <label for="recovery-password">كلمة المرور الجديدة</label>
+            <input id="recovery-password" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <div class="login-field">
+            <label for="recovery-confirm">تأكيد كلمة المرور</label>
+            <input id="recovery-confirm" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <div id="recovery-error" class="login-notice error" role="status" aria-live="polite" hidden></div>
+          <button type="submit" class="btn btn-primary login-submit">حفظ كلمة المرور</button>
+        </form>
+      </main>
+    `;
+    const form = root.querySelector("#recovery-form");
+    const password = root.querySelector("#recovery-password");
+    const confirm = root.querySelector("#recovery-confirm");
+    const errorEl = root.querySelector("#recovery-error");
+    const button = form.querySelector("button[type=submit]");
+    password.focus();
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorEl.hidden = true;
+      if (password.value.length < 8) {
+        errorEl.textContent = "كلمة المرور يجب ألا تقل عن 8 أحرف.";
+        errorEl.hidden = false;
+        return;
+      }
+      if (password.value !== confirm.value) {
+        errorEl.textContent = "كلمتا المرور غير متطابقتين.";
+        errorEl.hidden = false;
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "جارٍ الحفظ…";
+      try {
+        await updateRecoveredPassword(password.value);
+        root.innerHTML = `
+          <main class="login-screen"><div class="login-card recovery-success" role="status">
+            <div class="login-mark" aria-hidden="true">م</div>
+            <h1>تم تحديث كلمة المرور</h1>
+            <p>يمكنك الآن تسجيل الدخول باستخدام كلمة المرور الجديدة.</p>
+            <button type="button" class="btn btn-primary" id="return-login">العودة لتسجيل الدخول</button>
+          </div></main>`;
+        root.querySelector("#return-login").addEventListener("click", resolve);
+      } catch (error) {
+        errorEl.textContent = error.message || "تعذر تحديث كلمة المرور.";
+        errorEl.hidden = false;
+        button.disabled = false;
+        button.textContent = "حفظ كلمة المرور";
+      }
+    });
+  });
+}
+
+function loadView(viewName) {
+  if (!loadedViews.has(viewName)) {
+    const pending = VIEW_LOADERS[viewName]().catch((error) => {
+      loadedViews.delete(viewName);
+      throw error;
+    });
+    loadedViews.set(viewName, pending);
+  }
+  return loadedViews.get(viewName);
 }
 
 const main = document.getElementById("main-view");
@@ -143,6 +272,8 @@ if (navToggleBtn) {
 // لكل ضغطة تنقّل داخلية) — فقط عشان تبقى نفس الصفحة لو المستخدم عمل
 // تحديث (F5) للمتصفح، بدون بناء نظام توجيه كامل جديد غير موجود أصلًا.
 async function renderView(viewName) {
+  if (!VIEW_LOADERS[viewName]) viewName = "dashboard";
+  if (ADMIN_VIEWS.has(viewName) && !isAdmin(currentProfile)) viewName = "dashboard";
   navButtons.forEach((b) => {
     const active = b.dataset.view === viewName;
     b.classList.toggle("active", active);
@@ -153,46 +284,24 @@ async function renderView(viewName) {
   history.replaceState(null, "", `#${viewName}`);
   main.setAttribute("aria-busy", "true");
   closeMobileNav();
+  main.innerHTML = '<div class="empty view-loading" role="status">جارٍ تحميل الصفحة…</div>';
 
-  switch (viewName) {
-    case "dashboard":
-      await mountDashboardView(main, { onGoto: renderView });
-      break;
-    case "plan":
-      await mountDepartmentPlanView(main);
-      break;
-    case "agenda":
-      await mountAgendaView(main);
-      break;
-    case "students":
-      await mountStudentsView(main, { onGoto: renderView });
-      break;
-    case "grades":
-      await mountGradesView(main, { onGoto: renderView });
-      break;
-    case "cases":
-      await mountCasesView(main);
-      break;
-    case "support":
-      await mountSupportView(main);
-      break;
-    case "career":
-      await mountCareerView(main);
-      break;
-    case "promoted":
-      await mountPromotedView(main, { onGoto: renderView });
-      break;
-    case "backup":
-      await mountBackupView(main);
-      break;
-    case "users":
-      await mountUsersView(main);
-      break;
-    case "imports":
-      await mountImportsView(main);
-      break;
-    default:
-      mountStub(main, viewName);
+  try {
+    const mount = await loadView(viewName);
+    await mount(main, VIEW_OPTIONS[viewName]?.() || undefined);
+    if (currentProfile?.role === "read_only") {
+      main.insertAdjacentHTML("afterbegin", '<div class="readonly-banner" role="status">أنت في وضع القراءة فقط — عمليات التعديل محمية من قاعدة البيانات.</div>');
+    }
+  } catch (error) {
+    console.error("تعذر تحميل الصفحة", error);
+    main.innerHTML = `
+      <div class="card load-failure" role="alert">
+        <h1>تعذر تحميل الصفحة</h1>
+        <p>تحقق من اتصال الإنترنت ثم حاول مجددًا.</p>
+        <button type="button" class="btn btn-primary" id="retry-view">إعادة المحاولة</button>
+      </div>
+    `;
+    main.querySelector("#retry-view")?.addEventListener("click", () => renderView(viewName));
   }
   main.removeAttribute("aria-busy");
   window.scrollTo(0, 0);
@@ -207,15 +316,25 @@ navButtons.forEach((btn) => {
 });
 
 function applyProfileToChrome(profile) {
+  const role = profile.role || (profile.is_admin ? "admin" : "counselor");
+  const admin = isAdmin(profile);
+  document.documentElement.dataset.userRole = role;
   const nameEl = document.getElementById("current-user-name");
   if (nameEl) nameEl.textContent = profile.full_name || profile.email || "مساحة المرشد";
   const usersNavItem = document.getElementById("users-nav-item");
-  if (usersNavItem) usersNavItem.style.display = profile.is_admin ? "" : "none";
+  if (usersNavItem) usersNavItem.style.display = admin ? "" : "none";
   const importsNavItem = document.getElementById("imports-nav-item");
-  if (importsNavItem) importsNavItem.style.display = profile.is_admin ? "" : "none";
+  if (importsNavItem) importsNavItem.style.display = admin ? "" : "none";
+  const backupNavItem = document.getElementById("backup-nav-item");
+  if (backupNavItem) backupNavItem.style.display = admin ? "" : "none";
+  const roleEl = document.getElementById("current-user-role");
+  if (roleEl) roleEl.textContent = ({ admin: "إدمن", counselor: "مرشد", read_only: "قراءة فقط" })[role] || "مرشد";
 }
 
 async function boot() {
+  if (consumeRecoverySession()) {
+    await showPasswordRecoveryScreen();
+  }
   let profile = getSession() ? getCurrentProfile() : null;
   // جلسة محفوظة من نفس التبويب (sessionStorage) — نتأكد إنها لسا صالحة
   // وإن الحساب لسا نشط قبل ما نثق فيها (لو تم تعطيله بالسحابة بالمنتصف).
@@ -226,6 +345,7 @@ async function boot() {
   if (!profile) {
     profile = await showLoginScreen();
   }
+  currentProfile = profile;
 
   // دخول ناجح فعليًا من هنا — نظهر هيكل التطبيق (كان hidden منذ التحميل
   // الأول، خارج شجرة الوصولية تمامًا) ونحذف شاشة الدخول نهائيًا من الصفحة.
@@ -234,6 +354,7 @@ async function boot() {
 
   applyProfileToChrome(profile);
 
+  const { seedIfEmpty } = await import("./services/seed-runtime.js");
   await seedIfEmpty();
   // يحافظ على الصفحة الحالية بعد تحديث المتصفح (F5) لو كان الهاش يطابق
   // صفحة معروفة فعليًا — وإلا يرجع للرئيسية كسلوك افتراضي آمن.
@@ -250,3 +371,4 @@ async function boot() {
 }
 
 boot();
+import("./pwa.js").then(({ initPwa }) => initPwa()).catch(() => {});

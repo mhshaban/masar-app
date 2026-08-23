@@ -1,7 +1,6 @@
 // مسار — إدارة الحسابات (Edge Function). نسخة مبسّطة مستوحاة من نمط
 // admin-users في تطبيق CCE (بدون نسخ الكود نفسه، وبدون أي تعديل على
-// مستودع CCE) — لا أدوار متعددة هنا: أي حساب profiles.is_active=true له
-// وصول كامل لبيانات الطلاب، و profiles.is_admin=true فقط يقدر يدير الحسابات.
+// مستودع CCE) — يدير أدوار admin/counselor/read_only من طرف الخادم.
 //
 // يستخدم service_role key من أسرار بيئة الدالة فقط (تُضبط من لوحة تحكم
 // Supabase مباشرة) — هذا المفتاح لا يدخل الكود ولا يُرفع لأي مكان بالمستودع.
@@ -23,6 +22,7 @@ const fail = (message: string, status = 400) => json({ error: message }, status)
 
 const normalizeUsername = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '')
 const validUsername = (value: string) => /^[a-z0-9][a-z0-9._-]{2,31}$/.test(value)
+const validRoles = new Set(['admin', 'counselor', 'read_only'])
 // إيميل داخلي اصطناعي عند إنشاء حساب باسم مستخدم فقط (بدون إيميل حقيقي) —
 // يطابق نفس منطق masar_resolve_login_identifier بملف SQL (يقارن الجزء قبل
 // @ من هذا الإيميل باسم المستخدم المُدخَل بشاشة الدخول).
@@ -69,11 +69,11 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile, error: callerProfileError } = await admin
     .from('profiles')
-    .select('id,is_admin,is_active')
+    .select('id,is_admin,is_active,role')
     .eq('id', caller.id)
     .maybeSingle()
   if (callerProfileError) return fail(callerProfileError.message, 500)
-  if (!callerProfile?.is_active || !callerProfile?.is_admin) {
+  if (!callerProfile?.is_active || !(callerProfile?.is_admin || callerProfile?.role === 'admin')) {
     return fail('You do not have permission to manage accounts', 403)
   }
 
@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
       const email = requestedEmail || internalEmailFor(username)
       const password = String(user.password ?? '')
       const fullName = String(user.full_name ?? '').trim()
+      const role = validRoles.has(String(user.role ?? '')) ? String(user.role) : (user.is_admin === true ? 'admin' : 'counselor')
       if (!validUsername(username) || !fullName || password.length < 8) {
         return fail('الاسم الكامل، اسم مستخدم صالح، وكلمة مرور 8 أحرف على الأقل مطلوبة')
       }
@@ -137,14 +138,15 @@ Deno.serve(async (req) => {
         id: userId,
         email,
         full_name: fullName,
-        is_admin: user.is_admin === true,
+        role,
+        is_admin: role === 'admin',
         is_active: true,
       })
       if (profileError) {
         await admin.auth.admin.deleteUser(userId)
         return fail(profileError.message)
       }
-      await audit('create_user', userId, null, { email, full_name: fullName, is_admin: user.is_admin === true })
+      await audit('create_user', userId, null, { email, full_name: fullName, role })
       return json({ ok: true, user_id: userId })
     }
 
@@ -158,6 +160,19 @@ Deno.serve(async (req) => {
       const { error } = await admin.from('profiles').update({ is_active: isActive }).eq('id', userId)
       if (error) return fail(error.message)
       await audit(isActive ? 'activate_user' : 'deactivate_user', userId, oldProfile, { ...oldProfile, is_active: isActive })
+      return json({ ok: true })
+    }
+
+    if (action === 'set_role') {
+      const userId = String(input.user_id ?? '')
+      const role = String(input.role ?? '')
+      if (!userId || !validRoles.has(role)) return fail('دور المستخدم غير صالح')
+      if (userId === caller.id && role !== 'admin') return fail('لا يمكنك إزالة صلاحية الإدمن من حسابك أنت')
+      const { data: oldProfile, error: readError } = await admin.from('profiles').select('*').eq('id', userId).maybeSingle()
+      if (readError) return fail(readError.message, 500)
+      const { error } = await admin.from('profiles').update({ role, is_admin: role === 'admin' }).eq('id', userId)
+      if (error) return fail(error.message)
+      await audit('set_role', userId, oldProfile, { ...oldProfile, role, is_admin: role === 'admin' })
       return json({ ok: true })
     }
 

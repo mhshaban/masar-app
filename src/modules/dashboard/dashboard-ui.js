@@ -1,8 +1,6 @@
-import { getAgendaProgressSummary } from "../agenda/agenda-service.js";
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
-import { listStudentsNeedingAttention, NEED_LABELS } from "./followup-needs-service.js";
-import { listStaleOpenCases } from "../cases/guidance-service.js";
-import { listOverdueActions } from "../support/support-service.js";
+import { NEED_LABELS } from "./followup-needs-service.js";
+import { loadDashboardSnapshot } from "./dashboard-service.js";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -99,12 +97,7 @@ async function renderRemindersCard(root) {
 }
 
 export async function mountDashboardView(container, { onGoto }) {
-  const [agenda, attentionRows, staleCases, overdueSupportActions] = await Promise.all([
-    getAgendaProgressSummary(),
-    listStudentsNeedingAttention(),
-    listStaleOpenCases(),
-    listOverdueActions(),
-  ]);
+  const { agenda, attentionRows, staleCases, overdueSupportActions } = await loadDashboardSnapshot();
 
   container.innerHTML = `
     <div class="topbar">

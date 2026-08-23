@@ -152,7 +152,8 @@ export async function renderBatchHistory(root) {
 async function renderPendingList(root, onGoto) {
   const rows = await listStudentsWithPendingSubjects();
   if (!rows.length) {
-    const isAdmin = !!getCurrentProfile()?.is_admin;
+    const profile = getCurrentProfile();
+    const isAdmin = profile?.role === "admin" || profile?.is_admin === true;
     root.innerHTML = `
       <div class="card"><h2>طلاب لديهم مقررات لم تُجتَز بعد</h2>
         <div class="empty">

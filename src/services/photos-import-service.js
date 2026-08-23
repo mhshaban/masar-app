@@ -3,6 +3,8 @@
 // كل طالب على حِدة.
 import { list as listAll, bulkPut } from "./cloud-runtime.js";
 import { normalizeArabicIndicDigits } from "./text-normalize.js";
+import { invalidateStudentsCache } from "../modules/students/students-service.js";
+import { dataUrlToBlob, uploadStudentPhoto } from "./student-photo-storage.js";
 
 // اسم الملف عادة الرقم الأكاديمي وحده ("20254220.jpg")، لكن قد يحمل زوائد
 // حقيقية (بادئة كاميرا "IMG_"، اسم الطالب بجانبه، أرقام عربية-هندية). نطبّع
@@ -55,7 +57,34 @@ export async function matchPhotoFiles(files) {
 // يكتب دفعة واحدة (bulkPut مجزّأة داخليًا) بدل استدعاء حفظ منفصل لكل طالب —
 // أسرع بكثير مع مئات/آلاف الصور وأقل عرضة لتعليق المتصفح.
 export async function commitPhotoMatches(resolved) {
-  const records = resolved.map(({ student, dataUrl }) => ({ ...student, photo: dataUrl }));
+  const records = await Promise.all(resolved.map(async ({ student, blob, dataUrl }) => {
+    if (blob) {
+      const photoPath = await uploadStudentPhoto(student.id, blob);
+      return { ...student, photoPath, photo: null };
+    }
+    return { ...student, photo: dataUrl };
+  }));
   if (records.length) await bulkPut("students", records);
+  invalidateStudentsCache();
   return records.length;
+}
+
+export async function migrateLegacyStudentPhotos(onProgress = () => {}) {
+  const students = await listAll("students");
+  const legacy = students.filter((student) => typeof student.photo === "string" && student.photo.startsWith("data:image/"));
+  let migrated = 0;
+  const failed = [];
+  for (const student of legacy) {
+    try {
+      const blob = dataUrlToBlob(student.photo);
+      const photoPath = await uploadStudentPhoto(student.id, blob);
+      await bulkPut("students", [{ ...student, photoPath, photo: null }]);
+      migrated += 1;
+    } catch (error) {
+      failed.push({ studentId: student.id, message: error.message });
+    }
+    onProgress({ total: legacy.length, migrated, failed: failed.length });
+  }
+  invalidateStudentsCache();
+  return { total: legacy.length, migrated, failed };
 }

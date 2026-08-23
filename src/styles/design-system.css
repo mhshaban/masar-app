@@ -115,6 +115,8 @@
   }
   body { direction: rtl; }
 
+  .standalone body { min-height: 100dvh; }
+
   .app { display: flex; min-height: 100vh; }
   /* [hidden] الافتراضي من المتصفح (display:none) يتساوى بالتخصيص مع .app
      (display:flex) — وقاعدة صفحتنا تكسبه عادةً لأنها ليست UA stylesheet.
@@ -175,19 +177,20 @@
 
   .navsplit { height: 1px; background: rgba(247,245,239,0.14); margin: 12px 4px; }
 
-  .portal-toggle {
+  .user-panel {
     margin-top: auto;
     padding: 10px;
     border-radius: 10px;
     background: rgba(247,245,239,0.07);
     font-size: 12.5px;
   }
-  .portal-toggle .row { display: flex; gap: 6px; margin-top: 8px; }
-  .portal-toggle button {
+  .user-panel .row { display: flex; gap: 6px; margin-top: 8px; }
+  .user-role { margin-top: 7px; font-size: 11px; opacity: 0.72; }
+  .user-panel button {
     flex: 1; padding: 7px 6px; border-radius: 7px; border: 1px solid rgba(247,245,239,0.2);
     background: transparent; color: inherit; font-family: inherit; font-size: 12px; cursor: pointer;
   }
-  .portal-toggle button.on { background: var(--paper-50); color: var(--teal-900); font-weight: 700; border-color: transparent; }
+  .user-panel button.on { background: var(--paper-50); color: var(--teal-900); font-weight: 700; border-color: transparent; }
 
   /* ---------- Main ---------- */
   .main { flex: 1 1 auto; min-width: 0; padding: 26px 34px 60px; }
@@ -289,6 +292,7 @@
 
   .empty { text-align: center; padding: 30px 10px; color: var(--ink-500); font-size: 13px; }
   .empty[role="alert"] { color: var(--critical); }
+  .readonly-banner { margin-bottom: 14px; padding: 10px 12px; border: 1px solid var(--warning); border-radius: 9px; background: var(--warning-bg); color: var(--warning); font-size: 12.5px; }
 
   .toast-region {
     position: fixed; bottom: 18px; inset-inline-end: 18px; z-index: 10000;
@@ -312,6 +316,17 @@
   }
   .toast-close:focus-visible { outline: 2px solid var(--teal-600); outline-offset: 2px; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .install-card, .pwa-update-notice {
+    position: fixed; inset-inline: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 11000;
+    max-width: 420px; margin-inline: auto; padding: 16px 18px;
+    border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+    color: var(--ink-800); box-shadow: var(--shadow);
+  }
+  .install-card strong { display: block; margin-inline-end: 24px; }
+  .install-card p { margin: 6px 0 12px; color: var(--ink-500); font-size: 12.5px; line-height: 1.7; }
+  .install-dismiss { position: absolute; inset-inline-end: 8px; top: 7px; width: 36px; height: 36px; border: 0; background: none; color: var(--ink-500); font-size: 22px; cursor: pointer; }
+  .pwa-update-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
   .tab { padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--ink-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -357,9 +372,6 @@
   .match-ambiguous { color: var(--warning); }
   .match-unmatched { color: var(--critical); }
 
-  .portal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-  .portal-header .avatar-lg { width: 46px; height: 46px; border-radius: 50%; background: var(--teal-600); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; }
-
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
   a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible, tr:focus-visible {
     outline: 2px solid var(--clay-500); outline-offset: 2px;
@@ -378,7 +390,7 @@
     position: fixed; inset: 0; z-index: 9999;
     background: var(--teal-900);
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; box-sizing: border-box;
+    padding: calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left)); box-sizing: border-box;
     overflow-y: auto;
   }
   .login-card {
@@ -402,6 +414,14 @@
     border: 1px solid var(--border); font-size: 14px; background: var(--surface);
     color: inherit; font-family: inherit; min-height: 44px;
   }
+  .password-control { position: relative; }
+  .password-control input { padding-inline-end: 72px; }
+  .password-toggle {
+    position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%);
+    min-width: 58px; min-height: 36px; border: 0; border-radius: 7px;
+    background: var(--paper-100); color: var(--ink-600); font-family: inherit;
+    font-size: 11.5px; font-weight: 700; cursor: pointer;
+  }
   .login-field input[aria-invalid="true"] { border-color: var(--critical); }
   .login-notice {
     font-size: 12.5px; padding: 10px 12px; border-radius: 9px; margin-bottom: 14px;
@@ -414,6 +434,8 @@
   .login-submit { width: 100%; min-height: 44px; margin-top: 4px; }
   .login-forgot { display: block; text-align: center; margin-top: 16px; font-size: 12.5px; color: var(--ink-500); line-height: 1.6; }
   .login-forgot a { color: var(--teal-600); font-weight: 600; }
+  .recovery-success { text-align: center; }
+  .recovery-success p { color: var(--ink-500); line-height: 1.8; }
 
   @media (max-width: 420px) {
     .login-card { padding: 26px 20px; border-radius: 14px; }
@@ -443,7 +465,7 @@
     .mobile-topbar {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--teal-900); color: var(--paper-50);
-      padding: 10px 14px; position: sticky; top: 0; z-index: 500;
+      padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left)); position: sticky; top: 0; z-index: 500;
     }
     .mobile-topbar .brand { padding: 0; gap: 8px; }
     .mobile-topbar .brand .name { font-size: 15px; font-weight: 700; }
@@ -457,7 +479,7 @@
       position: fixed; top: 0; bottom: 0; right: 0;
       width: min(280px, 85vw); height: 100vh;
       flex-direction: column; align-items: stretch;
-      padding: 18px 14px; gap: 4px; overflow-y: auto;
+      padding: calc(18px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); gap: 4px; overflow-y: auto;
       transform: translateX(100%);
       transition: transform 0.22s ease;
       z-index: 900;
@@ -466,8 +488,8 @@
     .brand .tagline { display: none; }
     .navitem { flex-direction: row; gap: 12px; font-size: 14px; padding: 11px 12px; min-height: 44px; white-space: normal; }
     .navsplit { display: block; }
-    .portal-toggle { display: block; }
-    .main { padding: 18px 16px 50px; }
+    .user-panel { display: block; }
+    .main { padding: 18px max(16px, env(safe-area-inset-right)) calc(50px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 
     /* أزرار وحقول لمس مريحة (~44px) على الهاتف — بدون المساس بكثافة
        سطح المكتب. الحقول عبر التطبيق مصمَّمة أصلًا بـstyle مضمَّن
@@ -475,6 +497,8 @@
        خاصية غير موجودة بذاك الـstyle المضمَّن، فتُطبَّق فوقه بلا تعارض
        تخصيص — تغطي كل الحقول عبر الشاشات دون تعديل كل ملف على حدة. */
     .btn { min-height: 44px; }
+    .link-btn, .password-toggle { min-height: 44px; }
+    .link-btn { padding-block: 10px; }
     input, select, textarea { min-height: 44px; }
   }
 
@@ -483,4 +507,3 @@
     .nav { transition: none; }
     .toast { animation: none; }
   }
-</style>
