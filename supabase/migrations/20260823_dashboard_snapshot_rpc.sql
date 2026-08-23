@@ -83,7 +83,7 @@ overdue_json as (
     and a.data->>'dueDate' < current_date::text
 ),
 plan_actions as (
-  select p.id || '-a' || action->>'no' id
+  select p.id || '-a' || (action->>'no') id
   from public."departmentPlanProjects" p
   cross join lateral jsonb_array_elements(coalesce(p.data->'actions','[]'::jsonb)) action
 ),
