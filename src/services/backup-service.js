@@ -2,6 +2,13 @@ import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js";
 import { COLLECTIONS, DB_VERSION } from "../core/config.js";
 
 export async function buildBackup() {
+  if (!globalThis.__MASAR_TEST_BACKEND__) {
+    try {
+      return await rpc("masar_export_backup");
+    } catch (error) {
+      throw new Error("تعذر إنشاء النسخة الاحتياطية الآمنة. تأكد من تطبيق migration الصلاحيات والتصدير الإداري.", { cause: error });
+    }
+  }
   const collections = {};
   for (const name of COLLECTIONS) {
     collections[name] = await listAll(name);

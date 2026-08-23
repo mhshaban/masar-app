@@ -75,22 +75,44 @@ const CHUNK_SIZE = 500;
 // فعليًا — المشكلة بالقراءة فقط. نجلب صفحة صفحة حتى تكون آخر صفحة أصغر من
 // حجم الصفحة (يعني ما تبقى شي).
 const PAGE_SIZE = 1000;
+const READ_CACHE_MS = 5_000;
+const listCache = new Map();
+const inFlightLists = new Map();
+
+function invalidateCollection(collection) {
+  listCache.delete(collection);
+  inFlightLists.delete(collection);
+}
 
 export async function list(collection) {
   const backend = testBackend();
   if (backend) return backend.list(collection);
-  const allRows = [];
-  let offset = 0;
-  while (true) {
-    const res = await request(`${collection}?select=id,data&order=id.asc`, {
-      headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
-    });
-    const page = await res.json();
-    allRows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
+  const cached = listCache.get(collection);
+  if (cached && cached.until > Date.now()) return cached.rows;
+  if (inFlightLists.has(collection)) return inFlightLists.get(collection);
+
+  const pending = (async () => {
+    const allRows = [];
+    let offset = 0;
+    while (true) {
+      const res = await request(`${collection}?select=id,data&order=id.asc`, {
+        headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+      });
+      const page = await res.json();
+      allRows.push(...page);
+      if (page.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+    const rows = allRows.map(rowToRecord);
+    listCache.set(collection, { rows, until: Date.now() + READ_CACHE_MS });
+    return rows;
+  })();
+  inFlightLists.set(collection, pending);
+  try {
+    return await pending;
+  } finally {
+    if (inFlightLists.get(collection) === pending) inFlightLists.delete(collection);
   }
-  return allRows.map(rowToRecord);
 }
 
 // list() fetches an entire collection — correct for screens that genuinely
@@ -151,6 +173,7 @@ export async function save(collection, record) {
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify([{ id: toSave.id, data: toSave }]),
   });
+  invalidateCollection(collection);
   return toSave;
 }
 
@@ -169,6 +192,7 @@ export async function bulkPut(collection, records) {
       body: JSON.stringify(rows.slice(i, i + CHUNK_SIZE)),
     });
   }
+  invalidateCollection(collection);
 }
 
 export async function remove(collection, id) {
@@ -178,6 +202,7 @@ export async function remove(collection, id) {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },
   });
+  invalidateCollection(collection);
 }
 
 export async function count(collection) {
@@ -206,4 +231,5 @@ export async function clear(collection) {
       headers: { Prefer: "return=minimal" },
     });
   }
+  invalidateCollection(collection);
 }

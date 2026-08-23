@@ -11,6 +11,7 @@ import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } fro
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
 import { downloadRowsAsXlsx } from "../../services/xlsx-export.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
+import { ensureXlsx } from "../../services/vendor-loader.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -312,7 +313,8 @@ export async function renderImportTab(root) {
 async function renderAnalyticsTab(root, onGoto) {
   const stats = await getGradeStats();
   if (!stats.total) {
-    const isAdmin = !!getCurrentProfile()?.is_admin;
+    const profile = getCurrentProfile();
+    const isAdmin = profile?.role === "admin" || profile?.is_admin === true;
     root.innerHTML = `
       <div class="card"><div class="empty">
         لا توجد درجات مستوردة بعد
@@ -355,7 +357,7 @@ async function renderAnalyticsTab(root, onGoto) {
     exportBtn.textContent = "جارٍ التحضير… قد يستغرق دقيقة مع البيانات الكبيرة";
     statusRoot.innerHTML = "";
     try {
-      const rows = await buildGradesExportRows();
+      const [, rows] = await Promise.all([ensureXlsx(), buildGradesExportRows()]);
       downloadRowsAsXlsx(`درجات-مسار-${new Date().toISOString().slice(0, 10)}`, "الدرجات", rows);
     } catch (err) {
       statusRoot.innerHTML = `<p class="hint" style="color:var(--critical);">تعذّر التصدير: ${esc(err.message)}</p>`;

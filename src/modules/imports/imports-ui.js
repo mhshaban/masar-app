@@ -4,11 +4,8 @@
 // دوال العرض المستوردة من ملف الشاشة الأصلي (export مضاف لها هناك)، فقط
 // إعادة تجميع بصري — منطق القراءة/التحقق/الحفظ نفسه بلا أي تغيير.
 //
-// ملاحظة أمنية: الإخفاء هنا واجهة فقط (نفس نمط "إدارة المستخدمين" — العنصر
-// بالقائمة يُخفى لغير الإدمن). عمليات الاستيراد نفسها تكتب لنفس الجداول
-// المشتركة التي يقدر أي حساب نشط يكتب فيها أصلًا (قرار تصميم مؤكَّد سابقًا:
-// كل مرشد نشط له وصول كامل لبيانات القسم) — هذا تنظيم واجهة، لا تشديد صلاحيات
-// بقاعدة البيانات.
+// ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
+// لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
 import { getRosterStatus } from "../students/students-service.js";
 import { renderImportSection as renderStudentsRosterImport, renderPhotoImportSection } from "../students/students-ui.js";
 import { renderImportTab as renderGradesImportTab } from "../grades/grades-ui.js";
@@ -19,6 +16,7 @@ import {
   renderSchedulePdfImportSection,
 } from "../promoted/promoted-ui.js";
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
+import { ensurePdfJs, ensureXlsx } from "../../services/vendor-loader.js";
 
 const TABS = [
   { key: "students", label: "سجل الطلبة" },
@@ -28,6 +26,7 @@ const TABS = [
 ];
 
 async function mountStudentsTab(root) {
+  await ensureXlsx();
   const status = await getRosterStatus();
   root.innerHTML = `
     <div id="imports-students-roster" style="margin-bottom:16px;"></div>
@@ -43,10 +42,12 @@ async function mountStudentsTab(root) {
 }
 
 async function mountGradesTab(root) {
+  await Promise.all([ensureXlsx(), ensurePdfJs()]);
   await renderGradesImportTab(root);
 }
 
 async function mountPromotedTab(root) {
+  await Promise.all([ensureXlsx(), ensurePdfJs()]);
   root.innerHTML = `
     <div id="imports-promoted-roster" style="margin-bottom:16px;"></div>
     <div id="imports-promoted-history" style="margin-bottom:16px;"></div>

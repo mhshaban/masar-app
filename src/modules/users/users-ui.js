@@ -1,8 +1,8 @@
-// شاشة إدارة المستخدمين — تظهر فقط للحسابات is_admin (راجع app.js:
-// users-nav-item يُخفى/يُظهر بحسب profile.is_admin). كل عملية هنا تمر عبر
+// شاشة إدارة المستخدمين — تظهر فقط لدور admin (مع توافق is_admin القديم).
+// كل عملية هنا تمر عبر
 // admin-users Edge Function بمفتاح service_role من طرف الخادم — لا صلاحيات
 // إدارية تُتحقق أو تُمنح من الواجهة نفسها.
-import { listUsers, createAccount, setAccountActive, resetAccountPassword } from "../../services/auth-service.js";
+import { listUsers, createAccount, setAccountActive, setAccountRole, resetAccountPassword } from "../../services/auth-service.js";
 import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 
 function esc(str) {
@@ -10,6 +10,8 @@ function esc(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
+
+const ROLE_LABELS = { admin: "إدمن", counselor: "مرشد", read_only: "قراءة فقط" };
 
 async function renderList(container) {
   const listRoot = container.querySelector("#users-list");
@@ -35,12 +37,17 @@ async function renderList(container) {
         ${users.map((u) => {
           const profile = u.profile || {};
           const active = profile.is_active !== false;
+          const role = profile.role || (profile.is_admin ? "admin" : "counselor");
           return `
             <tr data-id="${esc(u.id)}">
               <td>${esc(profile.full_name || "—")}</td>
               <td>${esc(u.email || "—")}</td>
               <td>${active ? '<span class="pill pill-success">نشط</span>' : '<span class="pill pill-critical">معطّل</span>'}</td>
-              <td>${profile.is_admin ? '<span class="pill pill-neutral">إدمن</span>' : ""}</td>
+              <td>
+                <select data-action="role" aria-label="دور ${esc(profile.full_name || u.email || "المستخدم")}" style="padding:7px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:inherit;font-family:inherit;">
+                  ${Object.entries(ROLE_LABELS).map(([value, label]) => `<option value="${value}"${role === value ? " selected" : ""}>${label}</option>`).join("")}
+                </select>
+              </td>
               <td style="display:flex;gap:8px;">
                 <button class="link-btn" data-action="toggle" data-active="${active}">${active ? "تعطيل" : "تفعيل"}</button>
                 <button class="link-btn" data-action="reset-password">إعادة تعيين كلمة المرور</button>
@@ -67,6 +74,21 @@ async function renderList(container) {
     });
   });
 
+  listRoot.querySelectorAll("[data-action='role']").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const userId = select.closest("[data-id]").dataset.id;
+      select.disabled = true;
+      try {
+        await setAccountRole(userId, select.value);
+        showToast("تم تحديث صلاحية الحساب");
+        await renderList(container);
+      } catch (err) {
+        showToast(err.message, { type: "error" });
+        await renderList(container);
+      }
+    });
+  });
+
   listRoot.querySelectorAll("[data-action='reset-password']").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const row = btn.closest("[data-id]");
@@ -86,7 +108,7 @@ async function renderList(container) {
 export async function mountUsersView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>إدارة المستخدمين</h1><div class="sub">إنشاء حسابات المرشدين وتعطيلها — كل حساب نشط له وصول كامل لبيانات الطلاب</div></div>
+      <div><h1>إدارة المستخدمين</h1><div class="sub">إنشاء الحسابات وتحديد صلاحية الإدمن أو المرشد أو القراءة فقط</div></div>
     </div>
     <div class="card" style="margin-bottom:16px;">
       <h2>حساب جديد</h2>
@@ -103,9 +125,14 @@ export async function mountUsersView(container) {
           <label class="hint" for="user-form-password" style="display:block;margin-bottom:4px;">كلمة المرور</label>
           <input id="user-form-password" name="password" type="password" required minlength="8" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
-          <input type="checkbox" name="isAdmin"> صلاحية إدمن
-        </label>
+        <div>
+          <label class="hint" for="user-form-role" style="display:block;margin-bottom:4px;">الدور</label>
+          <select id="user-form-role" name="role" style="min-height:44px;padding:9px 12px;border-radius:9px;border:1px solid var(--border);font-family:inherit;background:var(--surface);color:inherit;">
+            <option value="counselor">مرشد</option>
+            <option value="read_only">قراءة فقط</option>
+            <option value="admin">إدمن</option>
+          </select>
+        </div>
         <button class="btn btn-primary" type="submit">إنشاء الحساب</button>
       </form>
     </div>
@@ -120,7 +147,8 @@ export async function mountUsersView(container) {
         fullName: form.fullName.value,
         username: form.username.value,
         password: form.password.value,
-        isAdmin: form.isAdmin.checked,
+        role: form.role.value,
+        isAdmin: form.role.value === "admin",
       });
       form.reset();
       showToast("تم إنشاء الحساب");

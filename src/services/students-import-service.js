@@ -6,6 +6,7 @@
 // دخول — استيراد داخل التطبيق (يكتب عبر cloud-runtime.js، خلف تسجيل
 // الدخول + RLS) هو البديل الآمن.
 import { clear, bulkPut } from "./cloud-runtime.js";
+import { invalidateStudentsCache } from "../modules/students/students-service.js";
 import { readWorkbook } from "./xlsx-parser.js";
 import { resetStudentsSeedCache } from "./students-source.js";
 
@@ -120,6 +121,7 @@ export async function parseStudentsWorkbook(file) {
 export async function commitStudentsImport(students) {
   await clear("students");
   if (students.length) await bulkPut("students", students);
+  invalidateStudentsCache();
   resetStudentsSeedCache();
   return { count: students.length };
 }

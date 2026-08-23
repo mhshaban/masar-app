@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="مسار">
+  <rect width="512" height="512" fill="#1a2744"/>
+  <circle cx="256" cy="256" r="188" fill="#213154"/>
+  <path d="M118 340c51-96 118-141 201-136 31 2 58 11 78 27" fill="none" stroke="#f5edd8" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="120" cy="342" r="19" fill="#c8923a"/>
+  <circle cx="396" cy="231" r="19" fill="#c8923a"/>
+  <text x="256" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="168" font-weight="700" fill="#c8923a">م</text>
+</svg>

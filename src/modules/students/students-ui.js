@@ -1,10 +1,11 @@
-import { getRosterStatus, getFilterOptions, searchStudents, getRosterStats, getStudent, updateStudentPhoto, removeStudentPhoto } from "./students-service.js";
+import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent, updateStudentPhoto, removeStudentPhoto } from "./students-service.js";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
-import { matchPhotoFiles, commitPhotoMatches } from "../../services/photos-import-service.js";
+import { matchPhotoFiles, commitPhotoMatches, migrateLegacyStudentPhotos } from "../../services/photos-import-service.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
+import { createSignedStudentPhotoUrl } from "../../services/student-photo-storage.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -23,7 +24,7 @@ const PHOTO_MAX_DIMENSION = 300;
 // images), so this is a manual upload. Resized client-side before storing
 // so a phone-camera photo doesn't bloat the shared database with a
 // multi-megabyte original for a 64px avatar.
-function resizeImageToDataUrl(file) {
+function resizeImageToBlob(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -35,7 +36,7 @@ function resizeImageToDataUrl(file) {
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("تعذّر تجهيز الصورة")), "image/webp", 0.82);
     };
     img.onerror = () => reject(new Error("تعذّرت قراءة الصورة"));
     reader.readAsDataURL(file);
@@ -97,12 +98,24 @@ export function renderPhotoImportSection(root, { onImported }) {
       <h2>استيراد صور الطلبة</h2>
       <p class="hint">اختر كل ملفات الصور دفعة واحدة — لازم يكون اسم كل ملف هو الرقم الأكاديمي للطالب (مثال: 20254220.jpg). تتم المطابقة تلقائيًا ويظهر تقرير قبل الحفظ.</p>
       <input type="file" id="photos-import-input" aria-label="صور الطلبة" accept="image/*" multiple style="margin-bottom:12px;">
+      <button type="button" class="btn btn-ghost" id="photos-migrate-legacy" style="margin-inline-start:8px;">نقل الصور القديمة إلى التخزين الآمن</button>
       <div id="photos-import-preview"></div>
     </div>
   `;
 
   const fileInput = root.querySelector("#photos-import-input");
   const previewRoot = root.querySelector("#photos-import-preview");
+  root.querySelector("#photos-migrate-legacy").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    previewRoot.innerHTML = '<p class="hint">جارٍ فحص الصور القديمة…</p>';
+    const result = await migrateLegacyStudentPhotos(({ total, migrated, failed }) => {
+      previewRoot.innerHTML = `<p class="hint">تم نقل ${migrated} من ${total}${failed ? ` — تعذر ${failed}` : ""}…</p>`;
+    });
+    previewRoot.innerHTML = `<p class="hint" role="status">اكتمل النقل: ${result.migrated} من ${result.total}${result.failed.length ? `، وتعذر ${result.failed.length}` : ""}.</p>`;
+    button.disabled = false;
+    await onImported();
+  });
 
   fileInput.addEventListener("change", async () => {
     const files = [...fileInput.files];
@@ -141,7 +154,7 @@ export function renderPhotoImportSection(root, { onImported }) {
         const resolved = [];
         for (const { file, student } of batch) {
           try {
-            resolved.push({ student, dataUrl: await resizeImageToDataUrl(file) });
+            resolved.push({ student, blob: await resizeImageToBlob(file) });
           } catch {
             failed += 1;
           }
@@ -209,13 +222,12 @@ function renderFilters(root, options, current, onChange, onQueryChange) {
 
 const PAGE_SIZE = 50;
 
-function renderTable(root, allResults, visibleCount, onOpen, onLoadMore) {
-  if (!allResults.length) {
+function renderTable(root, students, total, onOpen, onLoadMore) {
+  if (!students.length) {
     root.innerHTML = '<div class="card"><div class="empty">لا يوجد طلاب مطابقون لهذا البحث</div></div>';
     return;
   }
-  const students = allResults.slice(0, visibleCount);
-  const remaining = allResults.length - students.length;
+  const remaining = total - students.length;
   root.innerHTML = `
     <div class="card">
       <div class="tablewrap"><table>
@@ -225,7 +237,9 @@ function renderTable(root, allResults, visibleCount, onOpen, onLoadMore) {
             <tr data-id="${esc(s.id)}">
               <td>
                 <div style="display:flex; align-items:center; gap:10px;">
-                  ${s.photo
+                  ${s.photoPath
+                    ? `<img data-photo-path="${esc(s.photoPath)}" alt="" loading="lazy" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex:0 0 auto;">`
+                    : s.photo
                     ? `<img src="${esc(s.photo)}" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex:0 0 auto;">`
                     : `<div class="row-item" style="padding:0; border:none;"><div class="avatar">${esc(initials(s.name))}</div></div>`}
                   <div>
@@ -255,6 +269,15 @@ function renderTable(root, allResults, visibleCount, onOpen, onLoadMore) {
   });
   const loadMoreBtn = root.querySelector("#students-load-more");
   if (loadMoreBtn) loadMoreBtn.addEventListener("click", onLoadMore);
+  hydrateStudentPhotoImages(root);
+}
+
+async function hydrateStudentPhotoImages(root) {
+  const images = [...root.querySelectorAll("img[data-photo-path]")];
+  await Promise.all(images.map(async (img) => {
+    const url = await createSignedStudentPhotoUrl(img.dataset.photoPath);
+    if (url && img.isConnected) img.src = url;
+  }));
 }
 
 function scheduleRow(label, value) {
@@ -360,6 +383,10 @@ async function renderDetail(container, id, onBack) {
   const hasGuidanceFlags = s.supportNeeded || s.socialGuidance;
   const promotedSubjects = await getPendingSubjectsForStudent(String(s.academicId || s.id));
   const pendingSubjects = promotedSubjects.filter((r) => !r.cleared);
+  const signedPhotoUrl = s.photoPath ? await createSignedStudentPhotoUrl(s.photoPath) : null;
+  const displayPhoto = signedPhotoUrl || s.photo || null;
+  const profile = getCurrentProfile();
+  const canManagePhoto = !!(profile?.is_admin || profile?.role === "admin");
 
   container.innerHTML = `
     <button class="backlink" id="students-back">
@@ -368,16 +395,16 @@ async function renderDetail(container, id, onBack) {
     </button>
     <div class="topbar">
       <div style="display:flex; align-items:center; gap:14px;">
-        <div id="student-photo-wrap" style="cursor:pointer; flex:0 0 auto;" title="اضغط لتغيير الصورة">
-          ${s.photo
-            ? `<img src="${esc(s.photo)}" alt="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid var(--border); display:block;">`
+        <div id="student-photo-wrap" style="cursor:${canManagePhoto ? "pointer" : "default"}; flex:0 0 auto;"${canManagePhoto ? ' title="اضغط لتغيير الصورة"' : ""}>
+          ${displayPhoto
+            ? `<img src="${esc(displayPhoto)}" alt="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid var(--border); display:block;">`
             : `<div style="width:64px; height:64px; border-radius:50%; background:var(--teal-600); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px;">${esc(initials(s.name))}</div>`}
-          <input type="file" id="student-photo-input" accept="image/*" style="display:none;">
+          ${canManagePhoto ? '<input type="file" id="student-photo-input" accept="image/*" style="display:none;">' : ""}
         </div>
         <div>
           <h1>${esc(s.name) || "—"}</h1>
           <div class="sub">${esc(s.level) || "—"} · ${esc(s.section) || "—"} · ${esc(s.department) || "—"} — ${esc(s.track) || "—"}</div>
-          ${s.photo ? '<button class="link-btn" id="student-photo-remove" style="color:var(--critical); margin-top:2px;">إزالة الصورة</button>' : ""}
+          ${displayPhoto && canManagePhoto ? '<button class="link-btn" id="student-photo-remove" style="color:var(--critical); margin-top:2px;">إزالة الصورة</button>' : ""}
         </div>
       </div>
       <div class="meta">الرقم الأكاديمي ${esc(s.academicId) || "—"}</div>
@@ -448,13 +475,13 @@ async function renderDetail(container, id, onBack) {
   container.querySelector("#students-back").addEventListener("click", onBack);
 
   const photoInput = container.querySelector("#student-photo-input");
-  container.querySelector("#student-photo-wrap").addEventListener("click", () => photoInput.click());
-  photoInput.addEventListener("change", async () => {
+  if (photoInput) container.querySelector("#student-photo-wrap").addEventListener("click", () => photoInput.click());
+  photoInput?.addEventListener("change", async () => {
     const file = photoInput.files[0];
     if (!file) return;
     try {
-      const dataUrl = await resizeImageToDataUrl(file);
-      await updateStudentPhoto(id, dataUrl);
+      const blob = await resizeImageToBlob(file);
+      await updateStudentPhoto(id, blob);
       await renderDetail(container, id, onBack);
     } catch (err) {
       alert(err.message);
@@ -478,7 +505,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
   const status = await getRosterStatus();
   if (!status.available) {
     const profile = getCurrentProfile();
-    renderEmptyState(container, { isAdmin: !!profile?.is_admin, onGoto });
+    renderEmptyState(container, { isAdmin: profile?.role === "admin" || profile?.is_admin === true, onGoto });
     return;
   }
 
@@ -494,7 +521,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     <div id="students-results"></div>
   `;
 
-  const stats = await getRosterStats();
+  const { stats, options } = await getRosterMeta();
   const topLevels = Object.entries(stats.byLevel);
   container.querySelector("#students-stats").innerHTML = `
     <div class="card stat"><div class="label">إجمالي الطلبة</div><div class="value">${stats.total}</div></div>
@@ -504,27 +531,37 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     <div class="card stat"><div class="label">لديهم ملاحظات دعم/إرشاد</div><div class="value">${stats.flagged}</div></div>
   `;
 
-  const options = await getFilterOptions();
   const resultsRoot = container.querySelector("#students-results");
   const countRoot = container.querySelector("#students-count");
 
-  let visibleCount = PAGE_SIZE;
-  let lastResults = [];
+  let loadedResults = [];
+  let matchingTotal = 0;
+  let requestVersion = 0;
+  let searchTimer = null;
 
   const draw = () => {
-    countRoot.textContent = `${lastResults.length} من ${stats.total} طالبًا`;
+    countRoot.textContent = `${matchingTotal} من ${stats.total} طالبًا`;
     renderTable(
       resultsRoot,
-      lastResults,
-      visibleCount,
+      loadedResults,
+      matchingTotal,
       (id) => renderDetail(container, id, () => mountStudentsView(container)),
-      () => { visibleCount += PAGE_SIZE; draw(); },
+      async () => {
+        const page = await searchStudentsPage({ ...state, offset: loadedResults.length, limit: PAGE_SIZE });
+        loadedResults.push(...page.rows);
+        matchingTotal = page.total;
+        draw();
+      },
     );
   };
 
   const refresh = async () => {
-    lastResults = await searchStudents(state);
-    visibleCount = PAGE_SIZE;
+    const version = ++requestVersion;
+    resultsRoot.innerHTML = '<div class="card"><div class="empty" role="status">جارٍ البحث…</div></div>';
+    const page = await searchStudentsPage({ ...state, offset: 0, limit: PAGE_SIZE });
+    if (version !== requestVersion) return;
+    loadedResults = page.rows;
+    matchingTotal = page.total;
     draw();
   };
 
@@ -536,7 +573,8 @@ export async function mountStudentsView(container, { onGoto } = {}) {
 
   const onQueryChange = async (query) => {
     state = { ...state, query };
-    await refresh();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(refresh, 250);
   };
 
   renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange);
