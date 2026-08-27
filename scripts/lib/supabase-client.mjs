@@ -90,11 +90,13 @@ export async function fetchStudents(token) {
   return listAll(token, "students");
 }
 
-// نفس سلوك cloud-runtime.js's clear() بالضبط: يجيب كل الـids الحالية أولًا
-// ثم يحذفها على دفعات id=in.(...) — بدل DELETE بلا فلتر.
-export async function clearCollection(token, collection) {
+export async function listIds(token, collection) {
   const existing = await listAll(token, collection);
-  const ids = existing.map((r) => r.id);
+  return existing.map((r) => r.id);
+}
+
+// يحذف قائمة ids محدَّدة على دفعات id=in.(...) — بدل DELETE بلا فلتر.
+export async function deleteIds(token, collection, ids) {
   for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
     const idList = ids.slice(i, i + CHUNK_SIZE).map(encodeURIComponent).join(",");
     const res = await fetch(`${SB_URL}/rest/v1/${collection}?id=in.(${idList})`, {
@@ -104,6 +106,14 @@ export async function clearCollection(token, collection) {
     if (!res.ok) throw new Error(`فشل حذف بيانات ${collection} القديمة: ` + (await res.text()));
   }
   return ids.length;
+}
+
+// نفس سلوك cloud-runtime.js's clear() بالضبط: يجيب كل الـids الحالية أولًا
+// ثم يحذفها على دفعات. لا يُستخدم بسكربت التحليل (يكتب-ثم-يشذّب بدل
+// يمسح-ثم-يكتب — راجع cowork-analyze-grades.mjs)، مُبقى هنا لأي استخدام مستقبلي.
+export async function clearCollection(token, collection) {
+  const ids = await listIds(token, collection);
+  return deleteIds(token, collection, ids);
 }
 
 export async function bulkPut(token, collection, records) {

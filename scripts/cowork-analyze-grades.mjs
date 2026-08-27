@@ -33,7 +33,7 @@ import { parseCertificateRows } from "./lib/certificate-parser.mjs";
 import { parseCheckpointWorkbook } from "./lib/checkpoint-xlsx-parser.mjs";
 import { subjectKeyForGrade } from "./lib/subject-groups.mjs";
 import { gradeRowPct } from "./lib/score-conventions.mjs";
-import { loginInteractive, fetchStudents, clearCollection, bulkPut } from "./lib/supabase-client.mjs";
+import { loginInteractive, fetchStudents, listIds, deleteIds, bulkPut } from "./lib/supabase-client.mjs";
 import { looksLikeScheduleDocument, MAX_PLAUSIBLE_SUBJECTS_PER_TERM } from "./lib/document-classifier.mjs";
 
 async function walk(dir) {
@@ -276,8 +276,23 @@ async function main() {
 
   const academicFlagsRecords = [...rowsByStudent.entries()].map(([studentId, rows]) => aggregateStudent(studentId, rows));
 
-  const termAveragesRecords = matchedTerms.map((t, i) => ({
-    id: `${t.studentId}--t${i}`,
+  // نفس الطالب/الفترة قد يظهر أكثر من مرة (شهادة مكرَّرة بمجلد فرعي تاني،
+  // نسخة قديمة تُركت جنب نسخة مُعاد إصدارها، نسخة تعارض OneDrive) — بدون
+  // تجميع هنا كنّا نكتب صفّين منفصلين بـtermAverages لنفس الفترة بدل واحد.
+  // آخر ملف يُقرأ هو اللي يُعتمَد (last-write-wins)، وأي تعارض بالقيمة
+  // (معدّلان مختلفان لنفس الطالب/الفترة) يُطبَع بالملخص عشان يُراجَع يدويًا.
+  const termAveragesByKey = new Map();
+  const termConflicts = [];
+  for (const t of matchedTerms) {
+    const key = `${t.studentId}::${t.term}`;
+    const existing = termAveragesByKey.get(key);
+    if (existing && existing.averagePct !== t.averagePct) {
+      termConflicts.push({ studentId: t.studentId, term: t.term, values: [existing.averagePct, t.averagePct] });
+    }
+    termAveragesByKey.set(key, t);
+  }
+  const termAveragesRecords = [...termAveragesByKey.values()].map((t) => ({
+    id: `${t.studentId}--${t.term}`,
     studentId: String(t.studentId),
     term: t.term,
     averagePct: t.averagePct,
@@ -315,6 +330,10 @@ async function main() {
   if (unmatchedTermIds.size) {
     console.log(`معدلات فصلية رسمية غير مطابقة (${unmatchedTermIds.size}): ${[...unmatchedTermIds].join("، ")}`);
   }
+  if (termConflicts.length) {
+    console.log(`⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة (${termConflicts.length}) — على الأغلب ملف مكرَّر بقيمة مختلفة، اعتمدنا آخر ملف قُرئ وتجاهلنا الباقي، راجعها يدويًا:`);
+    printCapped(termConflicts, (c) => `  - ${c.studentId} / ${c.term}: ${c.values.join(" ثم ")}`);
+  }
   console.log(`\nسيُكتب: ${academicFlagsRecords.length} صف academicFlags، ${termAveragesRecords.length} صف termAverages.`);
 
   if (dryRun) {
@@ -322,14 +341,29 @@ async function main() {
     return;
   }
 
-  console.log("\nجارٍ مسح البيانات القديمة (استبدال كامل)...");
-  const clearedFlags = await clearCollection(token, "academicFlags");
-  const clearedTerms = await clearCollection(token, "termAverages");
-  console.log(`تم حذف ${clearedFlags} صفًا قديمًا من academicFlags و${clearedTerms} صفًا من termAverages.`);
+  // استبدال كامل، لكن بترتيب آمن: نكتب الجديد أولًا (upsert بنفس الـid يستبدل
+  // القديم لنفس الطالب/الفترة تلقائيًا)، ثم نحذف فقط الـids القديمة اللي ما
+  // عادت موجودة بهذه التشغيلة (طالب/فترة زال من الملفات). لو الكتابة فشلت
+  // بمنتصفها (انقطاع شبكة، صف تالف)، البيانات القديمة تبقى كما هي بدل ما
+  // تنمسح بلا بديل — عكس الترتيب القديم (امسح ثم اكتب) اللي كان يترك
+  // الجدولين فارغين أو منقوصين لو انقطعت الكتابة بعد المسح مباشرة.
+  console.log("\nجارٍ جلب الـids الحالية (لتحديد ما سيُحذف لاحقًا فقط)...");
+  const [existingFlagIds, existingTermIds] = await Promise.all([
+    listIds(token, "academicFlags"),
+    listIds(token, "termAverages"),
+  ]);
 
   console.log("جارٍ كتابة البيانات الجديدة...");
   await bulkPut(token, "academicFlags", academicFlagsRecords);
   await bulkPut(token, "termAverages", termAveragesRecords);
+
+  const newFlagIds = new Set(academicFlagsRecords.map((r) => r.id));
+  const newTermIds = new Set(termAveragesRecords.map((r) => r.id));
+  const staleFlagIds = existingFlagIds.filter((id) => !newFlagIds.has(id));
+  const staleTermIds = existingTermIds.filter((id) => !newTermIds.has(id));
+  console.log(`جارٍ حذف ${staleFlagIds.length} صفًا لم يعد له مصدر بـacademicFlags و${staleTermIds.length} بـtermAverages...`);
+  await deleteIds(token, "academicFlags", staleFlagIds);
+  await deleteIds(token, "termAverages", staleTermIds);
 
   console.log(`\nتم بنجاح — ${academicFlagsRecords.length} طالبًا لديهم بيانات أكاديمية محدَّثة، ${termAveragesRecords.length} معدّل فصلي رسمي.`);
 }
