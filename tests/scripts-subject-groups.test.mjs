@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { subjectKeyForGrade, subjectSortRank } from "../src/modules/grades/subject-groups.js";
+import { subjectKeyForGrade, subjectSortRank } from "../scripts/lib/subject-groups.mjs";
 
 test("subjectKeyForGrade merges the real code split reported by the counselor (كيم/فيز -> العلوم)", () => {
   assert.equal(subjectKeyForGrade({ subjectCode: "كيم801", subjectName: "الطاقة" }), "العلوم");
@@ -15,7 +15,6 @@ test("subjectKeyForGrade merges اللغة العربية across its per-term co
 });
 
 test("subjectKeyForGrade prefers the official code table over a printed subject name that disagrees", () => {
-  // The code is authoritative; a term-specific printed name shouldn't split it.
   assert.equal(subjectKeyForGrade({ subjectCode: "دين807", subjectName: "التربية الإسلامية 1" }), "التربية الإسلامية");
 });
 
@@ -86,12 +85,12 @@ test("subjectKeyForGrade resolves تمك803 (a term-3/4 الكهرباء code wi
 });
 
 test("subjectSortRank ranks ثقافة عامة subjects before تخصصية/مساندة ones (counselor's requested ordering)", () => {
-  assert.equal(subjectSortRank("الرياضيات"), 0); // ثقافة عامة
-  assert.equal(subjectSortRank("العلوم"), 0); // ثقافة عامة
-  assert.equal(subjectSortRank("الكهرباء"), 1); // تخصصية
-  assert.equal(subjectSortRank("الإلكترونيات"), 1); // تخصصية
-  assert.equal(subjectSortRank("تقنيات وصيانة الحاسوب"), 1); // تخصصية
-  assert.equal(subjectSortRank("الحاسب الآلي"), 1); // مساندة
+  assert.equal(subjectSortRank("الرياضيات"), 0);
+  assert.equal(subjectSortRank("العلوم"), 0);
+  assert.equal(subjectSortRank("الكهرباء"), 1);
+  assert.equal(subjectSortRank("الإلكترونيات"), 1);
+  assert.equal(subjectSortRank("تقنيات وصيانة الحاسوب"), 1);
+  assert.equal(subjectSortRank("الحاسب الآلي"), 1);
   assert.ok(subjectSortRank("الرياضيات") < subjectSortRank("الكهرباء"));
 });
 

@@ -16,18 +16,15 @@ const COLLECTION_LABELS = {
   followUpItems: "بنود تقرير المتابعة",
   reminders: "التذكيرات",
   students: "سجل الطلبة",
-  grades: "الدرجات",
+  academicFlags: "بيانات أكاديمية مجمَّعة (من تحليل Cowork)",
   termAverages: "المعدلات الفصلية الرسمية",
   guidanceCases: "الحالات الإرشادية",
   caseSessions: "جلسات متابعة الحالات",
   supportPlans: "خطط الدعم",
   supportPlanActions: "إجراءات خطط الدعم",
   careerSessions: "جلسات التوجيه المهني",
-  importBatches: "دفعات استيراد الدرجات",
   promotedSubjects: "مقررات الطلاب المرفعين",
   promotedImportBatches: "دفعات استيراد المرفعين",
-  teacherSchedule: "الجدول الدراسي التفصيلي",
-  officeHours: "الساعات المكتبية للمعلمين",
 };
 
 function renderSummary(counts) {

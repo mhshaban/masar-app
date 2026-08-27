@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCertificateRows } from "../src/modules/grades/certificate-parser.js";
+import { parseCertificateRows } from "../scripts/lib/certificate-parser.mjs";
 
-// rawRows mimics pdf-parser.js output: one array of cell strings per visual row,
+// rawRows mimics pdf-rows.mjs output: one array of cell strings per visual row,
 // already sorted into RTL column order (as extractPdfRows produces it).
 const rawRows = [
   ["اسم الطالب", ":", "خالد أحمد النعيمي", "رقم الطالب", ":", "(", "2024", "12345", ")"],

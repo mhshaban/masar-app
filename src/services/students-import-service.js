@@ -116,8 +116,8 @@ export async function parseStudentsWorkbook(file) {
   return { sheetName, students };
 }
 
-// كشف الطلاب يُعاد إصداره كامل كل مرة من إدارة المدرسة — نفس منطق
-// schedule-service.js: استبدال كامل وليس دفعة قابلة للتراجع.
+// كشف الطلاب يُعاد إصداره كامل كل مرة من إدارة المدرسة — استبدال كامل
+// وليس دفعة قابلة للتراجع.
 export async function commitStudentsImport(students) {
   await clear("students");
   if (students.length) await bulkPut("students", students);

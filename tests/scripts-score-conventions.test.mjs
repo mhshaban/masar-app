@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isEncodedAbsenceScore } from "../src/modules/grades/score-conventions.js";
+import { isEncodedAbsenceScore } from "../scripts/lib/score-conventions.mjs";
 
 test("isEncodedAbsenceScore recognizes the literal 0.5 encoding, as number or string", () => {
   assert.equal(isEncodedAbsenceScore(0.5), true);

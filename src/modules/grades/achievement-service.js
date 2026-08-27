@@ -1,6 +1,4 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { gradeRowPct } from "./score-conventions.js";
-import { subjectKeyForGrade } from "./subject-groups.js";
 import { listStudents } from "../students/students-service.js";
 
 // The rating LABEL comes from Bahrain MOE's own scale, taken verbatim from
@@ -24,46 +22,29 @@ export function ratingForPct(pct) {
 
 export const TIER_LABELS = { high: "متفوقون", medium: "متوسطو التحصيل", low: "متدنو التحصيل" };
 
-// One row per student who has at least one graded (non-absent/barred) row —
-// overall average, official-scale rating, and any subject averaging under
-// 50% by name (so a strong-average student with one failing subject still
-// surfaces it). Sorted worst-average-first since that's the actionable end.
+// academicFlags holds one aggregate row per student (overallPct + a
+// per-subject pct list, already averaged and subject-name-resolved by
+// Cowork outside Masar — see grade-flags-service.js for the full data-flow
+// note). This classification screen only applies the counselor's own
+// rating scale to those precomputed numbers; it never sees a raw score row.
 export async function computeStudentAchievement() {
-  const [grades, students] = await Promise.all([listAll("grades"), listStudents()]);
+  const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
   const studentById = new Map(students.map((s) => [String(s.id), s]));
 
-  const byStudent = new Map();
-  for (const g of grades) {
-    if (!g.studentId) continue;
-    if (!byStudent.has(g.studentId)) byStudent.set(g.studentId, []);
-    byStudent.get(g.studentId).push(g);
-  }
-
   const rows = [];
-  for (const [studentId, list] of byStudent) {
-    const graded = list.filter((g) => g.score != null);
-    if (!graded.length) continue;
-
-    const avgPct = Math.round((graded.reduce((sum, g) => sum + gradeRowPct(g), 0) / graded.length) * 100);
-
-    const bySubject = new Map();
-    for (const g of graded) {
-      const key = subjectKeyForGrade(g);
-      if (!bySubject.has(key)) bySubject.set(key, []);
-      bySubject.get(key).push(g);
-    }
-    const weakSubjects = [...bySubject.entries()]
-      .map(([subject, subjectRows]) => ({
-        subject,
-        pct: Math.round((subjectRows.reduce((sum, g) => sum + gradeRowPct(g), 0) / subjectRows.length) * 100),
-      }))
-      .filter((s) => s.pct < 50)
+  for (const f of flags) {
+    if (!f.studentId || f.overallPct == null) continue;
+    const avgPct = Math.round(Number(f.overallPct));
+    const subjects = f.subjects || [];
+    const weakSubjects = subjects
+      .filter((s) => s.pct != null && Math.round(Number(s.pct)) < 50)
+      .map((s) => ({ subject: s.subject, pct: Math.round(Number(s.pct)) }))
       .sort((a, b) => a.pct - b.pct);
 
     const rating = ratingForPct(avgPct);
-    const student = studentById.get(String(studentId));
+    const student = studentById.get(String(f.studentId));
     rows.push({
-      studentId,
+      studentId: f.studentId,
       studentName: student ? student.name : null,
       level: student ? student.level : null,
       section: student ? student.section : null,
@@ -71,7 +52,7 @@ export async function computeStudentAchievement() {
       rating: rating.label,
       tier: rating.tier,
       weakSubjects,
-      subjectCount: bySubject.size,
+      subjectCount: subjects.length,
     });
   }
 
@@ -84,25 +65,24 @@ export async function computeStudentAchievement() {
 // list. One entry per subject name, each holding every student's rating in
 // that subject only.
 export async function computeSubjectAchievement() {
-  const [grades, students] = await Promise.all([listAll("grades"), listStudents()]);
+  const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
   const studentById = new Map(students.map((s) => [String(s.id), s]));
 
   const bySubject = new Map();
-  for (const g of grades) {
-    if (!g.studentId || g.score == null) continue;
-    const subject = subjectKeyForGrade(g);
-    if (!bySubject.has(subject)) bySubject.set(subject, new Map());
-    const byStudent = bySubject.get(subject);
-    if (!byStudent.has(g.studentId)) byStudent.set(g.studentId, []);
-    byStudent.get(g.studentId).push(g);
+  for (const f of flags) {
+    if (!f.studentId) continue;
+    for (const s of f.subjects || []) {
+      if (s.pct == null) continue;
+      if (!bySubject.has(s.subject)) bySubject.set(s.subject, []);
+      bySubject.get(s.subject).push({ studentId: f.studentId, pct: Math.round(Number(s.pct)) });
+    }
   }
 
   const subjects = [];
-  for (const [subject, byStudent] of bySubject) {
+  for (const [subject, rows] of bySubject) {
     const counts = { high: 0, medium: 0, low: 0 };
     const studentRows = [];
-    for (const [studentId, rows] of byStudent) {
-      const pct = Math.round((rows.reduce((sum, g) => sum + gradeRowPct(g), 0) / rows.length) * 100);
+    for (const { studentId, pct } of rows) {
       const rating = ratingForPct(pct);
       counts[rating.tier] += 1;
       const student = studentById.get(String(studentId));

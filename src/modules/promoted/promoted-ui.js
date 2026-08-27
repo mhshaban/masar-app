@@ -1,8 +1,6 @@
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
 } from "./promoted-service.js";
-import { parseScheduleWorkbook, commitSchedule, commitScheduleFromPdfSections, getScheduleSummary } from "../schedule/schedule-service.js";
-import { extractPdfSectionSchedule } from "../../services/schedule-pdf-parser.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
@@ -183,128 +181,6 @@ async function renderPendingList(root, onGoto) {
       </table></div>
     </div>
   `;
-}
-
-async function renderScheduleSummary(root) {
-  const { scheduleRowCount, officeHoursTeacherCount } = await getScheduleSummary();
-  root.innerHTML = `
-    <div class="grid g2" style="margin-bottom:12px;">
-      <div class="card stat"><div class="label">صفوف الجدول الدراسي المستوردة</div><div class="value">${scheduleRowCount}</div></div>
-      <div class="card stat"><div class="label">معلمون لديهم ساعات مكتبية</div><div class="value">${officeHoursTeacherCount}</div></div>
-    </div>
-  `;
-}
-
-export async function renderScheduleImportSection(root, onCommitted) {
-  root.innerHTML = `
-    <div class="card">
-      <h2>الجدول الدراسي والساعات المكتبية</h2>
-      <p class="hint">من نفس ملف كشف الطلاب الكامل — شيتَي "جداول المعلمين" و"الساعات المكتبية". كل استيراد يستبدل البيانات السابقة بالكامل (بيانات مرجعية، لا حاجة لتراجع تدريجي).</p>
-      <div id="schedule-summary"></div>
-      <input type="file" id="schedule-file-input" aria-label="ملف كشف الطلاب (جداول المعلمين والساعات المكتبية)" accept=".xlsx" style="margin-bottom:10px;">
-      <div id="schedule-parse-result"></div>
-    </div>
-  `;
-
-  await renderScheduleSummary(root.querySelector("#schedule-summary"));
-  const fileInput = root.querySelector("#schedule-file-input");
-  const resultRoot = root.querySelector("#schedule-parse-result");
-
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    if (!file) return;
-    resultRoot.innerHTML = '<p class="hint">جارٍ التحليل…</p>';
-    try {
-      const parsed = await parseScheduleWorkbook(file);
-      resultRoot.innerHTML = `
-        <p class="hint">
-          ${parsed.scheduleFound ? `تم إيجاد ${parsed.scheduleRows.length} صف جدول دراسي.` : "لم يُعثر على شيت جداول المعلمين."}
-          ${parsed.officeHoursFound ? ` ${parsed.officeHoursRows.length} معلم لديهم ساعات مكتبية.` : " لم يُعثر على شيت الساعات المكتبية."}
-        </p>
-        <button class="btn btn-primary" id="schedule-commit" style="background:var(--critical);">استبدال البيانات الحالية بهذا الاستيراد</button>
-      `;
-      resultRoot.querySelector("#schedule-commit").addEventListener("click", async () => {
-        if (!confirm("سيُستبدل الجدول الدراسي والساعات المكتبية الحاليان بالكامل بهذا الملف. هل أنت متأكد؟")) return;
-        await commitSchedule(parsed);
-        resultRoot.innerHTML = '<p class="hint">تم الاستيراد بنجاح.</p>';
-        fileInput.value = "";
-        await renderScheduleSummary(root.querySelector("#schedule-summary"));
-        await onCommitted();
-      });
-    } catch (err) {
-      resultRoot.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(err.message)}</p>`;
-    }
-  });
-}
-
-// مصدر ثانٍ لنفس بيانات الجدول الدراسي — بدل شيت "جداول المعلمين" الكامل،
-// المدرسة ترفع ملف PDF "جدول حصص الفصل الدراسي" الرسمي منفصلًا لكل شعبة.
-// يقبل عدة ملفات دفعة واحدة (شعبة واحدة لكل ملف)، ويعرض تقرير الشعب
-// المستخرجة قبل أي اعتماد فعلي — نفس فلسفة استيراد صور الطلبة.
-export async function renderSchedulePdfImportSection(root, onCommitted) {
-  root.innerHTML = `
-    <div class="card" style="margin-top:16px;">
-      <h2>استيراد جدول شعب (PDF)</h2>
-      <p class="hint">اختر عدة ملفات PDF دفعة واحدة — ملف "جدول حصص الفصل الدراسي" الرسمي لكل شعبة على حِدة. كل شعبة تُستبدل بياناتها بالكامل دون التأثير على بقية الشعب المستوردة مسبقًا.</p>
-      <input type="file" id="schedule-pdf-input" aria-label="ملفات جدول حصص الشعب (PDF)" accept="application/pdf,.pdf" multiple style="margin-bottom:12px;">
-      <div id="schedule-pdf-preview"></div>
-    </div>
-  `;
-
-  const fileInput = root.querySelector("#schedule-pdf-input");
-  const previewRoot = root.querySelector("#schedule-pdf-preview");
-
-  fileInput.addEventListener("change", async () => {
-    const files = [...fileInput.files];
-    if (!files.length) return;
-    previewRoot.innerHTML = '<p class="hint">جارٍ قراءة الملفات…</p>';
-
-    const parsed = []; // { fileName, section }
-    const failed = []; // { fileName, reason }
-    for (const file of files) {
-      try {
-        const result = await extractPdfSectionSchedule(file);
-        if (!result.section || !result.rows.length) {
-          failed.push({ fileName: file.name, reason: "تعذّر التعرّف على الشعبة أو الحصص داخل الملف" });
-        } else {
-          parsed.push({ fileName: file.name, ...result });
-        }
-      } catch (err) {
-        failed.push({ fileName: file.name, reason: err.message || "تعذّرت قراءة الملف" });
-      }
-    }
-
-    previewRoot.innerHTML = `
-      ${parsed.length ? `
-        <div class="tablewrap"><table>
-          <thead><tr><th>الملف</th><th>الشعبة</th><th>المستوى</th><th>عدد الحصص</th></tr></thead>
-          <tbody>
-            ${parsed.map((p) => `
-              <tr><td>${esc(p.fileName)}</td><td>${esc(p.section)}</td><td>${esc(p.level) || "—"}</td><td class="num">${p.rows.length}</td></tr>
-            `).join("")}
-          </tbody>
-        </table></div>
-      ` : ""}
-      ${failed.length ? `
-        <details style="margin-top:10px;">
-          <summary class="hint" style="cursor:pointer;">ملفات تعذّرت قراءتها (${failed.length})</summary>
-          <ul class="plain">${failed.map((f) => `<li class="row-item"><div class="body"><div class="title">${esc(f.fileName)}</div><div class="meta">${esc(f.reason)}</div></div></li>`).join("")}</ul>
-        </details>
-      ` : ""}
-      ${parsed.length ? `<button class="btn btn-primary" id="schedule-pdf-commit" style="margin-top:12px; background:var(--critical);">استبدال جدول ${parsed.length} شعبة بهذا الاستيراد</button>` : ""}
-    `;
-
-    const commitBtn = previewRoot.querySelector("#schedule-pdf-commit");
-    if (!commitBtn) return;
-    commitBtn.addEventListener("click", async () => {
-      if (!confirm(`سيُستبدل الجدول الدراسي لـ${parsed.length} شعبة بمحتوى هذه الملفات. بقية الشعب لن تتأثر. هل أنت متأكد؟`)) return;
-      commitBtn.disabled = true;
-      const total = await commitScheduleFromPdfSections(parsed);
-      previewRoot.innerHTML = `<p class="hint">تم استيراد ${total} صفًا عبر ${parsed.length} شعبة بنجاح.</p>`;
-      fileInput.value = "";
-      await onCommitted();
-    });
-  });
 }
 
 export async function mountPromotedView(container, { onGoto } = {}) {

@@ -22,9 +22,15 @@ test("ratingForPct matches the Ministry of Education's own scale from the certif
 
 test("computeStudentAchievement classifies a student by overall average and flags weak subjects by name", async () => {
   await bulkPut("students", [{ id: "s1", name: "طالب أول", level: "الثالث", section: "١" }]);
-  await bulkPut("grades", [
-    { id: "g1", studentId: "s1", subjectName: "الرياضيات", score: 90, maxScore: 100 },
-    { id: "g2", studentId: "s1", subjectName: "اللغة العربية", score: 30, maxScore: 100 },
+  await bulkPut("academicFlags", [
+    {
+      id: "s1",
+      studentId: "s1",
+      overallPct: 60,
+      subjects: [{ subject: "الرياضيات", pct: 90 }, { subject: "اللغة العربية", pct: 30 }],
+      absentCount: 0,
+      barredCount: 0,
+    },
   ]);
 
   const rows = await computeStudentAchievement();
@@ -36,9 +42,8 @@ test("computeStudentAchievement classifies a student by overall average and flag
   assert.equal(rows[0].weakSubjects[0].subject, "اللغة العربية");
 });
 
-test("computeStudentAchievement skips a student with no numeric score at all", async () => {
+test("computeStudentAchievement skips a student with no academicFlags row (no overall average)", async () => {
   await bulkPut("students", [{ id: "s1", name: "طالب" }]);
-  await bulkPut("grades", [{ id: "g1", studentId: "s1", subjectName: "الرياضيات", score: null, scoreStatus: "absent" }]);
 
   const rows = await computeStudentAchievement();
   assert.equal(rows.length, 0);
@@ -49,11 +54,23 @@ test("computeSubjectAchievement classifies students per subject independently of
     { id: "s1", name: "طالب أول", level: "الثالث", section: "١" },
     { id: "s2", name: "طالب ثاني", level: "الثالث", section: "١" },
   ]);
-  await bulkPut("grades", [
-    { id: "g1", studentId: "s1", subjectName: "الرياضيات", score: 95, maxScore: 100 },
-    { id: "g2", studentId: "s1", subjectName: "اللغة العربية", score: 20, maxScore: 100 },
-    { id: "g3", studentId: "s2", subjectName: "الرياضيات", score: 40, maxScore: 100 },
-    { id: "g4", studentId: "s2", subjectName: "اللغة العربية", score: 85, maxScore: 100 },
+  await bulkPut("academicFlags", [
+    {
+      id: "s1",
+      studentId: "s1",
+      overallPct: 58,
+      subjects: [{ subject: "الرياضيات", pct: 95 }, { subject: "اللغة العربية", pct: 20 }],
+      absentCount: 0,
+      barredCount: 0,
+    },
+    {
+      id: "s2",
+      studentId: "s2",
+      overallPct: 63,
+      subjects: [{ subject: "الرياضيات", pct: 40 }, { subject: "اللغة العربية", pct: 85 }],
+      absentCount: 0,
+      barredCount: 0,
+    },
   ]);
 
   const subjects = await computeSubjectAchievement();
@@ -72,9 +89,11 @@ test("computeSubjectAchievement classifies students per subject independently of
   assert.equal(arabic.counts.low, 1);
 });
 
-test("computeSubjectAchievement excludes absent/barred rows from a subject's tally", async () => {
+test("computeSubjectAchievement skips a subject entry with no numeric pct", async () => {
   await bulkPut("students", [{ id: "s1", name: "طالب" }]);
-  await bulkPut("grades", [{ id: "g1", studentId: "s1", subjectName: "الرياضيات", score: null, scoreStatus: "absent" }]);
+  await bulkPut("academicFlags", [
+    { id: "s1", studentId: "s1", overallPct: null, subjects: [{ subject: "الرياضيات", pct: null }], absentCount: 1, barredCount: 0 },
+  ]);
 
   const subjects = await computeSubjectAchievement();
   assert.equal(subjects.length, 0);

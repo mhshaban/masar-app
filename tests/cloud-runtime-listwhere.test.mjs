@@ -5,8 +5,10 @@ import assert from "node:assert/strict";
 // الحقيقي (بدون fake-cloud-backend.mjs) للتأكد من إن listWhere() فعليًا
 // يرسل فلتر Supabase من طرف الخادم (data->>field=eq.value) بدل ما يجيب كل
 // المجموعة ويفلترها بالمتصفح — هذا بالضبط اللي كان يخلي عرض المسار
-// الأكاديمي لطالب واحد ياخذ أكثر من 3 دقايق (list("grades") كان يسحب كل
-// درجات المدرسة كاملة أول ما صار عندها آلاف الصفوف الحقيقية).
+// الأكاديمي لطالب واحد ياخذ أكثر من 3 دقايق تاريخيًا (list("grades") كان
+// يسحب كل درجات المدرسة كاملة أول ما صار عندها آلاف الصفوف الحقيقية،
+// قبل أن ينتقل استيراد الدرجات لـCowork ويُحذف جدول grades من مسار كليًا
+// — termAverages أدناه مثال حي بديل، نفس آلية الفلترة بالضبط).
 globalThis.sessionStorage = {
   _store: new Map(),
   getItem(k) { return this._store.has(k) ? this._store.get(k) : null; },
@@ -15,9 +17,9 @@ globalThis.sessionStorage = {
 };
 
 const SERVER_ROWS = [
-  { id: "g1", data: { id: "g1", studentId: "20254220", score: 90 } },
-  { id: "g2", data: { id: "g2", studentId: "99999999", score: 10 } },
-  { id: "g3", data: { id: "g3", studentId: "20254220", score: 85 } },
+  { id: "t1", data: { id: "t1", studentId: "20254220", averagePct: 90 } },
+  { id: "t2", data: { id: "t2", studentId: "99999999", averagePct: 10 } },
+  { id: "t3", data: { id: "t3", studentId: "20254220", averagePct: 85 } },
 ];
 
 let lastUrl = null;
@@ -35,7 +37,7 @@ globalThis.fetch = async (url) => {
 const { listWhere } = await import("../src/services/cloud-runtime.js");
 
 test("listWhere() filters server-side via the URL, not by fetching everything and filtering in JS", async () => {
-  const rows = await listWhere("grades", "studentId", "20254220");
+  const rows = await listWhere("termAverages", "studentId", "20254220");
   assert.ok(lastUrl.includes("data->>studentId=eq.20254220"), `expected a server-side filter in the URL, got: ${lastUrl}`);
   assert.equal(rows.length, 2);
   assert.ok(rows.every((r) => r.studentId === "20254220"), "must not leak another student's rows");

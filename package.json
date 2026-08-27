@@ -1,14 +1,15 @@
 {
   "name": "masar-app",
   "private": true,
-  "description": "اختبارات آلية لخدمات مسار (dev-only — لا تؤثر على التطبيق المُشغَّل في المتصفح بدون خطوة بناء)",
+  "description": "اختبارات آلية لخدمات مسار + سكربت تحليل الدرجات لـCowork (dev-only — لا تؤثر على التطبيق المُشغَّل في المتصفح بدون خطوة بناء)",
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "import-certificates": "node scripts/import-certificates.mjs"
+    "analyze-grades": "node scripts/cowork-analyze-grades.mjs"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
-    "pdfjs-dist": "^2.16.105"
+    "pdfjs-dist": "^2.16.105",
+    "xlsx": "^0.18.5"
   }
 }

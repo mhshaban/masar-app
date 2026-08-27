@@ -117,13 +117,15 @@ export async function list(collection) {
 
 // list() fetches an entire collection — correct for screens that genuinely
 // need every row (roster stats, cross-student candidate lists), but a real
-// cost once a collection is large (grades: tens of thousands of rows for
-// the whole school) and the caller only wants one student's rows. This asks
-// Supabase to filter server-side on a field inside the jsonb `data` column
-// (PostgREST's ->> text-extract operator), instead of downloading
-// everything and filtering client-side. Confirmed live: a student's
-// academic-path view was taking 3+ minutes before this (list("grades") was
-// paging through the whole school's grades to find one student's rows).
+// cost once a collection is large and the caller only wants one student's
+// rows. This asks Supabase to filter server-side on a field inside the
+// jsonb `data` column (PostgREST's ->> text-extract operator), instead of
+// downloading everything and filtering client-side. Confirmed live: a
+// student's academic-path view was taking 3+ minutes before this
+// (list("grades") was paging through the whole school's grade rows to find
+// one student's — that raw table is gone now that grade import moved to
+// Cowork, but termAverages and promotedSubjects still lean on this exact
+// mechanism).
 export async function listWhere(collection, field, value) {
   const backend = testBackend();
   if (backend) return backend.listWhere(collection, field, value);
@@ -143,7 +145,7 @@ export async function listWhere(collection, field, value) {
 
 // يستدعي دالة SQL جاهزة بجانب قاعدة البيانات (Postgres RPC عبر PostgREST) —
 // للحسابات التجميعية اللي تكلف كثير لو صارت بالمتصفح بعد تنزيل كل الصفوف
-// (راجع masar_grade_summaries كمثال: supabase/migrations/20260821_*.sql).
+// (راجع masar_search_students كمثال: supabase/migrations/20260823_student_search_rpc.sql).
 // بدون منفذ اختبار خاص عمدًا: أي كود يستدعي هذي الدالة بالاختبارات يتحمّل
 // مسؤولية موك globalThis.fetch مباشرة (نفس نمط cloud-runtime-pagination
 // test.mjs)، لأن هذي الدالة بطبيعتها استثناء (منطق عمل جاهز بجانب

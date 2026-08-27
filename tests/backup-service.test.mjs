@@ -11,14 +11,14 @@ beforeEach(async () => {
 
 test("buildBackup captures every collection with a timestamp and db version", async () => {
   await bulkPut("students", [{ id: "s1", name: "طالب" }]);
-  await bulkPut("grades", [{ id: "g1", score: 90 }]);
+  await bulkPut("academicFlags", [{ id: "s1", studentId: "s1", overallPct: 90 }]);
 
   const backup = await buildBackup();
   assert.equal(backup.app, "masar");
   assert.ok(backup.exportedAt);
   assert.ok(backup.dbVersion);
   assert.equal(backup.collections.students.length, 1);
-  assert.equal(backup.collections.grades.length, 1);
+  assert.equal(backup.collections.academicFlags.length, 1);
   assert.equal(backup.collections.reminders.length, 0);
 });
 
@@ -27,7 +27,7 @@ test("summarizeBackup counts records per collection", async () => {
   const backup = await buildBackup();
   const counts = summarizeBackup(backup);
   assert.equal(counts.students, 2);
-  assert.equal(counts.grades, 0);
+  assert.equal(counts.academicFlags, 0);
 });
 
 test("parseBackupFile rejects invalid JSON and mis-shaped files", () => {

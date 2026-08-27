@@ -1,11 +1,8 @@
-import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent, updateStudentPhoto, removeStudentPhoto } from "./students-service.js";
+import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent } from "./students-service.js";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
-import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
-import { matchPhotoFiles, commitPhotoMatches, migrateLegacyStudentPhotos } from "../../services/photos-import-service.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
-import { createSignedStudentPhotoUrl } from "../../services/student-photo-storage.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -16,31 +13,6 @@ function esc(str) {
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/);
   return parts.slice(0, 2).map((p) => p[0] || "").join("");
-}
-
-const PHOTO_MAX_DIMENSION = 300;
-
-// No source file has student photos (checked — no photo column, no embedded
-// images), so this is a manual upload. Resized client-side before storing
-// so a phone-camera photo doesn't bloat the shared database with a
-// multi-megabyte original for a 64px avatar.
-function resizeImageToBlob(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = () => { img.src = reader.result; };
-    reader.onerror = () => reject(reader.error);
-    img.onload = () => {
-      const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("تعذّر تجهيز الصورة")), "image/webp", 0.82);
-    };
-    img.onerror = () => reject(new Error("تعذّرت قراءة الصورة"));
-    reader.readAsDataURL(file);
-  });
 }
 
 // يستورد شيت "كشف الطلاب" من نفس ملف كشف الطلاب الكامل المستخدم لبقية
@@ -82,90 +54,6 @@ export function renderImportSection(root, { onImported, isUpdate }) {
     } catch (err) {
       previewRoot.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(err.message)}</p>`;
     }
-  });
-}
-
-// استيراد دفعة صور دفعة واحدة (بدل رفع صورة صورة من صفحة كل طالب) — الملفات
-// يجب أن تكون مسمّاة بالرقم الأكاديمي للطالب. يعرض تقرير مطابقة أولًا (مين
-// انطابق، مين ما انطابق، مين له أكثر من ملف) قبل أي كتابة فعلية، ويحفظ على
-// دفعات صغيرة (بدل الكل دفعة وحدة) عشان لا يعلّق المتصفح مع مئات الصور —
-// نفس درس أزمة رفع شهادات PDF الكبيرة سابقًا.
-const PHOTO_COMMIT_BATCH = 40;
-
-export function renderPhotoImportSection(root, { onImported }) {
-  root.innerHTML = `
-    <div class="card">
-      <h2>استيراد صور الطلبة</h2>
-      <p class="hint">اختر كل ملفات الصور دفعة واحدة — لازم يكون اسم كل ملف هو الرقم الأكاديمي للطالب (مثال: 20254220.jpg). تتم المطابقة تلقائيًا ويظهر تقرير قبل الحفظ.</p>
-      <input type="file" id="photos-import-input" aria-label="صور الطلبة" accept="image/*" multiple style="margin-bottom:12px;">
-      <button type="button" class="btn btn-ghost" id="photos-migrate-legacy" style="margin-inline-start:8px;">نقل الصور القديمة إلى التخزين الآمن</button>
-      <div id="photos-import-preview"></div>
-    </div>
-  `;
-
-  const fileInput = root.querySelector("#photos-import-input");
-  const previewRoot = root.querySelector("#photos-import-preview");
-  root.querySelector("#photos-migrate-legacy").addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    previewRoot.innerHTML = '<p class="hint">جارٍ فحص الصور القديمة…</p>';
-    const result = await migrateLegacyStudentPhotos(({ total, migrated, failed }) => {
-      previewRoot.innerHTML = `<p class="hint">تم نقل ${migrated} من ${total}${failed ? ` — تعذر ${failed}` : ""}…</p>`;
-    });
-    previewRoot.innerHTML = `<p class="hint" role="status">اكتمل النقل: ${result.migrated} من ${result.total}${result.failed.length ? `، وتعذر ${result.failed.length}` : ""}.</p>`;
-    button.disabled = false;
-    await onImported();
-  });
-
-  fileInput.addEventListener("change", async () => {
-    const files = [...fileInput.files];
-    if (!files.length) return;
-    previewRoot.innerHTML = '<p class="hint">جارٍ المطابقة…</p>';
-
-    const { matched, unmatched, duplicates } = await matchPhotoFiles(files);
-
-    previewRoot.innerHTML = `
-      <div class="tablewrap"><table>
-        <tbody>
-          <tr><td>ملفات لها طالب مطابق</td><td class="num">${matched.length}</td></tr>
-          <tr><td>ملفات بدون طالب مطابق (تحقق من اسم الملف)</td><td class="num">${unmatched.length}</td></tr>
-          <tr><td>طلبة لهم أكثر من ملف بنفس الرقم (يُستخدم أول ملف فقط لكل طالب)</td><td class="num">${duplicates.length}</td></tr>
-        </tbody>
-      </table></div>
-      ${unmatched.length ? `
-        <details style="margin-top:10px;">
-          <summary class="hint" style="cursor:pointer;">عرض الملفات غير المطابقة (${unmatched.length})</summary>
-          <ul class="plain">${unmatched.map((u) => `<li class="row-item"><div class="body"><div class="title">${esc(u.file.name)}</div></div></li>`).join("")}</ul>
-        </details>
-      ` : ""}
-      ${matched.length ? `<button class="btn btn-primary" id="photos-import-commit" style="margin-top:12px;">حفظ ${matched.length} صورة</button>` : ""}
-      <div id="photos-import-progress" style="margin-top:10px;"></div>
-    `;
-
-    const commitBtn = previewRoot.querySelector("#photos-import-commit");
-    if (!commitBtn) return;
-    commitBtn.addEventListener("click", async () => {
-      commitBtn.disabled = true;
-      const progressRoot = previewRoot.querySelector("#photos-import-progress");
-      let done = 0;
-      let failed = 0;
-      for (let i = 0; i < matched.length; i += PHOTO_COMMIT_BATCH) {
-        const batch = matched.slice(i, i + PHOTO_COMMIT_BATCH);
-        const resolved = [];
-        for (const { file, student } of batch) {
-          try {
-            resolved.push({ student, blob: await resizeImageToBlob(file) });
-          } catch {
-            failed += 1;
-          }
-        }
-        await commitPhotoMatches(resolved);
-        done += batch.length;
-        progressRoot.innerHTML = `<p class="hint">تم حفظ ${done} من ${matched.length}…</p>`;
-      }
-      progressRoot.innerHTML = `<p class="hint">تم بنجاح — ${matched.length - failed} صورة محفوظة${failed ? `، تعذّرت قراءة ${failed} ملف` : ""}.</p>`;
-      await onImported();
-    });
   });
 }
 
@@ -237,11 +125,7 @@ function renderTable(root, students, total, onOpen, onLoadMore) {
             <tr data-id="${esc(s.id)}">
               <td>
                 <div style="display:flex; align-items:center; gap:10px;">
-                  ${s.photoPath
-                    ? `<img data-photo-path="${esc(s.photoPath)}" alt="" loading="lazy" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex:0 0 auto;">`
-                    : s.photo
-                    ? `<img src="${esc(s.photo)}" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex:0 0 auto;">`
-                    : `<div class="row-item" style="padding:0; border:none;"><div class="avatar">${esc(initials(s.name))}</div></div>`}
+                  <div class="row-item" style="padding:0; border:none;"><div class="avatar">${esc(initials(s.name))}</div></div>
                   <div>
                     <div style="font-weight:600;">${esc(s.name) || "—"}</div>
                     <div class="hint" style="margin:0;">${esc(s.academicId) || "—"}</div>
@@ -269,108 +153,6 @@ function renderTable(root, students, total, onOpen, onLoadMore) {
   });
   const loadMoreBtn = root.querySelector("#students-load-more");
   if (loadMoreBtn) loadMoreBtn.addEventListener("click", onLoadMore);
-  hydrateStudentPhotoImages(root);
-}
-
-async function hydrateStudentPhotoImages(root) {
-  const images = [...root.querySelectorAll("img[data-photo-path]")];
-  await Promise.all(images.map(async (img) => {
-    const url = await createSignedStudentPhotoUrl(img.dataset.photoPath);
-    if (url && img.isConnected) img.src = url;
-  }));
-}
-
-function scheduleRow(label, value) {
-  return `<div class="row-item"><div class="body"><div class="title">${esc(label)}</div></div><span class="pill pill-neutral">${esc(value) || "—"}</span></div>`;
-}
-
-// نسخة مختصرة من SESSION_NAMES تطابق تسمية الجدول الرسمي المطبوع
-// ("صباحي"/"مسائي") بدل الاسم الكامل المستخدم بلوحة الساعات المكتبية.
-const SHORT_SESSION_NAMES = { 1: "صباحي", 2: "مسائي" };
-const GRID_DAYS = [1, 2, 3, 4, 5];
-
-// يبني الجدول الأسبوعي بنفس شكل الجدول الرسمي المطبوع اللي يستخدمه المرشد
-// فعليًا: الأيام أعمدة، وكل حصة صف من 4 أسطر (المقرر/المعلم/الغرفة/الفترة).
-// حقل "الغرفة" هنا هو نفسه اللي كان يُعرض بجدول أيام التنقل المنفصل سابقًا —
-// المدرسة تكتب فيه رمز تنقل بدل رقم قاعة بالحصص اللي ما فيها قاعة فعلية، فدمج
-// الجدولين بواحد (بدل عرضهما منفصلين) ما يفقد أي معلومة كانت تُعرض قبل.
-function scheduleGridTable(rows) {
-  // التجميع بـ"الحصة" وحدها لا بـ"الحصة+الفترة" معًا: يوم واحد قد يدرّس نفس
-  // رقم الحصة بفترة مختلفة عن بقية الأيام (مثال حقيقي مؤكَّد من جدول رسمي:
-  // نفس الحصة الثالثة مسائية يوم الأحد وصباحية بقية الأيام) — التجميع
-  // بالاثنين معًا كان يفصلهما بصفين منفصلين بدل صف واحد، فتظهر أغلب أعمدة
-  // كل صف فارغة بالخطأ رغم توفر بياناتها.
-  const blocks = new Map();
-  for (const r of rows) {
-    const key = String(r.period ?? 0);
-    if (!blocks.has(key)) blocks.set(key, { period: r.period, byDay: new Map() });
-    blocks.get(key).byDay.set(r.day, r);
-  }
-  const sortedBlocks = [...blocks.values()].sort((a, b) => a.period - b.period);
-
-  const labelRow = (label, block, pick) => `
-    <tr>
-      <td><strong>${esc(label)}</strong></td>
-      ${GRID_DAYS.map((d) => `<td>${esc(pick(block.byDay.get(d))) || "—"}</td>`).join("")}
-    </tr>
-  `;
-
-  return `
-    <div class="tablewrap"><table>
-      <thead>
-        <tr><th>اليوم</th>${GRID_DAYS.map((d) => `<th>${esc(DAY_NAMES[d])}</th>`).join("")}</tr>
-      </thead>
-      <tbody>
-        ${sortedBlocks.map((block) => `
-          ${labelRow("المقرر", block, (r) => r?.subjectCode)}
-          ${labelRow("المعلم", block, (r) => r?.teacher)}
-          ${labelRow("الغرفة", block, (r) => r?.room)}
-          ${labelRow("الفترة", block, (r) => (r?.session ? SHORT_SESSION_NAMES[r.session] : null))}
-        `).join("")}
-      </tbody>
-    </table></div>
-  `;
-}
-
-async function renderDetailedSchedule(root, section, weekSchedule) {
-  const rows = await getStudentSchedule(section);
-  const teachers = [...new Set(rows.map((r) => r.teacher).filter(Boolean))];
-  const officeHours = teachers.length ? await getOfficeHoursForTeachers(teachers) : [];
-  const officeByTeacher = new Map(officeHours.map((o) => [o.teacher, o]));
-  const hasWeekFallback = !rows.length && Object.values(weekSchedule || {}).some(Boolean);
-
-  root.innerHTML = `
-    <div class="grid g2">
-      <div class="card">
-        <h2>الجدول الدراسي الأسبوعي</h2>
-        ${rows.length ? scheduleGridTable(rows) : hasWeekFallback ? `
-          <ul class="plain">
-            ${scheduleRow("الأحد", weekSchedule.sunday)}
-            ${scheduleRow("الاثنين", weekSchedule.monday)}
-            ${scheduleRow("الثلاثاء", weekSchedule.tuesday)}
-            ${scheduleRow("الأربعاء", weekSchedule.wednesday)}
-            ${scheduleRow("الخميس", weekSchedule.thursday)}
-          </ul>
-        ` : '<div class="empty">لا يوجد جدول دراسي مستورَد بعد لهذه الشعبة — استورده من شاشة "الطلاب المرفعين"</div>'}
-      </div>
-      <div class="card">
-        <h2>الساعات المكتبية لمعلمي الطالب</h2>
-        ${teachers.length ? `
-          <ul class="plain">
-            ${teachers.map((t) => {
-              const office = officeByTeacher.get(t);
-              return `
-                <li class="row-item">
-                  <div class="body"><div class="title">${esc(t)}</div></div>
-                  ${office ? `<span class="pill pill-neutral">${esc(office.day)} — الحصة ${esc(office.period)}</span>` : '<span class="pill pill-neutral">غير مسجَّلة</span>'}
-                </li>
-              `;
-            }).join("")}
-          </ul>
-        ` : '<div class="empty">لا يوجد معلمون في الجدول التفصيلي بعد</div>'}
-      </div>
-    </div>
-  `;
 }
 
 async function renderDetail(container, id, onBack) {
@@ -383,10 +165,6 @@ async function renderDetail(container, id, onBack) {
   const hasGuidanceFlags = s.supportNeeded || s.socialGuidance;
   const promotedSubjects = await getPendingSubjectsForStudent(String(s.academicId || s.id));
   const pendingSubjects = promotedSubjects.filter((r) => !r.cleared);
-  const signedPhotoUrl = s.photoPath ? await createSignedStudentPhotoUrl(s.photoPath) : null;
-  const displayPhoto = signedPhotoUrl || s.photo || null;
-  const profile = getCurrentProfile();
-  const canManagePhoto = !!(profile?.is_admin || profile?.role === "admin");
 
   container.innerHTML = `
     <button class="backlink" id="students-back">
@@ -395,16 +173,10 @@ async function renderDetail(container, id, onBack) {
     </button>
     <div class="topbar">
       <div style="display:flex; align-items:center; gap:14px;">
-        <div id="student-photo-wrap" style="cursor:${canManagePhoto ? "pointer" : "default"}; flex:0 0 auto;"${canManagePhoto ? ' title="اضغط لتغيير الصورة"' : ""}>
-          ${displayPhoto
-            ? `<img src="${esc(displayPhoto)}" alt="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid var(--border); display:block;">`
-            : `<div style="width:64px; height:64px; border-radius:50%; background:var(--teal-600); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px;">${esc(initials(s.name))}</div>`}
-          ${canManagePhoto ? '<input type="file" id="student-photo-input" accept="image/*" style="display:none;">' : ""}
-        </div>
+        <div style="width:64px; height:64px; border-radius:50%; background:var(--teal-600); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px; flex:0 0 auto;">${esc(initials(s.name))}</div>
         <div>
           <h1>${esc(s.name) || "—"}</h1>
           <div class="sub">${esc(s.level) || "—"} · ${esc(s.section) || "—"} · ${esc(s.department) || "—"} — ${esc(s.track) || "—"}</div>
-          ${displayPhoto && canManagePhoto ? '<button class="link-btn" id="student-photo-remove" style="color:var(--critical); margin-top:2px;">إزالة الصورة</button>' : ""}
         </div>
       </div>
       <div class="meta">الرقم الأكاديمي ${esc(s.academicId) || "—"}</div>
@@ -464,8 +236,6 @@ async function renderDetail(container, id, onBack) {
       </table></div>
     </div>
 
-    <div id="student-detailed-schedule" style="margin-top:16px;"></div>
-
     <div class="topbar" style="margin-top:22px;">
       <div><h1 style="font-size:17px;">المسار الأكاديمي</h1><div class="sub">تاريخ الطالب عبر الفترات الدراسية، من الدرجات والشهادات المستوردة</div></div>
     </div>
@@ -474,30 +244,6 @@ async function renderDetail(container, id, onBack) {
 
   container.querySelector("#students-back").addEventListener("click", onBack);
 
-  const photoInput = container.querySelector("#student-photo-input");
-  if (photoInput) container.querySelector("#student-photo-wrap").addEventListener("click", () => photoInput.click());
-  photoInput?.addEventListener("change", async () => {
-    const file = photoInput.files[0];
-    if (!file) return;
-    try {
-      const blob = await resizeImageToBlob(file);
-      await updateStudentPhoto(id, blob);
-      await renderDetail(container, id, onBack);
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-  const removeBtn = container.querySelector("#student-photo-remove");
-  if (removeBtn) {
-    removeBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!confirm("إزالة صورة هذا الطالب؟")) return;
-      await removeStudentPhoto(id);
-      await renderDetail(container, id, onBack);
-    });
-  }
-
-  await renderDetailedSchedule(container.querySelector("#student-detailed-schedule"), s.section, s.weekSchedule);
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
 
