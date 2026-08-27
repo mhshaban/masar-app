@@ -87,7 +87,7 @@ python3 -m http.server 8080
 }
 ```
 
-اسم المقرر موحّد (لا رمز) — Cowork يطبّق نفس منطق التجميع القديم (`src/services/subject-groups-seed.js` الباقي بالمستودع كبيانات مرجعية مؤسسية فقط، لا كود مستهلَك من مسار بعد اليوم؛ كيم801/كيم802/فيز803...فيز806 كلها "العلوم"، مثلًا)، ونفس اصطلاح المدرسة أن الدرجة **"0.5"** الحرفية تعني غيابًا لا 0.5٪ (كان بـ`score-conventions.js`، محذوف الآن — القاعدتان موثَّقتان هنا فقط لأن الكود نفسه رحل). `termAverages` (معدل فصلي رسمي لكل طالب × فصل، من الشهادة) بقيت كما هي بلا تغيير — كانت أصلًا رقمًا مجمَّعًا لا صفًا خامًا.
+اسم المقرر موحّد (لا رمز) — عبر نفس جدول "المقررات" الرسمي (`src/services/subject-groups-seed.js`، بيانات مرجعية مؤسسية لا طلابية) ونفس اصطلاح المدرسة أن الدرجة **"0.5"** الحرفية تعني غيابًا لا 0.5٪. `termAverages` (معدل فصلي رسمي لكل طالب × فصل، من الشهادة) بقيت كما هي بلا تغيير — كانت أصلًا رقمًا مجمَّعًا لا صفًا خامًا.
 
 Cowork يكتب `academicFlags`/`termAverages` **كاملتين في كل تحليل (استبدال، لا تراكم)**، بحساب Supabase Auth حقيقي (إدمن — نفس صلاحية استيراد الدرجات القديم بالضبط عبر RLS)، بنفس REST API اللي تستخدمه الواجهة — بلا كود خادم جديد ولا مفتاح خدمة منفصل. العمليات تُسجَّل بـ`audit_logs` بهوية ذلك الحساب تلقائيًا.
 
@@ -96,19 +96,33 @@ Cowork يكتب `academicFlags`/`termAverages` **كاملتين في كل تحل
 **ما تغيّر فعليًا بالواجهة**:
 - لا تبويب استيراد للدرجات/الشهادات بعد الآن (لا بشاشة الدرجات ولا بالإدارة ← الاستيراد) — شاشة "الدرجات والتحليلات" تعرض التحليلات والتصنيف فقط.
 - المسار الأكاديمي بملف الطالب صار منحنى المعدل الفصلي فقط؛ الجدول المحوري (مقرر × فصل) أُزيل لأنه كان يعتمد على صفوف الدرجات الخام تحديدًا.
-- `scripts/import-certificates.mjs` (استيراد دفعي من الطرفية) حُذف — بديله الآن سكربت مكافئ من طرف Cowork يقرأ نفس مجلد OneDrive مباشرة.
-- الملفات المحذوفة بالكامل من مسار (منطقها انتقل مفهوميًا لـCowork، لا كود مشترك بين الطرفين): `grades-import-service.js`، `certificate-parser.js`، `subject-groups.js`، `score-conventions.js`، `pdf-parser.js`، حزمة pdf.js المُضمَّنة (`src/vendor/pdfjs/`)، و`xlsx-export.js`.
+- الملفات القديمة داخل `src/modules/grades/` و`src/services/` (`grades-import-service.js`، `certificate-parser.js`، `subject-groups.js`، `score-conventions.js`، `pdf-parser.js`، حزمة pdf.js المُضمَّنة، `xlsx-export.js`) حُذفت من التطبيق (مسار لا يستهلكها بعد اليوم) — لكن منطقها بالضبط (بلا أي تعديل بالمنطق نفسه، فقط تعديلات مسارات الاستيراد لتصير Node بدل متصفح) **منقول حرفيًا إلى `scripts/lib/`** أدناه، حتى لا يُعاد اختراعه أو يختلف عن النسخة المُختبَرة سابقًا على 894 شهادة حقيقية.
 - الجداول المحذوفة من قاعدة بيانات مسار (migration `20260827_grades_import_to_cowork.sql`): `grades`، `importBatches`. دالتا Postgres `masar_grade_summaries`/`masar_dashboard_snapshot` أُلغيتا معهما — الرئيسية رجعت لتركيب لقطتها بجافاسكربت مباشرة (نفس `dashboard-service.js` القديم قبل تحسين RPC)، لأن `academicFlags` صار صغيرًا كفاية (صف لكل طالب) أن يفقد التحسين مبرره الأصلي.
 
-**بديل مؤقت إن لم يُنجَز سكربت Cowork بعد**: تعبئة `academicFlags`/`termAverages` يدويًا عبر REST مباشر أو SQL Editor ممكنة (نفس RLS، حساب إدمن)، لكن هذا القسم كله مصمَّم على افتراض أن Cowork هو من يكتبها فعليًا من تحليل ملفات OneDrive الـ1,445 شهادة PDF + كشوف الإكسل.
+### السكربت الفعلي: `scripts/cowork-analyze-grades.mjs`
 
-## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
-
-83 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+يعوّض `scripts/import-certificates.mjs` القديم (كان يستورد شهادات PDF فقط لجدول `grades` الخام، حُذف مع الجدول نفسه) — هذا يقرأ **الإكسل والشهادات معًا** من مجلد واحد (المجلد المزامَن محليًا من OneDrive)، ويكتب `academicFlags`/`termAverages` مباشرة، بلا أي صف درجة خام يمر على مسار إطلاقًا:
 
 ```bash
 cd masar-app
-npm install   # مرة واحدة، يجلب fake-indexeddb فقط (devDependency)
+npm install   # مرة واحدة — يجلب pdfjs-dist وxlsx (حزمة SheetJS من npm) كمان
+node scripts/cowork-analyze-grades.mjs /path/to/onedrive-folder --dry-run   # معاينة أولًا
+node scripts/cowork-analyze-grades.mjs /path/to/onedrive-folder            # التنفيذ الفعلي
+```
+
+- يفحص المجلد **بالكامل بما فيه المجلدات الفرعية** — كل ملف `.pdf` يُعامَل كشهادة، وكل ملف `.xlsx`/`.xls` يُعامَل كدرجات وقفة تقويمية (يُتجاهَل بصمت لو ما فيه عمودا "رقم الطالب"/"الدرجة" المتوقَّعين — يحمي من التقاط ملف كشف الطلاب الكامل بالغلط لو كان بنفس المجلد).
+- **اسم ملف الإكسل نفسه = اسم الفترة** المحفوظ (بدون الامتداد) — سمِّ كل ملف بوضوح، مثال: `الوقفة الأولى - الفصل الأول 2025-2026.xlsx`.
+- يطلب تسجيل دخول تفاعلي بالطرفية (حساب Supabase حقيقي، إدمن — لا شيء يُكتب لملف ولا يُرسل لغير Supabase مباشرة)، يجلب سجل الطلبة الحالي للمطابقة، ثم يطبع ملخصًا كاملًا (ملفات نجحت/فشلت، صفوف مطابقة/غير مطابقة، عدد صفوف academicFlags/termAverages التي ستُكتب) **قبل** أي تعديل فعلي — راجعه دائمًا (خصوصًا `--dry-run` أول مرة على عيّنة).
+- **استبدال كامل لا تراكم**: كل تشغيلة تمسح `academicFlags`/`termAverages` بالكامل وتكتبهما من الصفر من كل الملفات الموجودة بالمجلد وقت التشغيل — شغّله دائمًا على المجلد الكامل (كل الشهادات الـ1,445 + كل ملفات الوقفة التقويمية)، لا فقط الملفات الجديدة، وإلا تُفقَد بيانات الطلاب اللي ملفاتهم غير موجودة بهذه التشغيلة.
+- `scripts/lib/`: الوحدات القابلة للاختبار المستقلة عن الشبكة — `score-conventions.mjs`، `subject-groups.mjs`، `certificate-parser.mjs` (منطق تحليل بحت، مُختبَر بـ`tests/scripts-*.test.mjs`)، بالإضافة لـ`pdf-rows.mjs` (استخراج PDF عبر pdfjs-dist) و`checkpoint-xlsx-parser.mjs` (قراءة إكسل عبر حزمة xlsx) و`supabase-client.mjs` (تسجيل الدخول التفاعلي + REST، بنفس دلالات `cloud-runtime.js` تمامًا: نفس تقسيم الدفعات، نفس ترويسات `Prefer`).
+
+## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
+
+119 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+
+```bash
+cd masar-app
+npm install   # مرة واحدة — يجلب fake-indexeddb (اختبارات) وpdfjs-dist وxlsx (سكربت Cowork)
 npm test
 ```
 
@@ -118,6 +132,8 @@ npm test
 - `tests/students-import-service.test.mjs`: تحويل صف حقيقي كامل من شيت "كشف الطلاب" (مثبَّت هنا حرفيًا، بكل الأعمدة الـ36) لنفس شكل سجل الطالب الذي كان ينتجه seed القديم؛ استبدال السجل بالكامل عند كل استيراد؛ وتثبيت مباشر لعلة ذاكرة تخزين مؤقت حقيقية (`ensureStudentsSeeded` كانت تعلّق على نتيجة "غير متوفر" الأولى ولا تتحدّث بعد استيراد ناجح).
 - `tests/local-runtime.test.mjs`: عمليات IndexedDB الأساسية (حفظ، قراءة، دفعة، حذف، مسح).
 - `tests/term-progress-service.test.mjs`: ترتيب الفترات زمنيًا (بما فيه هجاء "الثانى" الفعلي في شهادات هذه المدرسة الذي كسر الترتيب فعليًا قبل الإصلاح)، وعدم تسرّب بيانات طالب لآخر.
+- `tests/scripts-certificate-parser.test.mjs`، `tests/scripts-subject-groups.test.mjs`، `tests/scripts-score-conventions.test.mjs`: نفس اختبارات `certificate-parser.js`/`subject-groups.js`/`score-conventions.js` الأصلية قبل نقلها، مُعاد تشغيلها بالكامل ضد `scripts/lib/*.mjs` (سكربت Cowork) للتأكد إن النقل بلا اختلاف بالمنطق.
+- `tests/scripts-checkpoint-xlsx-parser.test.mjs`: اكتشاف أعمدة "رقم الطالب"/"الدرجة" بالاسم البديل، تفسير "0.5" كغياب مُرمَّز، وتجاهل ملف إكسل مش فيه أعمدة درجات (بدل رمي خطأ) — يبني ملف xlsx حقيقي بالذاكرة عبر حزمة `xlsx` نفسها بدل تثبيت buffer جاهز.
 
 (الحالات الإرشادية وخطط الدعم اختُبرا يدويًا عبر Playwright وقت البناء — لم تُضَف بعد اختبارات آلية خاصة بهما.)
 
@@ -181,6 +197,9 @@ supabase/
                  20260827_grades_import_to_cowork.sql — إنشاء academicFlags، حذف grades/importBatches/teacherSchedule/officeHours ودوال Postgres المرتبطة بها، تحديث masar_export_backup — راجع القسم المخصص أدناه
   functions/
     admin-users/ Edge Function (Deno) — إنشاء/تعطيل حساب، إعادة تعيين كلمة مرور، بمفتاح service_role من طرف الخادم فقط
+scripts/
+  cowork-analyze-grades.mjs — سكربت Cowork: يحلل مجلد الإكسل/الشهادات ويكتب academicFlags/termAverages، راجع القسم المخصص أعلاه
+  lib/           score-conventions.mjs, subject-groups.mjs, certificate-parser.mjs, pdf-rows.mjs, checkpoint-xlsx-parser.mjs, supabase-client.mjs
 ```
 
 ## الإعداد السحابي (Supabase) — خطوات لازم تُنفَّذ يدويًا مرة واحدة
