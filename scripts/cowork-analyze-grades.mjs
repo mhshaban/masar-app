@@ -34,6 +34,7 @@ import { parseCheckpointWorkbook } from "./lib/checkpoint-xlsx-parser.mjs";
 import { subjectKeyForGrade } from "./lib/subject-groups.mjs";
 import { gradeRowPct } from "./lib/score-conventions.mjs";
 import { loginInteractive, fetchStudents, clearCollection, bulkPut } from "./lib/supabase-client.mjs";
+import { looksLikeScheduleDocument, MAX_PLAUSIBLE_SUBJECTS_PER_TERM } from "./lib/document-classifier.mjs";
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -44,6 +45,15 @@ async function walk(dir) {
     else files.push(full);
   }
   return files;
+}
+
+// يطبع أول 20 عنصر بس من قائمة طويلة — أرشيف مدرسة حقيقي فيه مئات الملفات
+// المتجاهَلة (جداول حصص مثلًا)، وطباعتها كلها تُغرق الطرفية عن أي معلومة
+// مفيدة فعليًا (رُصد فعليًا: مئات الأسطر لأخطاء متوقَّعة).
+const PRINT_CAP = 20;
+function printCapped(list, formatLine) {
+  list.slice(0, PRINT_CAP).forEach((item) => console.log(formatLine(item)));
+  if (list.length > PRINT_CAP) console.log(`  ... و${list.length - PRINT_CAP} ملفًا آخر (مختصرة لتجنّب إغراق الطرفية).`);
 }
 
 function isPdf(file) {
@@ -100,6 +110,8 @@ async function collectFromPdfs(files) {
   const allRows = [];
   const termSummaries = [];
   const errors = [];
+  const scheduleSkipped = [];
+  const suspicious = [];
   let ok = 0;
   for (const [i, file] of files.entries()) {
     const baseName = path.basename(file);
@@ -107,10 +119,21 @@ async function collectFromPdfs(files) {
     try {
       const buf = await readFile(file);
       const rawRows = await extractPdfRows(buf);
+      if (looksLikeScheduleDocument(rawRows)) {
+        console.log("… جدول حصص (مو شهادة درجات) — تجاهلته.");
+        scheduleSkipped.push(file);
+        continue;
+      }
       const cert = parseCertificateRows(rawRows);
       if (!cert.academicId) {
         console.log("⚠ تعذّر إيجاد رقم الطالب داخل الملف.");
         errors.push({ file, reason: "تعذّر إيجاد رقم الطالب داخل الملف." });
+        continue;
+      }
+      const maxSubjectsInAnyTerm = Math.max(0, ...cert.terms.map((t) => t.subjects.length));
+      if (maxSubjectsInAnyTerm > MAX_PLAUSIBLE_SUBJECTS_PER_TERM) {
+        console.log(`⚠ ${maxSubjectsInAnyTerm} مقرر بفصل واحد — عدد غير منطقي، غالبًا رقم أكاديمي طابق بالصدفة داخل ملف من نوع تاني. تجاهلته.`);
+        suspicious.push({ file, academicId: cert.academicId, subjectCount: maxSubjectsInAnyTerm });
         continue;
       }
       let subjectCount = 0;
@@ -138,7 +161,7 @@ async function collectFromPdfs(files) {
       errors.push({ file, reason: err.message });
     }
   }
-  return { rows: allRows, termSummaries, errors, ok };
+  return { rows: allRows, termSummaries, errors, scheduleSkipped, suspicious, ok };
 }
 
 // نفس منطق achievement-service.js/grade-flags-service.js القديم بالضبط —
@@ -227,9 +250,9 @@ async function main() {
     : { rows: [], skipped: [] };
 
   console.log("\nجارٍ قراءة ملفات الشهادات (PDF)...");
-  const { rows: pdfRows, termSummaries, errors: pdfErrors, ok: pdfOk } = pdfFiles.length
+  const { rows: pdfRows, termSummaries, errors: pdfErrors, scheduleSkipped, suspicious, ok: pdfOk } = pdfFiles.length
     ? await collectFromPdfs(pdfFiles)
-    : { rows: [], termSummaries: [], errors: [], ok: 0 };
+    : { rows: [], termSummaries: [], errors: [], scheduleSkipped: [], suspicious: [], ok: 0 };
 
   const token = await loginInteractive();
 
@@ -269,13 +292,20 @@ async function main() {
 
   console.log("\n=== الملخص ===");
   console.log(`ملفات شهادات PDF قُرئت بنجاح: ${pdfOk} من ${pdfFiles.length}`);
+  if (scheduleSkipped.length) {
+    console.log(`جداول حصص تم تجاهلها (متوقَّع، مو شهادات درجات): ${scheduleSkipped.length}`);
+  }
+  if (suspicious.length) {
+    console.log(`⚠ ملفات مشكوك فيها (${suspicious.length}) — رقم أكاديمي طابق لكن عدد المقررات غير منطقي، تُجوهلت ولم تُحسَب:`);
+    printCapped(suspicious, (s) => `  - ${path.basename(s.file)} (رقم ${s.academicId}, ${s.subjectCount} مقرر)`);
+  }
   if (pdfErrors.length) {
     console.log(`ملفات PDF فيها خطأ (${pdfErrors.length}):`);
-    pdfErrors.forEach((e) => console.log(`  - ${path.basename(e.file)}: ${e.reason}`));
+    printCapped(pdfErrors, (e) => `  - ${path.basename(e.file)}: ${e.reason}`);
   }
   if (xlsxSkipped.length) {
     console.log(`ملفات إكسل تم تجاهلها (${xlsxSkipped.length}):`);
-    xlsxSkipped.forEach((s) => console.log(`  - ${path.basename(s.file)}: ${s.reason}`));
+    printCapped(xlsxSkipped, (s) => `  - ${path.basename(s.file)}: ${s.reason}`);
   }
   console.log(`صفوف درجات (إكسل + PDF) قبل المطابقة: ${allRows.length}`);
   console.log(`صفوف مطابقة لطالب بالسجل: ${matchedRows.length}`);
