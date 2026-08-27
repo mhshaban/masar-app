@@ -22,6 +22,4 @@ export const COLLECTIONS = [
   "importBatches",
   "promotedSubjects",
   "promotedImportBatches",
-  "teacherSchedule",
-  "officeHours",
 ];

@@ -26,8 +26,6 @@ const COLLECTION_LABELS = {
   importBatches: "دفعات استيراد الدرجات",
   promotedSubjects: "مقررات الطلاب المرفعين",
   promotedImportBatches: "دفعات استيراد المرفعين",
-  teacherSchedule: "الجدول الدراسي التفصيلي",
-  officeHours: "الساعات المكتبية للمعلمين",
 };
 
 function renderSummary(counts) {

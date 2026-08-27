@@ -1,7 +1,6 @@
 import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent } from "./students-service.js";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
-import { getStudentSchedule, getOfficeHoursForTeachers, DAY_NAMES } from "../schedule/schedule-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
 import { getCurrentProfile } from "../../services/auth-service.js";
 
@@ -156,99 +155,6 @@ function renderTable(root, students, total, onOpen, onLoadMore) {
   if (loadMoreBtn) loadMoreBtn.addEventListener("click", onLoadMore);
 }
 
-function scheduleRow(label, value) {
-  return `<div class="row-item"><div class="body"><div class="title">${esc(label)}</div></div><span class="pill pill-neutral">${esc(value) || "—"}</span></div>`;
-}
-
-// نسخة مختصرة من SESSION_NAMES تطابق تسمية الجدول الرسمي المطبوع
-// ("صباحي"/"مسائي") بدل الاسم الكامل المستخدم بلوحة الساعات المكتبية.
-const SHORT_SESSION_NAMES = { 1: "صباحي", 2: "مسائي" };
-const GRID_DAYS = [1, 2, 3, 4, 5];
-
-// يبني الجدول الأسبوعي بنفس شكل الجدول الرسمي المطبوع اللي يستخدمه المرشد
-// فعليًا: الأيام أعمدة، وكل حصة صف من 4 أسطر (المقرر/المعلم/الغرفة/الفترة).
-// حقل "الغرفة" هنا هو نفسه اللي كان يُعرض بجدول أيام التنقل المنفصل سابقًا —
-// المدرسة تكتب فيه رمز تنقل بدل رقم قاعة بالحصص اللي ما فيها قاعة فعلية، فدمج
-// الجدولين بواحد (بدل عرضهما منفصلين) ما يفقد أي معلومة كانت تُعرض قبل.
-function scheduleGridTable(rows) {
-  // التجميع بـ"الحصة" وحدها لا بـ"الحصة+الفترة" معًا: يوم واحد قد يدرّس نفس
-  // رقم الحصة بفترة مختلفة عن بقية الأيام (مثال حقيقي مؤكَّد من جدول رسمي:
-  // نفس الحصة الثالثة مسائية يوم الأحد وصباحية بقية الأيام) — التجميع
-  // بالاثنين معًا كان يفصلهما بصفين منفصلين بدل صف واحد، فتظهر أغلب أعمدة
-  // كل صف فارغة بالخطأ رغم توفر بياناتها.
-  const blocks = new Map();
-  for (const r of rows) {
-    const key = String(r.period ?? 0);
-    if (!blocks.has(key)) blocks.set(key, { period: r.period, byDay: new Map() });
-    blocks.get(key).byDay.set(r.day, r);
-  }
-  const sortedBlocks = [...blocks.values()].sort((a, b) => a.period - b.period);
-
-  const labelRow = (label, block, pick) => `
-    <tr>
-      <td><strong>${esc(label)}</strong></td>
-      ${GRID_DAYS.map((d) => `<td>${esc(pick(block.byDay.get(d))) || "—"}</td>`).join("")}
-    </tr>
-  `;
-
-  return `
-    <div class="tablewrap"><table>
-      <thead>
-        <tr><th>اليوم</th>${GRID_DAYS.map((d) => `<th>${esc(DAY_NAMES[d])}</th>`).join("")}</tr>
-      </thead>
-      <tbody>
-        ${sortedBlocks.map((block) => `
-          ${labelRow("المقرر", block, (r) => r?.subjectCode)}
-          ${labelRow("المعلم", block, (r) => r?.teacher)}
-          ${labelRow("الغرفة", block, (r) => r?.room)}
-          ${labelRow("الفترة", block, (r) => (r?.session ? SHORT_SESSION_NAMES[r.session] : null))}
-        `).join("")}
-      </tbody>
-    </table></div>
-  `;
-}
-
-async function renderDetailedSchedule(root, section, weekSchedule) {
-  const rows = await getStudentSchedule(section);
-  const teachers = [...new Set(rows.map((r) => r.teacher).filter(Boolean))];
-  const officeHours = teachers.length ? await getOfficeHoursForTeachers(teachers) : [];
-  const officeByTeacher = new Map(officeHours.map((o) => [o.teacher, o]));
-  const hasWeekFallback = !rows.length && Object.values(weekSchedule || {}).some(Boolean);
-
-  root.innerHTML = `
-    <div class="grid g2">
-      <div class="card">
-        <h2>الجدول الدراسي الأسبوعي</h2>
-        ${rows.length ? scheduleGridTable(rows) : hasWeekFallback ? `
-          <ul class="plain">
-            ${scheduleRow("الأحد", weekSchedule.sunday)}
-            ${scheduleRow("الاثنين", weekSchedule.monday)}
-            ${scheduleRow("الثلاثاء", weekSchedule.tuesday)}
-            ${scheduleRow("الأربعاء", weekSchedule.wednesday)}
-            ${scheduleRow("الخميس", weekSchedule.thursday)}
-          </ul>
-        ` : '<div class="empty">لا يوجد جدول دراسي مستورَد بعد لهذه الشعبة — استورده من شاشة "الطلاب المرفعين"</div>'}
-      </div>
-      <div class="card">
-        <h2>الساعات المكتبية لمعلمي الطالب</h2>
-        ${teachers.length ? `
-          <ul class="plain">
-            ${teachers.map((t) => {
-              const office = officeByTeacher.get(t);
-              return `
-                <li class="row-item">
-                  <div class="body"><div class="title">${esc(t)}</div></div>
-                  ${office ? `<span class="pill pill-neutral">${esc(office.day)} — الحصة ${esc(office.period)}</span>` : '<span class="pill pill-neutral">غير مسجَّلة</span>'}
-                </li>
-              `;
-            }).join("")}
-          </ul>
-        ` : '<div class="empty">لا يوجد معلمون في الجدول التفصيلي بعد</div>'}
-      </div>
-    </div>
-  `;
-}
-
 async function renderDetail(container, id, onBack) {
   const s = await getStudent(id);
   if (!s) {
@@ -330,8 +236,6 @@ async function renderDetail(container, id, onBack) {
       </table></div>
     </div>
 
-    <div id="student-detailed-schedule" style="margin-top:16px;"></div>
-
     <div class="topbar" style="margin-top:22px;">
       <div><h1 style="font-size:17px;">المسار الأكاديمي</h1><div class="sub">تاريخ الطالب عبر الفترات الدراسية، من الدرجات والشهادات المستوردة</div></div>
     </div>
@@ -340,7 +244,6 @@ async function renderDetail(container, id, onBack) {
 
   container.querySelector("#students-back").addEventListener("click", onBack);
 
-  await renderDetailedSchedule(container.querySelector("#student-detailed-schedule"), s.section, s.weekSchedule);
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
 

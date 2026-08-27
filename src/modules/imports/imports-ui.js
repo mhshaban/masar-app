@@ -12,8 +12,6 @@ import { renderImportTab as renderGradesImportTab } from "../grades/grades-ui.js
 import {
   renderImportSection as renderPromotedRosterImport,
   renderBatchHistory as renderPromotedBatchHistory,
-  renderScheduleImportSection,
-  renderSchedulePdfImportSection,
 } from "../promoted/promoted-ui.js";
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
 import { ensurePdfJs, ensureXlsx } from "../../services/vendor-loader.js";
@@ -43,20 +41,16 @@ async function mountGradesTab(root) {
 }
 
 async function mountPromotedTab(root) {
-  await Promise.all([ensureXlsx(), ensurePdfJs()]);
+  await ensureXlsx();
   root.innerHTML = `
     <div id="imports-promoted-roster" style="margin-bottom:16px;"></div>
-    <div id="imports-promoted-history" style="margin-bottom:16px;"></div>
-    <div id="imports-promoted-schedule" style="margin-bottom:16px;"></div>
-    <div id="imports-promoted-schedule-pdf"></div>
+    <div id="imports-promoted-history"></div>
   `;
   const historyRoot = root.querySelector("#imports-promoted-history");
   await renderPromotedBatchHistory(historyRoot);
   await renderPromotedRosterImport(root.querySelector("#imports-promoted-roster"), async () => {
     await renderPromotedBatchHistory(historyRoot);
   });
-  await renderScheduleImportSection(root.querySelector("#imports-promoted-schedule"), async () => {});
-  await renderSchedulePdfImportSection(root.querySelector("#imports-promoted-schedule-pdf"), async () => {});
 }
 
 async function mountBackupTab(root) {
