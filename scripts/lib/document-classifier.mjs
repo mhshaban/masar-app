@@ -12,4 +12,4 @@ export function looksLikeScheduleDocument(rawRows) {
 // حتى لو ملف مو جدول حصص معروف الشكل، عدد مقررات غير منطقي لطالب واحد
 // بفصل واحد (شهادة حقيقية فيها ٦-١٠ مواد عادة) مؤشر قوي على مطابقة رقم
 // أكاديمي بالصدفة داخل ملف من نوع تاني كليًا — يُرفض بدل قبوله بصمت.
-export const MAX_PLAUSIBLE_SUBJECTS_PER_TERM = 20;
+export const MAX_PLAUSIBLE_SUBJECTS_PER_TERM = 25;
