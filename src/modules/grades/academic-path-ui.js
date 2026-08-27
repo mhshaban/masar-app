@@ -1,13 +1,4 @@
-import { getStudentTermTimeline, getStudentSubjectTimeline, getStudentTermColumns } from "./term-progress-service.js";
-
-function esc(str) {
-  return String(str ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
-}
-
-const SCORE_STATUS_LABELS = { absent: "غائب", barred: "محروم" };
-const FAIL_THRESHOLD_PCT = 50;
+import { getStudentTermTimeline } from "./term-progress-service.js";
 
 const CHART_W = 640;
 const CHART_H = 220;
@@ -18,7 +9,7 @@ const PAD_B = 26;
 
 function renderTermLineChart(points) {
   if (!points.length) {
-    return '<div class="empty">لا توجد معدلات فصلية بعد — تُستخرج تلقائيًا عند استيراد شهادة الطالب (PDF) أو درجاته (إكسل)</div>';
+    return '<div class="empty">لا توجد معدلات فصلية بعد — تُستخرج من تحليل شهادات الطالب بواسطة Cowork</div>';
   }
 
   const plotW = CHART_W - PAD_L - PAD_R;
@@ -76,61 +67,18 @@ function wireTermChart(root, points) {
   });
 }
 
-function subjectCell(point) {
-  if (!point) return '<td class="num" style="color:var(--ink-500);">—</td>';
-  if (point.scoreStatus) {
-    return `<td class="num" style="color:var(--ink-500);">${esc(SCORE_STATUS_LABELS[point.scoreStatus] || point.scoreStatus)}</td>`;
-  }
-  if (point.pct == null) return '<td class="num" style="color:var(--ink-500);">—</td>';
-  const color = point.pct < FAIL_THRESHOLD_PCT ? "var(--critical)" : "var(--success)";
-  return `<td class="num" style="color:${color}; font-weight:600;">${point.pct}٪</td>`;
-}
-
-function renderSubjectPivot(subjects, termColumns) {
-  if (!subjects.length) return '<div class="empty">لا توجد درجات مستوردة لهذا الطالب بعد</div>';
-  return `
-    <div class="tablewrap"><table>
-      <thead>
-        <tr>
-          <th>المقرر</th>
-          ${termColumns.map((t) => `<th>${esc(t)}</th>`).join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${subjects.map((s) => `
-          <tr>
-            <td>${esc(s.subject)}</td>
-            ${termColumns.map((t) => subjectCell(s.points.find((p) => p.term === t))).join("")}
-          </tr>
-        `).join("")}
-      </tbody>
-    </table></div>
-  `;
-}
-
 export async function renderAcademicPath(container, studentId) {
-  const [timeline, subjects, termColumns] = await Promise.all([
-    getStudentTermTimeline(studentId),
-    getStudentSubjectTimeline(studentId),
-    getStudentTermColumns(studentId),
-  ]);
+  const timeline = await getStudentTermTimeline(studentId);
 
   container.innerHTML = `
-    <div class="card" style="margin-bottom:16px;">
-      <h2>المعدل الفصلي عبر الزمن</h2>
-      <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب المستوردة فقط — لا يشمل درجات الوقفة التقويمية.</p>
-      <div id="term-chart-root"></div>
-    </div>
     <div class="card">
-      <h2>الدرجات حسب المقرر عبر الفترات</h2>
-      <p class="hint">كل صف مقرر واحد بحسب اسمه (لا رمزه، لأن الرمز يتغيّر بين الفصول لنفس المقرر) — كل عمود فترة دراسية.</p>
-      <div id="subject-pivot-root"></div>
+      <h2>المعدل الفصلي عبر الزمن</h2>
+      <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط — من تحليل Cowork، لا يشمل درجات الوقفة التقويمية.</p>
+      <div id="term-chart-root"></div>
     </div>
   `;
 
   const chartRoot = container.querySelector("#term-chart-root");
   chartRoot.innerHTML = renderTermLineChart(timeline);
   wireTermChart(chartRoot, timeline);
-
-  container.querySelector("#subject-pivot-root").innerHTML = renderSubjectPivot(subjects, termColumns);
 }

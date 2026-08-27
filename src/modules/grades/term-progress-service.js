@@ -1,12 +1,10 @@
 import { listWhere } from "../../services/cloud-runtime.js";
-import { gradeRowPct } from "./score-conventions.js";
-import { subjectKeyForGrade, subjectSortRank } from "./subject-groups.js";
 
-// Term labels are free text (typed by the counselor for Excel imports, or
-// extracted verbatim from the certificate's own line for PDF imports), so
-// there's no reliable field to sort on directly. This scans for a 4-digit
-// year and an "الأول/الثاني/الثالث" ordinal anywhere in the string — it
-// doesn't assume word order, only that both appear somewhere in the label.
+// Term labels are free text (extracted verbatim from the certificate's own
+// line by Cowork's analysis, mirroring how the counselor read them before),
+// so there's no reliable field to sort on directly. This scans for a
+// 4-digit year and an "الأول/الثاني/الثالث" ordinal anywhere in the
+// string — it doesn't assume word order, only that both appear somewhere.
 function extractYear(term) {
   const text = String(term || "");
   const ranged = text.match(/(\d{4})\s*\/\s*\d{2,4}/);
@@ -42,53 +40,4 @@ export async function getStudentTermTimeline(studentId) {
   return officialTerms
     .map((t) => ({ term: t.term, sortKey: termSortKey(t.term), averagePct: t.averagePct, rating: t.rating }))
     .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-}
-
-// Grouped via subjectKeyForGrade — the school's official "المقررات" table
-// maps every code variant a subject uses across its six terms to one
-// canonical name (e.g. كيم801/كيم802/فيز803.../فيز806 all resolve to
-// "العلوم"), so subjects that visibly split across levels under a plain
-// code or name comparison land in one row here instead.
-export async function getStudentSubjectTimeline(studentId) {
-  const grades = await listWhere("grades", "studentId", studentId);
-  const bySubject = new Map();
-  for (const g of grades) {
-    const key = subjectKeyForGrade(g);
-    if (!bySubject.has(key)) bySubject.set(key, []);
-    bySubject.get(key).push(g);
-  }
-
-  const subjects = [...bySubject.entries()].map(([subject, rows]) => {
-    const points = rows
-      .map((g) => ({
-        term: g.term,
-        sortKey: termSortKey(g.term),
-        score: g.score,
-        scoreStatus: g.scoreStatus,
-        pct: g.score != null ? Math.round(gradeRowPct(g) * 100) : null,
-      }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-    return { subject, points };
-  });
-
-  // المواد العامة أول الجدول، والتخصصية/المساندة معًا بآخره — طلب المرشد
-  // صراحةً، بدل ترتيب أبجدي بحت يخلط الكل.
-  return subjects.sort((a, b) => {
-    const rankDiff = subjectSortRank(a.subject) - subjectSortRank(b.subject);
-    if (rankDiff !== 0) return rankDiff;
-    return a.subject.localeCompare(b.subject, "ar");
-  });
-}
-
-// Chronologically-ordered distinct term labels across this student's grade
-// rows — used as the pivot table's columns.
-export async function getStudentTermColumns(studentId) {
-  const subjects = await getStudentSubjectTimeline(studentId);
-  const sortKeyByTerm = new Map();
-  for (const s of subjects) {
-    for (const p of s.points) {
-      if (!sortKeyByTerm.has(p.term)) sortKeyByTerm.set(p.term, p.sortKey);
-    }
-  }
-  return [...sortKeyByTerm.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([term]) => term);
 }
