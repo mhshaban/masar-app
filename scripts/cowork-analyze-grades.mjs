@@ -56,16 +56,28 @@ function isXlsx(file) {
 
 // صف درجة موحّد (سواء من إكسل وقفة تقويمية أو شهادة PDF) — نفس الشكل
 // اللي كان يُخزَّن بجدول grades سابقًا، لكن هنا مؤقت بالذاكرة فقط لحساب
-// academicFlags، لا يُكتب لقاعدة البيانات صفًا صفًا أبدًا.
-function unifiedRow({ studentId, subjectCode, subjectName, score, scoreStatus, maxScore, percentage, term }) {
-  return { studentId, subjectCode, subjectName, score, scoreStatus, maxScore: maxScore ?? null, percentage: percentage ?? null, term };
+// academicFlags، لا يُكتب لقاعدة البيانات صفًا صفًا أبدًا. sourceFile محفوظ
+// فقط للتشخيص بـ--student=، لا يدخل بأي حساب ولا يُكتب لأي مكان.
+function unifiedRow({ studentId, subjectCode, subjectName, score, scoreStatus, maxScore, percentage, term, sourceFile }) {
+  return { studentId, subjectCode, subjectName, score, scoreStatus, maxScore: maxScore ?? null, percentage: percentage ?? null, term, sourceFile };
 }
+
+// ملف كشف الطلاب الكامل (أو شيت "التسجيل" الحساس بداخله) ممنوع يُستورَد
+// لأي غرض بعد قرار "مسار يصغّر" — حتى لو صادف عمودَي 'رقم الطالب'/'الدرجة'
+// بالغلط بأحد شيتاته، يُرفض بالاسم صراحةً بدل الاعتماد على اكتشاف الأعمدة
+// فقط (رُصد فعليًا: هذا بالضبط ما حصل بتجربة حقيقية).
+const FORBIDDEN_FILENAME_RE = /كشف\s*طلاب\s*المدرسة|التسجيل/;
 
 async function collectFromXlsx(files) {
   const allRows = [];
   const skipped = [];
   for (const file of files) {
-    const term = path.basename(file).replace(/\.(xlsx|xls)$/i, "");
+    const baseName = path.basename(file);
+    const term = baseName.replace(/\.(xlsx|xls)$/i, "");
+    if (FORBIDDEN_FILENAME_RE.test(baseName)) {
+      skipped.push({ file, reason: "ملف كشف الطلاب الكامل (أو يشبه اسمه) — ممنوع استيراده هنا مهما كانت أعمدته، تجاهلته عمدًا." });
+      continue;
+    }
     try {
       const buf = await readFile(file);
       const parsed = parseCheckpointWorkbook(buf);
@@ -74,9 +86,9 @@ async function collectFromXlsx(files) {
         continue;
       }
       for (const r of parsed.rows) {
-        allRows.push(unifiedRow({ ...r, term }));
+        allRows.push(unifiedRow({ ...r, term, sourceFile: baseName }));
       }
-      console.log(`  ✓ ${path.basename(file)}: ${parsed.rows.length} صفًا (الفترة: ${term})`);
+      console.log(`  ✓ ${baseName}: ${parsed.rows.length} صفًا (الفترة: ${term})`);
     } catch (err) {
       skipped.push({ file, reason: err.message });
     }
@@ -90,7 +102,8 @@ async function collectFromPdfs(files) {
   const errors = [];
   let ok = 0;
   for (const [i, file] of files.entries()) {
-    process.stdout.write(`  [${i + 1}/${files.length}] ${path.basename(file)} ... `);
+    const baseName = path.basename(file);
+    process.stdout.write(`  [${i + 1}/${files.length}] ${baseName} ... `);
     try {
       const buf = await readFile(file);
       const rawRows = await extractPdfRows(buf);
@@ -111,6 +124,7 @@ async function collectFromPdfs(files) {
             score: subject.score,
             scoreStatus: subject.scoreStatus,
             term: term.label,
+            sourceFile: baseName,
           }));
         }
         if (term.average != null) {
@@ -162,12 +176,38 @@ function aggregateStudent(studentId, rows) {
   };
 }
 
+// يطبع كل صف خام مطابق لطالب واحد (اسم الملف المصدر، الفترة، المقرر،
+// الدرجة) بالإضافة للصف النهائي المجمَّع اللي بيُكتب لـacademicFlags —
+// عشان تتأكد بالمقارنة مع شهادة/كشف درجات حقيقية بيدك، بدل الثقة بأرقام
+// إجمالية لا تكشف مصدر الخطأ. استخدمه دائمًا قبل أي كتابة فعلية لبيانات
+// جديدة أو مصدر ملفات جديد.
+function printStudentInspection(studentId, rows, academicFlagsRecord, termAveragesRecords) {
+  console.log(`\n=== فحص تفصيلي للطالب ${studentId} ===`);
+  if (!rows.length) {
+    console.log("لا يوجد أي صف درجة مطابق لهذا الرقم الأكاديمي إطلاقًا.");
+    return;
+  }
+  console.log(`${rows.length} صفًا خامًا (قبل التجميع):`);
+  for (const r of rows) {
+    const scoreText = r.scoreStatus ? r.scoreStatus : (r.score ?? "—");
+    console.log(`  [${r.sourceFile}] الفترة: ${r.term} | المقرر: ${r.subjectCode || ""} ${r.subjectName || ""} | الدرجة: ${scoreText}`);
+  }
+  console.log("\nالمعدلات الفصلية الرسمية (من الشهادات فقط):");
+  const studentTerms = termAveragesRecords.filter((t) => t.studentId === String(studentId));
+  if (!studentTerms.length) console.log("  لا يوجد.");
+  for (const t of studentTerms) console.log(`  ${t.term}: ${t.averagePct}% (${t.rating || "—"})`);
+  console.log("\nالصف النهائي اللي سيُكتب بـacademicFlags:");
+  console.log(JSON.stringify(academicFlagsRecord, null, 2));
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+  const studentArg = args.find((a) => a.startsWith("--student="));
+  const inspectStudentId = studentArg ? studentArg.slice("--student=".length) : null;
   const folder = args.find((a) => !a.startsWith("--"));
   if (!folder) {
-    console.error("الاستخدام: node scripts/cowork-analyze-grades.mjs <مجلد-OneDrive> [--dry-run]");
+    console.error("الاستخدام: node scripts/cowork-analyze-grades.mjs <مجلد-OneDrive> [--dry-run] [--student=<رقم أكاديمي>]");
     process.exit(1);
   }
 
@@ -221,7 +261,13 @@ async function main() {
     rating: t.rating,
   }));
 
-  console.log("=== الملخص ===");
+  if (inspectStudentId) {
+    const rows = rowsByStudent.get(String(inspectStudentId)) || [];
+    const record = academicFlagsRecords.find((r) => r.studentId === String(inspectStudentId)) || null;
+    printStudentInspection(inspectStudentId, rows, record, termAveragesRecords);
+  }
+
+  console.log("\n=== الملخص ===");
   console.log(`ملفات شهادات PDF قُرئت بنجاح: ${pdfOk} من ${pdfFiles.length}`);
   if (pdfErrors.length) {
     console.log(`ملفات PDF فيها خطأ (${pdfErrors.length}):`);
