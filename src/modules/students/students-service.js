@@ -1,6 +1,5 @@
-import { list as listAll, get, save, rpc } from "../../services/cloud-runtime.js";
+import { list as listAll, get, rpc } from "../../services/cloud-runtime.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
-import { uploadStudentPhoto, removeStudentPhotoObject } from "../../services/student-photo-storage.js";
 
 const ROSTER_CACHE_MS = 15_000;
 let rosterCache = null;
@@ -114,38 +113,6 @@ export async function getRosterMeta() {
   }
   const [stats, options] = await Promise.all([getRosterStats(), getFilterOptions()]);
   return { stats, options };
-}
-
-// No photo data exists anywhere in the school's own files (checked the
-// master roster export — no photo column, no embedded images), so this is
-// manual-only: an admin attaches a photo per student from this device. The
-// optimized WebP blob is kept in a private Supabase Storage bucket and the
-// student record stores only its path; the UI resolves a short-lived signed
-// URL when the image is visible.
-export async function updateStudentPhoto(id, photo) {
-  const student = await get("students", id);
-  if (!student) return null;
-  let next;
-  if (typeof Blob !== "undefined" && photo instanceof Blob) {
-    const photoPath = await uploadStudentPhoto(id, photo);
-    next = { ...student, photoPath, photo: null };
-  } else {
-    // توافق انتقالي للاختبارات والبيانات القديمة فقط؛ الواجهة الجديدة ترفع Blob.
-    next = { ...student, photo };
-  }
-  await save("students", next);
-  invalidateStudentsCache();
-  return next;
-}
-
-export async function removeStudentPhoto(id) {
-  const student = await get("students", id);
-  if (!student) return null;
-  if (student.photoPath) await removeStudentPhotoObject(student.photoPath);
-  const next = { ...student, photoPath: null, photo: null };
-  await save("students", next);
-  invalidateStudentsCache();
-  return next;
 }
 
 export async function getRosterStats() {

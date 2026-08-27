@@ -12,11 +12,10 @@ export const DEFAULT_PROGRESS = {
 };
 
 // Evidence files (photos of the activity, signed attendance sheets, etc.)
-// are stored as data URLs directly on the actionProgress record, same
-// approach as student photos — synced to the shared Supabase database like
-// every other collection (see cloud-runtime.js), visible to every active
-// account. Capped higher than a photo since these can be scanned documents,
-// but still bounded so one action's evidence can't balloon the database.
+// are stored as data URLs directly on the actionProgress record — synced to
+// the shared Supabase database like every other collection (see
+// cloud-runtime.js), visible to every active account. Bounded so one
+// action's evidence can't balloon the database.
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 export async function getProgress(actionId) {

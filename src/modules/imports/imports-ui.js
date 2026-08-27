@@ -7,7 +7,7 @@
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
 import { getRosterStatus } from "../students/students-service.js";
-import { renderImportSection as renderStudentsRosterImport, renderPhotoImportSection } from "../students/students-ui.js";
+import { renderImportSection as renderStudentsRosterImport } from "../students/students-ui.js";
 import { renderImportTab as renderGradesImportTab } from "../grades/grades-ui.js";
 import {
   renderImportSection as renderPromotedRosterImport,
@@ -29,14 +29,10 @@ async function mountStudentsTab(root) {
   await ensureXlsx();
   const status = await getRosterStatus();
   root.innerHTML = `
-    <div id="imports-students-roster" style="margin-bottom:16px;"></div>
-    <div id="imports-students-photos"></div>
+    <div id="imports-students-roster"></div>
   `;
   renderStudentsRosterImport(root.querySelector("#imports-students-roster"), {
     isUpdate: status.available,
-    onImported: () => mountStudentsTab(root),
-  });
-  renderPhotoImportSection(root.querySelector("#imports-students-photos"), {
     onImported: () => mountStudentsTab(root),
   });
 }
