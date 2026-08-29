@@ -2,7 +2,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
+  buildDepartmentFormReportHtml,
 } from "../src/services/report-builders.js";
+
+test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
+  const html = buildDepartmentFormReportHtml({
+    id: "f-1", title: "تحويل إلى قسم التسجيل", createdDate: "2026-09-01", status: "completed",
+    student: { name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" },
+    fields: { reason: "تحديث البيانات", requestedAction: "مراجعة الملف" },
+    feedbackDate: "2026-09-02", feedback: "تم تحديث السجل",
+  }, "2026-09-03");
+  assert.match(html, /طالب تجريبي/);
+  assert.match(html, /تحديث البيانات/);
+  assert.match(html, /تم تحديث السجل/);
+  assert.match(html, /مكتملة/);
+});
 
 test("buildFollowUpReportHtml includes stats, per-section table, and item rows", () => {
   const bySection = new Map([
