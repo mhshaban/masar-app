@@ -21,4 +21,6 @@ export const COLLECTIONS = [
   "careerSessions",
   "promotedSubjects",
   "promotedImportBatches",
+  "departmentForms",
+  "schoolTeachers",
 ];
