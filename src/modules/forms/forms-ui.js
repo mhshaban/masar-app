@@ -136,6 +136,18 @@ async function renderTeachers(root) {
 export async function mountFormsView(container) {
   container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
-  async function show(tab) { container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab)); if (tab === "new") await renderCreate(content, show); else if (tab === "log") await renderLog(content, (id) => renderDetail(content, id, () => show("log"))); else await renderTeachers(content); }
+  async function show(tab) {
+    container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+    content.innerHTML = '<div class="empty" role="status">جارٍ تحميل البيانات…</div>';
+    try {
+      if (tab === "new") await renderCreate(content, show);
+      else if (tab === "log") await renderLog(content, (id) => renderDetail(content, id, () => show("log")));
+      else await renderTeachers(content);
+    } catch (error) {
+      console.error("تعذر تحميل قسم الاستمارات", error);
+      content.innerHTML = `<div class="card"><div class="empty" role="alert">تعذر تحميل البيانات من الخادم. تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مجددًا.<br><button class="btn btn-primary" id="forms-retry" style="margin-top:12px;">إعادة المحاولة</button></div></div>`;
+      content.querySelector("#forms-retry")?.addEventListener("click", () => show(tab));
+    }
+  }
   container.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => show(button.dataset.tab))); await show("new");
 }
