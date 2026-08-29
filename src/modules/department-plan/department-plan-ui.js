@@ -460,7 +460,7 @@ async function renderFollowUpGroupedView(root, jumpToAction) {
 export async function mountDepartmentPlanView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>خطة القسم — الإرشاد الأكاديمي والتوجيه المهني</h1><div class="sub">العام الدراسي 2025/2026 — من ملف الخطة الموحدة الفعلي، قابلة للتعديل</div></div>
+      <div><h1>خطة القسم — الإرشاد الأكاديمي والتوجيه المهني</h1><div class="sub">العام الدراسي 2026/2027 — من ملف الخطة الموحدة الفعلي، قابلة للتعديل</div></div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost" id="plan-export-followup-btn">تصدير تقرير المتابعة (Word)</button>
         <button class="btn btn-primary" id="plan-new-project-btn">+ مشروع جديد</button>
