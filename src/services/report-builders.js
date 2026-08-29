@@ -13,6 +13,34 @@ const AGENDA_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد ا
 const FOLLOWUP_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم", not_done: "لم ينجز", unknown: "غير محدد" };
 const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد التنفيذ", done: "تم" };
 
+export function buildDepartmentFormReportHtml(item, exportedAt) {
+  const labels = {
+    reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات", requestKind: "نوع الطلب",
+    guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم التواصل",
+    currentPlacement: "الوضع الحالي", requestedPlacement: "الوضع المطلوب",
+    guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي",
+    registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان",
+    subject: "الموضوع", consentText: "نص الموافقة", guardianResponse: "رد ولي الأمر",
+    responseDate: "تاريخ الرد", signature: "التوقيع/الإقرار",
+  };
+  const values = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
+  const statuses = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
+  const student = item.student || {};
+  const rows = Object.entries(item.fields || {}).filter(([key, value]) => key !== "createdDate" && value).map(([key, value]) => `<tr><th>${esc(labels[key] || key)}</th><td>${esc(values[value] || value)}</td></tr>`).join("");
+  return `
+    <h1>${esc(item.title || "استمارة القسم")}</h1>
+    <p class="meta">رقم السجل: ${esc(item.id)} — تاريخ الطلب: ${esc(item.createdDate)} — تاريخ التصدير: ${esc(exportedAt)}</p>
+    <h2>بيانات الطالب</h2>
+    <table>
+      <tr><th>اسم الطالب</th><td>${esc(student.name)}</td><th>الرقم الأكاديمي</th><td>${esc(student.academicId || "—")}</td></tr>
+      <tr><th>الرقم الشخصي</th><td>${esc(student.civilId || "—")}</td><th>المستوى والشعبة</th><td>${esc(student.level || "—")} / ${esc(student.section || "—")}</td></tr>
+      <tr><th>المسار/التخصص</th><td colspan="3">${esc(student.track || student.specialization || "—")}</td></tr>
+    </table>
+    <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>
+    <h2>الإجراء والتغذية الراجعة</h2>
+    <table><tr><th>الحالة</th><td>${esc(statuses[item.status] || item.status || "—")}</td><th>تاريخ الرد</th><td>${esc(item.feedbackDate || "—")}</td></tr><tr><th>التغذية الراجعة</th><td colspan="3">${esc(item.feedback || "—")}</td></tr></table>`;
+}
+
 export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
   const sections = [...bySection.entries()];
   return `
