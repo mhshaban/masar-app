@@ -1,11 +1,11 @@
-const CACHE_VERSION = "masar-static-v6";
+const CACHE_VERSION = "masar-static-v7";
 const STATIC_CACHE = CACHE_VERSION;
 const APP_SCOPE = new URL(self.registration.scope);
 const staticUrl = (path) => new URL(path, APP_SCOPE).href;
 const PRECACHE = [
   staticUrl("offline.html"),
   staticUrl("manifest.webmanifest"),
-  staticUrl("src/styles/design-system.css?v=2026-08-30-3"),
+  staticUrl("src/styles/design-system.css?v=2026-08-30-4"),
   staticUrl("icons/icon-192.png"),
   staticUrl("icons/icon-512.png"),
   staticUrl("icons/icon-maskable-512.png"),

@@ -169,15 +169,25 @@ function showLoginScreen() {
   });
 }
 
-function showInitialSetupScreen() {
+function showInitialSetupScreen({ offerCloudTransfer = false } = {}) {
   return new Promise((resolve) => {
     const root = document.getElementById("login-root");
     root.innerHTML = `
       <main class="login-screen" aria-labelledby="setup-title">
-        <form class="login-card" id="local-setup-form" novalidate>
+        <div class="login-card">
           <div class="login-mark" aria-hidden="true">م</div>
           <h1 id="setup-title">إعداد مسار المحلي</h1>
           <p class="login-sub">أنشئ حساب المدير المحلي. تحفظ كلمة المرور مشفّرة على هذا الجهاز ولا تُرسل لأي خادم.</p>
+          ${offerCloudTransfer ? `<form id="cloud-transfer-form" class="setup-transfer" novalidate>
+            <h2>أولًا: نقل بيانات مسار الحالية</h2>
+            <p class="login-sub">أدخل حساب Supabase القديم مرة واحدة لنسخ الخطة والطلبة والدرجات والاستمارات والمعلمين إلى هذا الجهاز. لن تُحذف النسخة السحابية.</p>
+            <div class="login-field"><label for="cloud-email">البريد الإلكتروني في مسار القديم</label><input id="cloud-email" name="email" type="email" required autocomplete="username"></div>
+            <div class="login-field"><label for="cloud-password">كلمة مرور مسار القديم</label><input id="cloud-password" name="password" type="password" required autocomplete="current-password"></div>
+            <div id="cloud-transfer-error" class="login-notice error" role="status" hidden></div>
+            <button class="btn btn-ghost login-submit" type="submit">نقل البيانات من Supabase</button>
+          </form><hr class="setup-divider">` : ""}
+          <form id="local-setup-form" novalidate>
+          <h2>${offerCloudTransfer ? "ثانيًا: إنشاء المدير المحلي" : "إنشاء المدير المحلي"}</h2>
           <div class="login-field"><label for="setup-full-name">الاسم الكامل</label><input id="setup-full-name" name="fullName" required autocomplete="name"></div>
           <div class="login-field"><label for="setup-username">اسم المستخدم</label><input id="setup-username" name="username" required autocomplete="username"></div>
           <div class="login-field"><label for="setup-email">البريد الإلكتروني (اختياري)</label><input id="setup-email" name="email" type="email" autocomplete="email"></div>
@@ -185,8 +195,26 @@ function showInitialSetupScreen() {
           <div class="login-field"><label for="setup-confirm">تأكيد كلمة المرور</label><input id="setup-confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
           <div id="setup-error" class="login-notice error" role="status" hidden></div>
           <button class="btn btn-primary login-submit" type="submit">إنشاء حساب المدير</button>
-        </form>
+          </form>
+        </div>
       </main>`;
+    const transferForm = root.querySelector("#cloud-transfer-form");
+    transferForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = transferForm.querySelector("button[type=submit]");
+      const error = transferForm.querySelector("#cloud-transfer-error");
+      error.hidden = true; button.disabled = true; button.textContent = "جارٍ نقل البيانات…";
+      try {
+        const { authenticateAndMigrateCloudData } = await import("./services/local-migration-service.js?v=local-2");
+        await authenticateAndMigrateCloudData(transferForm.email.value, transferForm.password.value, {
+          onProgress: ({ index, total }) => { button.textContent = `جارٍ النقل… ${index + 1} من ${total}`; },
+        });
+        location.reload();
+      } catch (err) {
+        error.textContent = err.message || "تعذر نقل البيانات"; error.hidden = false;
+        button.disabled = false; button.textContent = "نقل البيانات من Supabase";
+      }
+    });
     const form = root.querySelector("#local-setup-form");
     const error = root.querySelector("#setup-error");
     form.addEventListener("submit", async (event) => {
@@ -380,16 +408,17 @@ async function showBackupReminder() {
 async function boot() {
   const loginRoot = document.getElementById("login-root");
   loginRoot.innerHTML = '<main class="login-screen"><div class="login-card"><div class="login-mark">م</div><h1>تهيئة مسار المحلي</h1><p class="login-sub" id="migration-progress">جارٍ التحقق من البيانات المحلية…</p></div></main>';
+  let migrationStatus = null;
   try {
-    const { migrateCloudDataOnce } = await import("./services/local-migration-service.js");
-    await migrateCloudDataOnce({ onProgress: ({ index, total }) => {
+    const { migrateCloudDataOnce } = await import("./services/local-migration-service.js?v=local-2");
+    migrationStatus = await migrateCloudDataOnce({ onProgress: ({ index, total }) => {
       const el = document.getElementById("migration-progress");
       if (el) el.textContent = `جارٍ نسخ بيانات مسار بأمان… ${index + 1} من ${total}`;
     } });
   } catch (error) {
     console.warn("تعذر الترحيل التلقائي من النسخة السحابية", error);
   }
-  if (await needsInitialSetup()) await showInitialSetupScreen();
+  if (await needsInitialSetup()) await showInitialSetupScreen({ offerCloudTransfer: !migrationStatus?.completed });
   if (consumeRecoverySession()) {
     await showPasswordRecoveryScreen();
   }

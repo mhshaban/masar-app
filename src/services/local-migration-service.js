@@ -1,6 +1,6 @@
 import { COLLECTIONS } from "../core/config.js?v=local-1";
 import { get, save, bulkPut, count, clear } from "./local-runtime.js?v=local-1";
-import { SB_URL, SB_KEY, getAccessToken } from "./supabase-config.js";
+import { SB_URL, SB_KEY, getAccessToken, setAccessToken, clearAccessToken } from "./supabase-config.js";
 
 const MIGRATION_ID = "supabase-to-local-v1";
 const CLOUD_COLLECTIONS = COLLECTIONS.filter((name) => !["localUsers", "appSettings"].includes(name));
@@ -44,6 +44,23 @@ export async function migrateCloudDataOnce({ onProgress } = {}) {
   const status = { id: MIGRATION_ID, completed: true, completedAt: new Date().toISOString(), counts };
   await save("appSettings", status);
   return status;
+}
+
+export async function authenticateAndMigrateCloudData(email, password, { onProgress } = {}) {
+  const response = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: SB_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(email || "").trim(), password }),
+  });
+  if (!response.ok) throw new Error("تعذر الدخول إلى النسخة السحابية. تحقق من البريد وكلمة المرور");
+  const session = await response.json();
+  if (!session.access_token) throw new Error("لم تُرجع النسخة السحابية جلسة صالحة");
+  setAccessToken(session.access_token, session.expires_in);
+  try {
+    return await migrateCloudDataOnce({ onProgress });
+  } finally {
+    clearAccessToken();
+  }
 }
 
 export async function localDataCounts() {
