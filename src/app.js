@@ -24,7 +24,7 @@ const VIEW_LOADERS = {
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
   forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-08-30-3")).mountFormsView,
-  backup: async () => (await import("./modules/backup/backup-ui.js")).mountBackupView,
+  backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-08-30-5")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
   imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
 };

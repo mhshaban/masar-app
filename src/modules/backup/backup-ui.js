@@ -1,4 +1,5 @@
 import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js";
+import { authenticateAndMigrateCloudData } from "../../services/local-migration-service.js?v=local-3";
 import { count, save } from "../../services/storage-runtime.js";
 import { COLLECTIONS } from "../../core/config.js?v=local-1";
 import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
@@ -91,6 +92,39 @@ async function renderExportSection(root) {
   });
 }
 
+function renderCloudTransferSection(root) {
+  root.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <h2>نقل البيانات من Supabase</h2>
+      <p class="hint">استخدم حساب مسار السحابي القديم لنسخ البيانات إلى هذا المتصفح. تعيد العملية استبدال المجموعات المحلية بنسخة Supabase ولا تحذف أي بيانات من السحابة.</p>
+      <form id="cloud-transfer-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:220px;"><label class="hint" for="transfer-email">البريد الإلكتروني في مسار القديم</label><input id="transfer-email" name="email" type="email" required autocomplete="username" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:inherit;"></div>
+        <div style="flex:1;min-width:220px;"><label class="hint" for="transfer-password">كلمة مرور مسار القديم</label><input id="transfer-password" name="password" type="password" required autocomplete="current-password" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:inherit;"></div>
+        <button class="btn btn-primary" type="submit">إعادة نقل البيانات الآن</button>
+      </form>
+      <div id="cloud-transfer-status" style="margin-top:10px;"></div>
+    </div>`;
+  const form = root.querySelector("#cloud-transfer-form");
+  const status = root.querySelector("#cloud-transfer-status");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true; button.textContent = "جارٍ النقل…"; status.innerHTML = "";
+    try {
+      const result = await authenticateAndMigrateCloudData(form.email.value, form.password.value, {
+        onProgress: ({ index, total }) => { button.textContent = `جارٍ النقل… ${index + 1} من ${total}`; },
+      });
+      form.password.value = "";
+      status.innerHTML = `<div class="login-notice info" role="status">تم نقل البيانات بنجاح. المشاريع: ${result.counts.departmentPlanProjects || 0}، الطلبة: ${result.counts.students || 0}، المعدلات: ${result.counts.termAverages || 0}، المعلمون: ${result.counts.schoolTeachers || 0}. جارٍ إعادة التحميل…</div>`;
+      setTimeout(() => location.reload(), 1800);
+    } catch (err) {
+      form.password.value = "";
+      status.innerHTML = errorHtml(err.message || "تعذر نقل البيانات من Supabase");
+      button.disabled = false; button.textContent = "إعادة نقل البيانات الآن";
+    }
+  });
+}
+
 export function renderImportSection(root, onRestored) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
@@ -154,8 +188,10 @@ export async function mountBackupView(container) {
     <div class="topbar">
       <div><h1>النسخ الاحتياطي المحلي</h1><div class="sub">صدّر ملفًا كاملًا واحفظه في OneDrive أسبوعيًا لحماية بيانات هذا الجهاز</div></div>
     </div>
+    <div id="cloud-transfer"></div>
     <div id="backup-export"></div>
   `;
 
+  renderCloudTransferSection(container.querySelector("#cloud-transfer"));
   await renderExportSection(container.querySelector("#backup-export"));
 }

@@ -27,9 +27,9 @@ export async function getMigrationStatus() {
   return get("appSettings", MIGRATION_ID);
 }
 
-export async function migrateCloudDataOnce({ onProgress } = {}) {
+export async function migrateCloudDataOnce({ onProgress, force = false } = {}) {
   const previous = await getMigrationStatus();
-  if (previous?.completed) return previous;
+  if (previous?.completed && !force) return previous;
   const token = getAccessToken();
   if (!token) return { completed: false, skipped: true, reason: "no-cloud-session" };
   const counts = {};
@@ -41,6 +41,8 @@ export async function migrateCloudDataOnce({ onProgress } = {}) {
     if (rows.length) await bulkPut(collection, rows);
     counts[collection] = await count(collection);
   }
+  const coreTotal = (counts.departmentPlanProjects || 0) + (counts.students || 0) + (counts.termAverages || 0) + (counts.schoolTeachers || 0);
+  if (coreTotal === 0) throw new Error("لم تُرجع Supabase أي بيانات أساسية؛ لم يتم اعتماد محاولة النقل");
   const status = { id: MIGRATION_ID, completed: true, completedAt: new Date().toISOString(), counts };
   await save("appSettings", status);
   return status;
@@ -57,7 +59,7 @@ export async function authenticateAndMigrateCloudData(email, password, { onProgr
   if (!session.access_token) throw new Error("لم تُرجع النسخة السحابية جلسة صالحة");
   setAccessToken(session.access_token, session.expires_in);
   try {
-    return await migrateCloudDataOnce({ onProgress });
+    return await migrateCloudDataOnce({ onProgress, force: true });
   } finally {
     clearAccessToken();
   }
