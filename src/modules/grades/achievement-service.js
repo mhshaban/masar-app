@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/storage-runtime.js";
+import { list as listAll } from "../../services/cloud-runtime.js";
 import { listStudents } from "../students/students-service.js";
 
 // The rating LABEL comes from Bahrain MOE's own scale, taken verbatim from

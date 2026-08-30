@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION, COLLECTIONS } from "../core/config.js?v=local-1";
+import { DB_NAME, DB_VERSION, COLLECTIONS } from "../core/config.js";
 
 let dbPromise = null;
 
@@ -36,15 +36,6 @@ export async function list(collection) {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
-}
-
-export async function listWhere(collection, field, value) {
-  const rows = await list(collection);
-  return rows.filter((record) => String(record?.[field]) === String(value));
-}
-
-export async function rpc() {
-  throw new Error("هذه العملية السحابية غير مطلوبة في وضع مسار المحلي");
 }
 
 export async function get(collection, id) {

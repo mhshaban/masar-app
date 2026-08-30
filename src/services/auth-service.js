@@ -1,85 +1,223 @@
-import { list, get, save } from "./local-runtime.js?v=local-1";
+// مسار — الدخول الحقيقي (يحل محل local-lock.js بالكامل). نفس نمط CCE:
+// اسم مستخدم يترجم لإيميل عبر دالة SQL عامة (masar_resolve_login_identifier)،
+// ثم /auth/v1/token?grant_type=password مباشرة — بدون أي SDK.
+import { SB_URL, SB_KEY, getAccessToken, setAccessToken, clearAccessToken } from "./supabase-config.js";
+export { consumeSessionExpiredNotice } from "./supabase-config.js";
 
-const SESSION_KEY = "masar_local_session";
 const PROFILE_CACHE_KEY = "masar_profile_cache";
-const ITERATIONS = 210_000;
-function testBackend() { return typeof globalThis !== "undefined" ? globalThis.__MASAR_TEST_AUTH__ : null; }
-function bytesToBase64(bytes) { let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary); }
-function base64ToBytes(value) { const binary = atob(value); return Uint8Array.from(binary, (char) => char.charCodeAt(0)); }
-async function derivePassword(password, salt) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS }, key, 256);
-  return bytesToBase64(new Uint8Array(bits));
+
+function testBackend() {
+  return typeof globalThis !== "undefined" ? globalThis.__MASAR_TEST_AUTH__ : null;
 }
-async function passwordRecord(password) {
-  if (String(password || "").length < 8) throw new Error("كلمة المرور يجب ألا تقل عن 8 أحرف");
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  return { passwordSalt: bytesToBase64(salt), passwordHash: await derivePassword(password, salt), passwordIterations: ITERATIONS };
+
+export function getSession() {
+  const backend = testBackend();
+  if (backend) return backend.getSession();
+  const token = getAccessToken();
+  return token ? { accessToken: token } : null;
 }
-async function verifyPassword(password, user) {
-  if (!user.passwordSalt || !user.passwordHash) return false;
-  const candidate = await derivePassword(password, base64ToBytes(user.passwordSalt));
-  if (candidate.length !== user.passwordHash.length) return false;
-  let difference = 0;
-  for (let i = 0; i < candidate.length; i += 1) difference |= candidate.charCodeAt(i) ^ user.passwordHash.charCodeAt(i);
-  return difference === 0;
+
+const AUTH_FAILURE_MESSAGE = "تعذر تسجيل الدخول. تحقق من بياناتك أو تواصل مع مسؤول النظام";
+const NETWORK_FAILURE_MESSAGE = "تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى";
+
+// خطأ فشل الشبكة (fetch نفسه رمى استثناء — انقطاع اتصال، DNS، إلخ) مميَّز
+// بـ code صراحةً عن فشل المصادقة (401/بيانات خاطئة) — الواجهة (app.js)
+// تحتاج تفرّق بين الحالتين برسالتين مختلفتين تمامًا حسب طلب المرشد، بدل
+// رسالة عامة واحدة تخلط "بياناتك خطأ" مع "ما فيه إنترنت".
+function networkError() {
+  const err = new Error(NETWORK_FAILURE_MESSAGE);
+  err.code = "network";
+  return err;
 }
-function publicProfile(user) {
-  if (!user) return null;
-  return { id: user.id, username: user.username, email: user.email || null, full_name: user.fullName, role: user.role, is_admin: user.role === "admin", is_active: user.isActive !== false };
+
+function authError() {
+  const err = new Error(AUTH_FAILURE_MESSAGE);
+  err.code = "auth";
+  return err;
 }
-function cacheSession(user) {
-  const profile = publicProfile(user);
-  sessionStorage.setItem(SESSION_KEY, user.id); sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+
+export async function login(identifier, password) {
+  const backend = testBackend();
+  if (backend) return backend.login(identifier, password);
+
+  let resolveRes;
+  try {
+    resolveRes = await fetch(`${SB_URL}/rest/v1/rpc/masar_resolve_login_identifier`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ p_identifier: identifier }),
+    });
+  } catch {
+    throw networkError();
+  }
+  if (!resolveRes.ok) throw authError();
+  const email = await resolveRes.json();
+  if (!email) throw authError();
+
+  let tokenRes;
+  try {
+    tokenRes = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw networkError();
+  }
+  if (!tokenRes.ok) throw authError();
+  const tokenData = await tokenRes.json();
+  setAccessToken(tokenData.access_token, tokenData.expires_in);
+
+  const profile = await fetchProfileFromNetwork();
+  if (!profile || !profile.is_active) {
+    clearAccessToken();
+    sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    // هذا الحساب متحقَّق منه فعليًا (كلمة المرور صحيحة) لكنه معطَّل — رسالة
+    // أدق من الرسالة العامة تفيد المرشد فعليًا هنا، لا تكشف شي عن حساب غيره.
+    const err = new Error("هذا الحساب معطّل — راجع مدير النظام.");
+    err.code = "auth";
+    throw err;
+  }
   return profile;
 }
-export async function needsInitialSetup() { return (await list("localUsers")).length === 0; }
-export async function createInitialAdmin({ fullName, username, password, email }) {
-  if (!await needsInitialSetup()) throw new Error("تم إنشاء حساب المدير مسبقًا");
-  return createAccountRecord({ fullName, username, password, email, role: "admin" });
+
+export function logout() {
+  const backend = testBackend();
+  if (backend) return backend.logout();
+  clearAccessToken();
+  sessionStorage.removeItem(PROFILE_CACHE_KEY);
 }
-export function getSession() { const backend = testBackend(); if (backend) return backend.getSession(); const userId = sessionStorage.getItem(SESSION_KEY); return userId ? { userId } : null; }
-export async function login(identifier, password) {
-  const backend = testBackend(); if (backend) return backend.login(identifier, password);
-  const normalized = String(identifier || "").trim().toLowerCase();
-  const users = await list("localUsers");
-  const user = users.find((item) => item.username?.toLowerCase() === normalized || item.email?.toLowerCase() === normalized);
-  if (!user || !await verifyPassword(password, user)) throw new Error("تعذر تسجيل الدخول. تحقق من اسم المستخدم وكلمة المرور");
-  if (user.isActive === false) throw new Error("هذا الحساب معطّل — راجع مدير النظام.");
-  user.lastLoginAt = new Date().toISOString(); await save("localUsers", user); return cacheSession(user);
+
+// يرسل رابط استرجاع موحدًا دون كشف ما إذا كان المعرّف موجودًا. Supabase
+// نفسها قد لا ترسل بريدًا للحساب غير الموجود، لكن واجهة مسار تعرض الرسالة
+// نفسها في الحالتين لمنع تعداد الحسابات.
+export async function requestPasswordReset(identifier) {
+  const backend = testBackend();
+  if (backend?.requestPasswordReset) return backend.requestPasswordReset(identifier);
+
+  let email = null;
+  try {
+    const resolveRes = await fetch(`${SB_URL}/rest/v1/rpc/masar_resolve_login_identifier`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ p_identifier: String(identifier || "").trim() }),
+    });
+    if (resolveRes.ok) email = await resolveRes.json();
+  } catch {
+    throw networkError();
+  }
+
+  if (!email) return;
+  const redirectTo = new URL(window.location.pathname, window.location.origin).href;
+  try {
+    await fetch(`${SB_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw networkError();
+  }
 }
-export function logout() { const backend = testBackend(); if (backend) return backend.logout(); sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(PROFILE_CACHE_KEY); }
-export function getCurrentProfile() { const backend = testBackend(); if (backend) return backend.getCurrentProfile(); const cached = sessionStorage.getItem(PROFILE_CACHE_KEY); return cached ? JSON.parse(cached) : null; }
+
+export function consumeRecoverySession() {
+  if (typeof window === "undefined" || !window.location.hash.includes("type=recovery")) return false;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  if (params.get("type") !== "recovery" || !params.get("access_token")) return false;
+  setAccessToken(params.get("access_token"), Number(params.get("expires_in") || 3600));
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  return true;
+}
+
+export async function updateRecoveredPassword(password) {
+  const backend = testBackend();
+  if (backend?.updateRecoveredPassword) return backend.updateRecoveredPassword(password);
+  const token = getAccessToken();
+  if (!token) throw new Error("انتهت صلاحية رابط الاسترجاع. اطلب رابطًا جديدًا.");
+  let res;
+  try {
+    res = await fetch(`${SB_URL}/auth/v1/user`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password }),
+    });
+  } catch {
+    throw networkError();
+  }
+  if (!res.ok) throw new Error("تعذر تعيين كلمة المرور. قد يكون الرابط منتهيًا؛ اطلب رابطًا جديدًا.");
+  logout();
+}
+
+async function fetchProfileFromNetwork() {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (!userRes.ok) return null;
+  const authUser = await userRes.json();
+
+  const profileRes = await fetch(`${SB_URL}/rest/v1/profiles?select=*&id=eq.${authUser.id}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (!profileRes.ok) return null;
+  const rows = await profileRes.json();
+  const profile = rows[0] || null;
+  if (profile) sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+  return profile;
+}
+
+// يُستخدم بعد أول تحميل للصفحة (الجلسة موجودة من مرة دخول سابقة بنفس
+// المتصفح) — يرجّع النسخة المخزّنة محليًا فورًا (بدون انتظار شبكة) لعرض
+// الواجهة بسرعة، ثم مسؤولية المستدعي لو يبي نسخة أحدث يستدعي refreshProfile.
+export function getCurrentProfile() {
+  const backend = testBackend();
+  if (backend) return backend.getCurrentProfile();
+  const cached = sessionStorage.getItem(PROFILE_CACHE_KEY);
+  return cached ? JSON.parse(cached) : null;
+}
+
 export async function refreshProfile() {
-  const backend = testBackend(); if (backend) return backend.getCurrentProfile();
-  const id = sessionStorage.getItem(SESSION_KEY); if (!id) return null;
-  const user = await get("localUsers", id); if (!user || user.isActive === false) { logout(); return null; }
-  return cacheSession(user);
+  const backend = testBackend();
+  if (backend) return backend.getCurrentProfile();
+  return fetchProfileFromNetwork();
 }
-export function consumeSessionExpiredNotice() { return false; }
-export function consumeRecoverySession() { return false; }
-export async function updateRecoveredPassword() { throw new Error("غيّر كلمة المرور من إدارة المستخدمين المحلية"); }
-export async function requestPasswordReset() { throw new Error("استرجاع الحساب محلي؛ استخدم حساب المدير لإعادة تعيين كلمة المرور"); }
-export async function listUsers() {
-  requireAdmin();
-  const users = await list("localUsers");
-  return { users: users.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || "", "ar")).map((user) => ({ id: user.id, email: user.email, profile: publicProfile(user) })) };
+
+async function callAdminUsers(body) {
+  const backend = testBackend();
+  if (backend) return backend.callAdminUsers(body);
+  const token = getAccessToken();
+  if (!token) throw new Error("الجلسة منتهية — سجّل الدخول من جديد.");
+  const res = await fetch(`${SB_URL}/functions/v1/admin-users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "فشل الطلب.");
+  return data;
 }
-function requireAdmin() {
-  const profile = getCurrentProfile();
-  if (!profile || profile.role !== "admin") throw new Error("هذه العملية تتطلب صلاحية المدير");
+
+export function listUsers() {
+  return callAdminUsers({ action: "list_users" });
 }
-async function createAccountRecord({ username, password, fullName, email, role = "counselor", isAdmin }) {
-  const normalized = String(username || "").trim().toLowerCase();
-  if (!normalized) throw new Error("اسم المستخدم مطلوب");
-  if (!String(fullName || "").trim()) throw new Error("الاسم الكامل مطلوب");
-  const users = await list("localUsers");
-  if (users.some((user) => user.username?.toLowerCase() === normalized)) throw new Error("اسم المستخدم مستخدم مسبقًا");
-  const user = { id: `local-user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, username: normalized, fullName: fullName.trim(), email: String(email || "").trim() || null, role: isAdmin ? "admin" : role, isActive: true, createdAt: new Date().toISOString(), ...await passwordRecord(password) };
-  await save("localUsers", user); return { user: { id: user.id, email: user.email, profile: publicProfile(user) } };
+
+export function createAccount({ username, password, fullName, email, role = "counselor", isAdmin }) {
+  return callAdminUsers({
+    action: "create_user",
+    user: { username, password, full_name: fullName, email: email || null, role, is_admin: !!isAdmin },
+  });
 }
-export async function createAccount(details) { requireAdmin(); return createAccountRecord(details); }
-async function patchUser(userId, patch) { const user = await get("localUsers", userId); if (!user) throw new Error("الحساب غير موجود"); await save("localUsers", { ...user, ...patch, updatedAt: new Date().toISOString() }); }
-export const setAccountActive = (userId, isActive) => { requireAdmin(); return patchUser(userId, { isActive: !!isActive }); };
-export const setAccountRole = (userId, role) => { requireAdmin(); if (!["admin", "counselor", "read_only"].includes(role)) throw new Error("صلاحية غير صالحة"); return patchUser(userId, { role }); };
-export async function resetAccountPassword(userId, password) { requireAdmin(); return patchUser(userId, await passwordRecord(password)); }
+
+export function setAccountActive(userId, isActive) {
+  return callAdminUsers({ action: "set_active", user_id: userId, is_active: isActive });
+}
+
+export function setAccountRole(userId, role) {
+  return callAdminUsers({ action: "set_role", user_id: userId, role });
+}
+
+export function resetAccountPassword(userId, password) {
+  return callAdminUsers({ action: "reset_password", user_id: userId, password });
+}

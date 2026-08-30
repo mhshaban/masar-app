@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/storage-runtime.js";
+import { list as listAll } from "../../services/cloud-runtime.js";
 import { listAgendaEntries } from "../agenda/agenda-service.js";
 
 function aggregateStatus(entries) {

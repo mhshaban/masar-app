@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/storage-runtime.js";
+import { list as listAll } from "../../services/cloud-runtime.js";
 import { DEFAULT_PROGRESS } from "../execution/execution-service.js";
 
 export async function listAgendaEntries() {
@@ -15,7 +15,7 @@ export async function listAgendaEntries() {
       entries.push({
         id,
         // مخزَّنان صراحةً (لا تُشتَقّان من تفكيك id) — project.id نفسه قد
-        // يحتوي شرطة "-" (صيغة معرّفات storage-runtime.js: طابع زمني-عشوائي)،
+        // يحتوي شرطة "-" (صيغة معرّفات cloud-runtime.js: طابع زمني-عشوائي)،
         // فتفكيك id بحثًا عن "-a" غير موثوق أبدًا.
         projectId: project.id,
         no: action.no,

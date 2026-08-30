@@ -16,7 +16,7 @@ function initials(name) {
 }
 
 // يستورد شيت "كشف الطلاب" من نفس ملف كشف الطلاب الكامل المستخدم لبقية
-// الاستيرادات — عبر storage-runtime.js، خلف تسجيل الدخول + RLS، بدل ملف ثابت
+// الاستيرادات — عبر cloud-runtime.js، خلف تسجيل الدخول + RLS، بدل ملف ثابت
 // بالمستودع العام (كان يعني أي زائر يقدر يجلب بيانات الطلبة مباشرة).
 export function renderImportSection(root, { onImported, isUpdate }) {
   root.innerHTML = `

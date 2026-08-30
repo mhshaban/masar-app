@@ -3,9 +3,9 @@
 // حل محل التعبئة القديمة من data/students.local.json المحلي: بعد نقل مسار
 // لمستودع GitHub عام (لاستضافة GitHub Pages)، ملف ثابت فيه بيانات طلاب
 // حقيقية داخل نفس المستودع كان يعني أي زائر يقدر يجلبه مباشرة بدون تسجيل
-// دخول — استيراد داخل التطبيق (يكتب عبر storage-runtime.js، خلف تسجيل
+// دخول — استيراد داخل التطبيق (يكتب عبر cloud-runtime.js، خلف تسجيل
 // الدخول + RLS) هو البديل الآمن.
-import { clear, bulkPut } from "./storage-runtime.js";
+import { clear, bulkPut } from "./cloud-runtime.js";
 import { invalidateStudentsCache } from "../modules/students/students-service.js";
 import { readWorkbook } from "./xlsx-parser.js";
 import { resetStudentsSeedCache } from "./students-source.js";

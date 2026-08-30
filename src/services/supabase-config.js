@@ -32,7 +32,7 @@ export function clearAccessToken() {
 }
 
 // علم مؤقت (يُقرأ مرة وحدة ثم يُمسح) — يخلي شاشة الدخول تعرض "انتهت
-// جلستك" بدل شاشة دخول عادية بلا سياق، لما يُنهي storage-runtime.js الجلسة
+// جلستك" بدل شاشة دخول عادية بلا سياق، لما يُنهي cloud-runtime.js الجلسة
 // فجأة بسبب رفض الخادم لطلب أثناء الاستخدام (401)، لا بسبب انتهاء الوقت
 // المتوقَّع فقط (اللي getAccessToken already يتعامل معه استباقيًا أعلاه).
 const SESSION_EXPIRED_FLAG = "masar_session_expired";

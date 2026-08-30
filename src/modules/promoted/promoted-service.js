@@ -1,4 +1,4 @@
-import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../services/storage-runtime.js";
+import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 

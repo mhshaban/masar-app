@@ -1,4 +1,4 @@
-import { get, save } from "../../services/storage-runtime.js";
+import { get, save } from "../../services/cloud-runtime.js";
 
 export const DEFAULT_PROGRESS = {
   status: "not_started",
@@ -14,7 +14,7 @@ export const DEFAULT_PROGRESS = {
 // Evidence files (photos of the activity, signed attendance sheets, etc.)
 // are stored as data URLs directly on the actionProgress record — synced to
 // the shared Supabase database like every other collection (see
-// storage-runtime.js), visible to every active account. Bounded so one
+// cloud-runtime.js), visible to every active account. Bounded so one
 // action's evidence can't balloon the database.
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
