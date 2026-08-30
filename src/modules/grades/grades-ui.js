@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/cloud-runtime.js";
+import { list as listAll } from "../../services/storage-runtime.js";
 import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
 

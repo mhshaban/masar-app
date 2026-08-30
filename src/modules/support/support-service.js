@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, remove } from "../../services/storage-runtime.js";
 import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
 
 const NEXT_STATUS = { not_started: "ongoing", ongoing: "done", done: "not_started" };

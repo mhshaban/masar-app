@@ -3,7 +3,7 @@ export const APP_NAME = "مسار";
 export const RUNTIME_MODE = "local";
 
 export const DB_NAME = "masar-local";
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 export const COLLECTIONS = [
   "departmentPlanProjects",
@@ -23,4 +23,6 @@ export const COLLECTIONS = [
   "promotedImportBatches",
   "departmentForms",
   "schoolTeachers",
+  "localUsers",
+  "appSettings",
 ];

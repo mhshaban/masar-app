@@ -1,4 +1,4 @@
-import { count, bulkPut } from "./cloud-runtime.js";
+import { count, bulkPut } from "./storage-runtime.js";
 
 const DATA_URL = "data/students.local.json";
 

@@ -1,7 +1,6 @@
 // شاشة إدارة المستخدمين — تظهر فقط لدور admin (مع توافق is_admin القديم).
-// كل عملية هنا تمر عبر
-// admin-users Edge Function بمفتاح service_role من طرف الخادم — لا صلاحيات
-// إدارية تُتحقق أو تُمنح من الواجهة نفسها.
+// كل عملية هنا تمر عبر خدمة الحسابات المحلية التي تعيد التحقق من صلاحية
+// المدير، وليس عبر إظهار/إخفاء عناصر الواجهة وحده.
 import { listUsers, createAccount, setAccountActive, setAccountRole, resetAccountPassword } from "../../services/auth-service.js";
 import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 

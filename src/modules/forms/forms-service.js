@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove, bulkPut } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, remove, bulkPut } from "../../services/storage-runtime.js";
 
 export const FORM_TYPES = {
   school_admin: { label: "تحويل إلى إدارة المدرسة", kind: "referral", destination: "إدارة المدرسة" },

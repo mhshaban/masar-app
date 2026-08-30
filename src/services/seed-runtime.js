@@ -2,7 +2,7 @@ import { PLAN_SEED, PROGRESS_SEED } from "./seed-data.js";
 import { FOLLOWUP_ITEMS_SEED } from "./followup-seed-data.js";
 import { ACTION_FOLLOWUP_LINKS } from "./action-followup-links.js";
 import { DEFAULT_PROGRESS } from "../modules/execution/execution-service.js";
-import { count, bulkPut } from "./cloud-runtime.js";
+import { count, bulkPut } from "./storage-runtime.js";
 
 function flattenPlan() {
   const projects = [];

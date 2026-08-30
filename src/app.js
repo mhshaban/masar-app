@@ -9,7 +9,9 @@ import {
   requestPasswordReset,
   consumeRecoverySession,
   updateRecoveredPassword,
-} from "./services/auth-service.js";
+  needsInitialSetup,
+  createInitialAdmin,
+} from "./services/auth-service.js?v=local-1";
 
 const VIEW_LOADERS = {
   dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js")).mountDashboardView,
@@ -21,7 +23,7 @@ const VIEW_LOADERS = {
   support: async () => (await import("./modules/support/support-ui.js")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-08-30-2")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-08-30-3")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
   imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
@@ -40,7 +42,7 @@ function isAdmin(profile) {
   return profile?.role === "admin" || profile?.is_admin === true;
 }
 
-// شاشة دخول حقيقية (Supabase Auth) — تحل محل قفل الـ PIN المحلي القديم.
+// شاشة الدخول المحلية — الحسابات والصلاحيات محفوظة داخل قاعدة هذا المتصفح.
 // واجهة مستقلة تمامًا: تُبنى داخل #login-root (خارج #app-shell المخفي
 // بـ hidden منذ التحميل الأول)، فلا تظهر أي عناصر من القائمة/المحتوى قبل
 // نجاح الدخول ولا تقدر تستقبل تركيز أو نقر (hidden = خارج شجرة الوصولية
@@ -152,9 +154,8 @@ function showLoginScreen() {
       const originalLabel = submitBtn.textContent;
       submitBtn.textContent = "جارٍ تسجيل الدخول…";
       try {
-        // لا نسجّل identifier ولا password هنا ولا بأي مكان آخر — لا console،
-        // لا localStorage. التوكن نفسه يُخزَّن بـ sessionStorage فقط (راجع
-        // supabase-config.js)، وكلمة المرور لا تُخزَّن إطلاقًا بعد هذي النقطة.
+        // لا نسجّل identifier ولا password هنا ولا بأي سجل تشخيصي. تحتفظ
+        // قاعدة الجهاز فقط بمشتق مشفّر ومملّح للتحقق من كلمة المرور.
         const profile = await login(identifier, password);
         resolve(profile);
       } catch (err) {
@@ -164,6 +165,38 @@ function showLoginScreen() {
         submitBtn.disabled = false;
         submitBtn.textContent = originalLabel;
       }
+    });
+  });
+}
+
+function showInitialSetupScreen() {
+  return new Promise((resolve) => {
+    const root = document.getElementById("login-root");
+    root.innerHTML = `
+      <main class="login-screen" aria-labelledby="setup-title">
+        <form class="login-card" id="local-setup-form" novalidate>
+          <div class="login-mark" aria-hidden="true">م</div>
+          <h1 id="setup-title">إعداد مسار المحلي</h1>
+          <p class="login-sub">أنشئ حساب المدير المحلي. تحفظ كلمة المرور مشفّرة على هذا الجهاز ولا تُرسل لأي خادم.</p>
+          <div class="login-field"><label for="setup-full-name">الاسم الكامل</label><input id="setup-full-name" name="fullName" required autocomplete="name"></div>
+          <div class="login-field"><label for="setup-username">اسم المستخدم</label><input id="setup-username" name="username" required autocomplete="username"></div>
+          <div class="login-field"><label for="setup-email">البريد الإلكتروني (اختياري)</label><input id="setup-email" name="email" type="email" autocomplete="email"></div>
+          <div class="login-field"><label for="setup-password">كلمة المرور المحلية</label><input id="setup-password" name="password" type="password" minlength="8" required autocomplete="new-password"></div>
+          <div class="login-field"><label for="setup-confirm">تأكيد كلمة المرور</label><input id="setup-confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
+          <div id="setup-error" class="login-notice error" role="status" hidden></div>
+          <button class="btn btn-primary login-submit" type="submit">إنشاء حساب المدير</button>
+        </form>
+      </main>`;
+    const form = root.querySelector("#local-setup-form");
+    const error = root.querySelector("#setup-error");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault(); error.hidden = true;
+      if (form.password.value !== form.confirm.value) { error.textContent = "كلمتا المرور غير متطابقتين"; error.hidden = false; return; }
+      const button = form.querySelector("button[type=submit]"); button.disabled = true; button.textContent = "جارٍ الحفظ…";
+      try {
+        await createInitialAdmin({ fullName: form.fullName.value, username: form.username.value, email: form.email.value, password: form.password.value });
+        resolve();
+      } catch (err) { error.textContent = err.message; error.hidden = false; button.disabled = false; button.textContent = "إنشاء حساب المدير"; }
     });
   });
 }
@@ -332,13 +365,37 @@ function applyProfileToChrome(profile) {
   if (roleEl) roleEl.textContent = ({ admin: "إدمن", counselor: "مرشد", read_only: "قراءة فقط" })[role] || "مرشد";
 }
 
+async function showBackupReminder() {
+  const { get } = await import("./services/local-runtime.js");
+  const last = await get("appSettings", "last-backup-export");
+  const age = last?.exportedAt ? Date.now() - new Date(last.exportedAt).getTime() : Infinity;
+  if (age < 7 * 24 * 60 * 60 * 1000) return;
+  const reminder = document.createElement("div");
+  reminder.className = "readonly-banner";
+  reminder.innerHTML = 'مرّ أسبوع أو لم تُنشأ نسخة احتياطية محلية بعد. <button class="link-btn" type="button">فتح النسخ الاحتياطي</button>';
+  reminder.querySelector("button").addEventListener("click", () => renderView("backup"));
+  main.prepend(reminder);
+}
+
 async function boot() {
+  const loginRoot = document.getElementById("login-root");
+  loginRoot.innerHTML = '<main class="login-screen"><div class="login-card"><div class="login-mark">م</div><h1>تهيئة مسار المحلي</h1><p class="login-sub" id="migration-progress">جارٍ التحقق من البيانات المحلية…</p></div></main>';
+  try {
+    const { migrateCloudDataOnce } = await import("./services/local-migration-service.js");
+    await migrateCloudDataOnce({ onProgress: ({ index, total }) => {
+      const el = document.getElementById("migration-progress");
+      if (el) el.textContent = `جارٍ نسخ بيانات مسار بأمان… ${index + 1} من ${total}`;
+    } });
+  } catch (error) {
+    console.warn("تعذر الترحيل التلقائي من النسخة السحابية", error);
+  }
+  if (await needsInitialSetup()) await showInitialSetupScreen();
   if (consumeRecoverySession()) {
     await showPasswordRecoveryScreen();
   }
   let profile = getSession() ? getCurrentProfile() : null;
   // جلسة محفوظة من نفس التبويب (sessionStorage) — نتأكد إنها لسا صالحة
-  // وإن الحساب لسا نشط قبل ما نثق فيها (لو تم تعطيله بالسحابة بالمنتصف).
+  // وإن الحساب لا يزال موجودًا ونشطًا قبل الوثوق بها.
   if (profile) {
     profile = await refreshProfile();
     if (!profile || !profile.is_active) profile = null;
@@ -361,6 +418,7 @@ async function boot() {
   // صفحة معروفة فعليًا — وإلا يرجع للرئيسية كسلوك افتراضي آمن.
   const initialView = KNOWN_VIEWS.has(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard";
   await renderView(initialView);
+  await showBackupReminder();
 
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {

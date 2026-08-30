@@ -1,4 +1,4 @@
-import { list as listAll, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, save, remove } from "../../services/storage-runtime.js";
 
 export async function listReminders() {
   const reminders = await listAll("reminders");

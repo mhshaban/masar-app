@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, remove } from "../../services/storage-runtime.js";
 import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
 
 export const CASE_CATEGORIES = ["أكاديمية", "سلوكية", "اجتماعية", "نفسية"];

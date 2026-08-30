@@ -1,4 +1,4 @@
-import { list as listAll, get, rpc } from "../../services/cloud-runtime.js";
+import { list as listAll, get, rpc } from "../../services/storage-runtime.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 
 const ROSTER_CACHE_MS = 15_000;

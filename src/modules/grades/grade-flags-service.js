@@ -1,4 +1,4 @@
-import { list as listAll } from "../../services/cloud-runtime.js";
+import { list as listAll } from "../../services/storage-runtime.js";
 
 // A student below this general average, or failing/barred in any subject,
 // is surfaced as a candidate for a guidance case or a support plan — this

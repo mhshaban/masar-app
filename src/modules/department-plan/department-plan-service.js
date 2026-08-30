@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, remove } from "../../services/storage-runtime.js";
 
 const PILLAR_ORDER = ["الانجاز الاكاديمي", "التطور الشخصي", "القيادة"];
 export const PILLARS = PILLAR_ORDER;

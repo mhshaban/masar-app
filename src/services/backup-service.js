@@ -1,14 +1,7 @@
-import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js";
-import { COLLECTIONS, DB_VERSION } from "../core/config.js";
+import { list as listAll, bulkPut, clear } from "./storage-runtime.js";
+import { COLLECTIONS, DB_VERSION } from "../core/config.js?v=local-1";
 
 export async function buildBackup() {
-  if (!globalThis.__MASAR_TEST_BACKEND__) {
-    try {
-      return await rpc("masar_export_backup");
-    } catch (error) {
-      throw new Error("تعذر إنشاء النسخة الاحتياطية الآمنة. تأكد من تطبيق migration الصلاحيات والتصدير الإداري.", { cause: error });
-    }
-  }
   const collections = {};
   for (const name of COLLECTIONS) {
     collections[name] = await listAll(name);
@@ -68,11 +61,5 @@ export async function restoreBackup(data) {
       await bulkPut(name, records);
     }
   }
-  // تسجيل تدقيق فقط — بدون await عمدًا: البيانات نفسها استُعيدت فعليًا
-  // بهذي اللحظة، فلا مبرر يخلي المستخدم ينتظر رسالة النجاح/إعادة التحميل
-  // لمجرد بطء أو تعذّر شبكي بطلب التسجيل وحده (مثلًا الدالة SQL لسه ما
-  // نُفِّذت بقاعدة بيانات محمد، أو مهلة اتصال طويلة) — يعمل بالخلفية ولا
-  // يُفشل ولا يُبطئ الاستعادة نفسها، نفس أسلوب audit() الاختياري بـ
-  // admin-users Edge Function.
-  rpc("masar_log_backup_restore", { p_summary: counts }).catch(() => {});
+  return counts;
 }

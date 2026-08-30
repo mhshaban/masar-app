@@ -1,4 +1,4 @@
-import { list as listAll, listWhere, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, save, remove } from "../../services/storage-runtime.js";
 import { listStudents } from "../students/students-service.js";
 
 // The final secondary-school year (based on this school's actual level values:
