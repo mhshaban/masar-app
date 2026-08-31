@@ -98,10 +98,11 @@ async function renderRemindersCard(root) {
 
 export async function mountDashboardView(container, { onGoto }) {
   const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions } = await loadDashboardSnapshot();
+  const todayLabel = new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
 
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>مرحبًا بك في مسار</h1><div class="sub">مدرسة الشيخ عبدالله بن عيسى آل خليفة — قسم الإرشاد الأكاديمي والتوجيه المهني</div></div>
+      <div><h1>أولويات اليوم</h1><div class="sub">شنو يحتاجني اليوم؟ — ${esc(todayLabel)}</div></div>
     </div>
 
     <div class="grid g4" style="margin-bottom:16px;">

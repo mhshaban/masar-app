@@ -1,4 +1,4 @@
-const CACHE_VERSION = "masar-static-v8";
+const CACHE_VERSION = "masar-static-v9";
 const STATIC_CACHE = CACHE_VERSION;
 const APP_SCOPE = new URL(self.registration.scope);
 const staticUrl = (path) => new URL(path, APP_SCOPE).href;
