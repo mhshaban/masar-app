@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import "./helpers/fake-cloud-backend.mjs";
 import { clear } from "../src/services/cloud-runtime.js";
-import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, importTeachers } from "../src/modules/forms/forms-service.js";
+import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers } from "../src/modules/forms/forms-service.js";
 
 const student = { id: "s-1", name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" };
 
@@ -38,4 +38,13 @@ test("teacher batch import uses the personal number as a stable id", async () =>
   const teachers = await listTeachers();
   assert.equal(teachers.length, 2);
   assert.ok(teachers.some((teacher) => teacher.id === "teacher-001234567"));
+});
+
+test("teacher directory paginates metadata and fetches a photo only on demand", async () => {
+  await importTeachers(Array.from({ length: 30 }, (_, index) => ({ name: `معلم ${String(index).padStart(2, "0")}`, personalNo: String(1000 + index), photoDataUrl: index === 0 ? "data:image/jpeg;base64,AA" : "" })));
+  const firstPage = await listTeachersDirectory({ offset: 0, limit: 25 });
+  assert.equal(firstPage.total, 30);
+  assert.equal(firstPage.rows.length, 25);
+  assert.equal("photoDataUrl" in firstPage.rows[0], false);
+  assert.equal(await getTeacherPhoto("teacher-1000"), "data:image/jpeg;base64,AA");
 });

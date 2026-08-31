@@ -2,6 +2,7 @@ import { getAgendaProgressSummary } from "../agenda/agenda-service.js";
 import { listStudentsNeedingAttention } from "./followup-needs-service.js";
 import { listStaleOpenCases } from "../cases/guidance-service.js";
 import { listOverdueActions } from "../support/support-service.js";
+import { rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 
 // Used to compose this via one masar_dashboard_snapshot RPC — worthwhile
 // back when grade-flags scanned the full raw grades table (22,982+ rows) on
@@ -11,11 +12,25 @@ import { listOverdueActions } from "../support/support-service.js";
 // dependency were retired accordingly (see the grades-import-to-Cowork
 // migration).
 export async function loadDashboardSnapshot() {
+  if (!globalThis.__MASAR_TEST_BACKEND__) {
+    try {
+      const snapshot = await rpc("masar_dashboard_snapshot_v2", { p_stale_days: 14, p_attention_limit: 8 });
+      return {
+        agenda: snapshot.agenda || { total: 0, done: 0, ongoing: 0, notStarted: 0 },
+        attentionRows: snapshot.attentionRows || [],
+        attentionCount: Number(snapshot.attentionCount || 0),
+        staleCases: snapshot.staleCases || [],
+        overdueSupportActions: snapshot.overdueSupportActions || [],
+      };
+    } catch (error) {
+      console.warn("تعذر استخدام لقطة الرئيسية المخفّضة؛ سيُستخدم المسار التوافقي", error);
+    }
+  }
   const [agenda, attentionRows, staleCases, overdueSupportActions] = await Promise.all([
     getAgendaProgressSummary(),
     listStudentsNeedingAttention(),
     listStaleOpenCases(),
     listOverdueActions(),
   ]);
-  return { agenda, attentionRows, staleCases, overdueSupportActions };
+  return { agenda, attentionRows, attentionCount: attentionRows.length, staleCases, overdueSupportActions };
 }

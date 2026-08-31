@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove, bulkPut } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, remove, bulkPut, rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 
 export const FORM_TYPES = {
   school_admin: { label: "تحويل إلى إدارة المدرسة", kind: "referral", destination: "إدارة المدرسة" },
@@ -61,6 +61,19 @@ export const removeDepartmentForm = (id) => remove("departmentForms", id);
 export async function listTeachers() {
   const rows = await listAll("schoolTeachers");
   return rows.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+}
+
+export async function listTeachersDirectory({ query = "", offset = 0, limit = 25 } = {}) {
+  if (!globalThis.__MASAR_TEST_BACKEND__) {
+    return rpc("masar_teacher_directory", { p_query: query, p_offset: offset, p_limit: limit });
+  }
+  const rows = (await listTeachers()).filter((teacher) => !query || `${teacher.name || ""} ${teacher.nameEn || ""} ${teacher.personalNo || ""} ${teacher.employeeNo || ""} ${teacher.department || ""} ${teacher.jobTitle || ""}`.toLowerCase().includes(query.toLowerCase()));
+  return { total: rows.length, rows: rows.slice(offset, offset + limit).map(({ photoDataUrl, ...teacher }) => ({ ...teacher, hasPhoto: !!photoDataUrl })) };
+}
+
+export async function getTeacherPhoto(id) {
+  if (!globalThis.__MASAR_TEST_BACKEND__) return rpc("masar_teacher_photo", { p_id: id });
+  return (await get("schoolTeachers", id))?.photoDataUrl || "";
 }
 
 export async function saveTeacher(fields) {

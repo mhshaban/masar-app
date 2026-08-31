@@ -1,6 +1,6 @@
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
 import { NEED_LABELS } from "./followup-needs-service.js";
-import { loadDashboardSnapshot } from "./dashboard-service.js";
+import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-egress-1";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -97,7 +97,7 @@ async function renderRemindersCard(root) {
 }
 
 export async function mountDashboardView(container, { onGoto }) {
-  const { agenda, attentionRows, staleCases, overdueSupportActions } = await loadDashboardSnapshot();
+  const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions } = await loadDashboardSnapshot();
 
   container.innerHTML = `
     <div class="topbar">
@@ -105,7 +105,7 @@ export async function mountDashboardView(container, { onGoto }) {
     </div>
 
     <div class="grid g4" style="margin-bottom:16px;">
-      <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${attentionRows.length}</div></div>
+      <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${attentionCount}</div></div>
       <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${staleCases.length}</div></div>
       <div class="card stat"><div class="label">إجراءات دعم متأخرة</div><div class="value">${overdueSupportActions.length}</div></div>
       <div class="card stat"><div class="label">إجراءات خطة لم تبدأ</div><div class="value">${agenda.notStarted} <span style="font-size:13px; color:var(--ink-500);">من ${agenda.total}</span></div></div>
@@ -114,7 +114,7 @@ export async function mountDashboardView(container, { onGoto }) {
     <div class="card" style="margin-bottom:16px;">
       <div class="card-head">
         <h2>طلاب يحتاجون متابعة</h2>
-        <span class="pill pill-critical">${attentionRows.length}</span>
+        <span class="pill pill-critical">${attentionCount}</span>
       </div>
       <p class="hint">مُجمَّعة من ثلاث شاشات مستقلة (الحالات الإرشادية، خطط الدعم، التوجيه المهني) بحسب الطالب — قد يحتاج نفس الطالب أكثر من واحدة معًا.</p>
       ${attentionRows.length ? `
@@ -131,7 +131,7 @@ export async function mountDashboardView(container, { onGoto }) {
             </li>
           `).join("")}
         </ul>
-        ${attentionRows.length > 8 ? `<p class="hint" style="margin:10px 0 0;">و${attentionRows.length - 8} طالبًا آخرين...</p>` : ""}
+        ${attentionCount > attentionRows.length ? `<p class="hint" style="margin:10px 0 0;">و${attentionCount - attentionRows.length} طالبًا آخرين...</p>` : ""}
       ` : '<p class="hint">لا يوجد طلاب مرشَّحون حاليًا.</p>'}
     </div>
 

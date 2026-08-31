@@ -1,4 +1,4 @@
-const CACHE_VERSION = "masar-static-v5";
+const CACHE_VERSION = "masar-static-v6";
 const STATIC_CACHE = CACHE_VERSION;
 const APP_SCOPE = new URL(self.registration.scope);
 const staticUrl = (path) => new URL(path, APP_SCOPE).href;
@@ -47,6 +47,17 @@ self.addEventListener("fetch", (event) => {
 
   if (!isSafeStaticRequest(request, url)) return;
   event.respondWith(caches.open(STATIC_CACHE).then(async (cache) => {
+    // JavaScript is network-first so a newly published data-access fix is not
+    // hidden behind an older cached module. Other assets stay fast/offline.
+    if (url.pathname.endsWith(".js")) {
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type === "basic") cache.put(request, response.clone());
+        return response;
+      } catch {
+        return cache.match(request);
+      }
+    }
     const cached = await cache.match(request);
     const refresh = fetch(request).then((response) => {
       if (response.ok && response.type === "basic") cache.put(request, response.clone());

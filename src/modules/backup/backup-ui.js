@@ -1,5 +1,5 @@
-import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js";
-import { count } from "../../services/cloud-runtime.js";
+import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js?v=2026-08-31-egress-1";
+import { count } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS } from "../../core/config.js";
 import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 

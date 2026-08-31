@@ -1,10 +1,16 @@
-import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js";
+import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS, DB_VERSION } from "../core/config.js";
 
-export async function buildBackup() {
+const BACKUP_CACHE_MS = 10 * 60_000;
+let backupCache = null;
+
+export async function buildBackup({ force = false } = {}) {
   if (!globalThis.__MASAR_TEST_BACKEND__) {
+    if (!force && backupCache && backupCache.until > Date.now()) return backupCache.data;
     try {
-      return await rpc("masar_export_backup");
+      const data = await rpc("masar_export_backup");
+      backupCache = { data, until: Date.now() + BACKUP_CACHE_MS };
+      return data;
     } catch (error) {
       throw new Error("تعذر إنشاء النسخة الاحتياطية الآمنة. تأكد من تطبيق migration الصلاحيات والتصدير الإداري.", { cause: error });
     }

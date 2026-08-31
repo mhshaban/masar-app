@@ -1,8 +1,8 @@
 import { mountStudentPicker } from "../shared/student-picker.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
-  updateDepartmentForm, removeDepartmentForm, listTeachers, saveTeacher, removeTeacher,
-} from "./forms-service.js";
+  updateDepartmentForm, removeDepartmentForm, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
+} from "./forms-service.js?v=2026-08-31-egress-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js";
 import { downloadAsWordDoc } from "../../services/word-export.js";
 
@@ -118,19 +118,26 @@ async function imageToDataUrl(file) {
   canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(image.src); return canvas.toDataURL("image/jpeg", .78);
 }
 
-async function renderTeachers(root) {
-  const teachers = await listTeachers();
+const TEACHERS_PAGE_SIZE = 25;
+
+async function renderTeachers(root, { query = "", page = 0 } = {}) {
+  const offset = page * TEACHERS_PAGE_SIZE;
+  const { rows: teachers, total } = await listTeachersDirectory({ query, offset, limit: TEACHERS_PAGE_SIZE });
+  const pageCount = Math.max(1, Math.ceil(total / TEACHERS_PAGE_SIZE));
   root.innerHTML = `<div class="card forms-card"><h2>إضافة معلم</h2><form id="teacher-form" class="forms-grid">${field("اسم المعلم", "name", "text", true)}${field("الاسم باللغة الإنجليزية", "nameEn")}${field("الرقم الشخصي", "personalNo")}${field("الرقم الوظيفي", "employeeNo")}${field("المسمى الوظيفي", "jobTitle")}${field("القسم / المادة", "department")}${field("رقم التواصل", "phone", "tel")}${field("البريد الإلكتروني", "email", "email")}${area("ملاحظات", "notes")}<label class="forms-field"><span>الصورة</span><input name="photo" type="file" accept="image/*"></label><div class="forms-actions forms-wide"><button class="btn btn-primary">حفظ المعلم</button></div></form></div>
-    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${teachers.length})</h2></div><div class="search"><input id="teacher-search" type="search" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div id="teachers-table"></div></div>`;
+    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${total})</h2><div class="hint">تُحمّل صور الصفحة الحالية فقط لتقليل استهلاك البيانات.</div></div><div class="search"><input id="teacher-search" type="search" value="${esc(query)}" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div id="teachers-table"></div></div>`;
   root.querySelector("#teacher-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); try { data.photoDataUrl = await imageToDataUrl(event.target.photo.files[0]); delete data.photo; await saveTeacher(data); alert("تم حفظ بيانات المعلم"); await renderTeachers(root); } catch (error) { alert(error.message); } });
   const tableRoot = root.querySelector("#teachers-table");
-  function drawTeachers() {
-    const q = root.querySelector("#teacher-search").value.trim().toLowerCase();
-    const filtered = teachers.filter((teacher) => !q || `${teacher.name || ""} ${teacher.nameEn || ""} ${teacher.personalNo || ""} ${teacher.employeeNo || ""} ${teacher.department || ""} ${teacher.jobTitle || ""}`.toLowerCase().includes(q));
-    tableRoot.innerHTML = filtered.length ? `<div class="tablewrap"><table class="teachers-table"><thead><tr><th>الصورة</th><th>المعلم</th><th>الرقم الشخصي</th><th>القسم</th><th>الوظيفة</th><th>التواصل</th><th></th></tr></thead><tbody>${filtered.map((teacher) => `<tr>${teacher.photoDataUrl ? `<td><img src="${teacher.photoDataUrl}" alt="صورة ${esc(teacher.name)}"></td>` : '<td><div class="teacher-avatar">م</div></td>'}<td><strong>${esc(teacher.name)}</strong><div class="hint" dir="ltr">${esc(teacher.nameEn)}</div></td><td class="num">${esc(teacher.personalNo || teacher.employeeNo) || "—"}</td><td>${esc(teacher.department) || "—"}</td><td>${esc(teacher.jobTitle) || "—"}</td><td>${teacher.phone ? `<a href="tel:${esc(teacher.phone)}">${esc(teacher.phone)}</a><br>` : ""}${teacher.email ? `<a href="mailto:${esc(teacher.email)}">${esc(teacher.email)}</a>` : "—"}</td><td><button class="link-btn forms-danger" data-remove-teacher="${esc(teacher.id)}">حذف</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد بيانات مطابقة</div>';
-    tableRoot.querySelectorAll("[data-remove-teacher]").forEach((button) => button.addEventListener("click", async () => { if (!confirm("حذف بيانات هذا المعلم؟")) return; await removeTeacher(button.dataset.removeTeacher); await renderTeachers(root); }));
-  }
-  root.querySelector("#teacher-search").addEventListener("input", drawTeachers); drawTeachers();
+  tableRoot.innerHTML = teachers.length ? `<div class="tablewrap"><table class="teachers-table"><thead><tr><th>الصورة</th><th>المعلم</th><th>الرقم الشخصي</th><th>القسم</th><th>الوظيفة</th><th>التواصل</th><th></th></tr></thead><tbody>${teachers.map((teacher) => `<tr><td>${teacher.hasPhoto ? `<img data-teacher-photo="${esc(teacher.id)}" alt="صورة ${esc(teacher.name)}">` : '<div class="teacher-avatar">م</div>'}</td><td><strong>${esc(teacher.name)}</strong><div class="hint" dir="ltr">${esc(teacher.nameEn)}</div></td><td class="num">${esc(teacher.personalNo || teacher.employeeNo) || "—"}</td><td>${esc(teacher.department) || "—"}</td><td>${esc(teacher.jobTitle) || "—"}</td><td>${teacher.phone ? `<a href="tel:${esc(teacher.phone)}">${esc(teacher.phone)}</a><br>` : ""}${teacher.email ? `<a href="mailto:${esc(teacher.email)}">${esc(teacher.email)}</a>` : "—"}</td><td><button class="link-btn forms-danger" data-remove-teacher="${esc(teacher.id)}">حذف</button></td></tr>`).join("")}</tbody></table></div><div class="forms-actions" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" id="teachers-prev" ${page <= 0 ? "disabled" : ""}>السابق</button><span class="hint">صفحة ${page + 1} من ${pageCount}</span><button class="btn btn-ghost" id="teachers-next" ${page + 1 >= pageCount ? "disabled" : ""}>التالي</button></div>` : '<div class="empty">لا توجد بيانات مطابقة</div>';
+  tableRoot.querySelectorAll("[data-remove-teacher]").forEach((button) => button.addEventListener("click", async () => { if (!confirm("حذف بيانات هذا المعلم؟")) return; await removeTeacher(button.dataset.removeTeacher); await renderTeachers(root, { query, page }); }));
+  tableRoot.querySelector("#teachers-prev")?.addEventListener("click", () => renderTeachers(root, { query, page: page - 1 }));
+  tableRoot.querySelector("#teachers-next")?.addEventListener("click", () => renderTeachers(root, { query, page: page + 1 }));
+  let searchTimer;
+  root.querySelector("#teacher-search").addEventListener("input", (event) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderTeachers(root, { query: event.target.value.trim(), page: 0 }), 300); });
+  await Promise.all([...tableRoot.querySelectorAll("[data-teacher-photo]")].map(async (image) => {
+    try { const photo = await getTeacherPhoto(image.dataset.teacherPhoto); if (photo) image.src = photo; else image.replaceWith(Object.assign(document.createElement("div"), { className: "teacher-avatar", textContent: "م" })); }
+    catch { image.replaceWith(Object.assign(document.createElement("div"), { className: "teacher-avatar", textContent: "م" })); }
+  }));
 }
 
 export async function mountFormsView(container) {
