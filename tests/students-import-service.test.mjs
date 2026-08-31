@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { rowToStudent, commitStudentsImport } from "../src/services/students-import-service.js";
 import { list as listAll, count } from "../src/services/cloud-runtime.js";
 import { ensureStudentsSeeded } from "../src/services/students-source.js";
+import { updateStudent } from "../src/modules/students/students-service.js";
 
 // The exact row (by column index) from the school's real كشف الطلاب sheet
 // for student 20254220 — pinned here byte-for-byte against the sheet's own
@@ -82,6 +83,25 @@ test("commitStudentsImport replaces the whole roster (كشف الطلاب reissu
   const rows = await listAll("students");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].name, "طالب ثالث");
+});
+
+test("a new roster import preserves counselor notes for the same student", async () => {
+  await commitStudentsImport([{ id: "20254220", academicId: "20254220", name: "طالب أول", notes: "متابعة أسبوعية" }]);
+  await commitStudentsImport([{ id: "20254220", academicId: "20254220", name: "الاسم المحدّث" }]);
+  const [student] = await listAll("students");
+  assert.equal(student.name, "الاسم المحدّث");
+  assert.equal(student.notes, "متابعة أسبوعية");
+});
+
+test("editing basic student data keeps the stable record id and stores notes", async () => {
+  await commitStudentsImport([{ id: "20254220", academicId: "20254220", name: "طالب أول", level: "الأول" }]);
+  const updated = await updateStudent("20254220", { name: "طالب محدّث", level: "الثاني", notes: "يحتاج متابعة" });
+  assert.equal(updated.id, "20254220");
+  assert.equal(updated.academicId, "20254220");
+  assert.equal(updated.name, "طالب محدّث");
+  assert.equal(updated.level, "الثاني");
+  assert.equal(updated.notes, "يحتاج متابعة");
+  assert.equal(await count("students"), 1);
 });
 
 test("commitStudentsImport handles an empty roster without throwing", async () => {

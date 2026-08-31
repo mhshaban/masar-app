@@ -32,6 +32,17 @@ test("teacher register stores searchable identifying fields", async () => {
   assert.equal(teacher.employeeNo, "T-01");
 });
 
+test("editing a teacher updates the same record without creating a duplicate", async () => {
+  const original = await saveTeacher({ name: "معلم تجريبي", personalNo: "123456789", department: "الرياضيات", photoDataUrl: "data:image/jpeg;base64,AA" });
+  await saveTeacher({ ...original, name: "معلم محدّث", department: "العلوم" });
+  const teachers = await listTeachers();
+  assert.equal(teachers.length, 1);
+  assert.equal(teachers[0].id, original.id);
+  assert.equal(teachers[0].name, "معلم محدّث");
+  assert.equal(teachers[0].department, "العلوم");
+  assert.equal(teachers[0].photoDataUrl, "data:image/jpeg;base64,AA");
+});
+
 test("teacher batch import uses the personal number as a stable id", async () => {
   const count = await importTeachers([{ name: "معلم أول", personalNo: "001234567", department: "الرياضيات" }, { name: "معلم ثان", personalNo: "009876543", department: "العلوم" }]);
   assert.equal(count, 2);

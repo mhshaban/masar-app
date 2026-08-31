@@ -1,4 +1,4 @@
-import { list as listAll, get, rpc } from "../../services/cloud-runtime.js";
+import { list as listAll, get, save, rpc } from "../../services/cloud-runtime.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 
 const ROSTER_CACHE_MS = 15_000;
@@ -46,6 +46,21 @@ export async function getStudent(id) {
     return rosterCache.find((student) => String(student.id) === String(id)) || null;
   }
   return get("students", id);
+}
+
+export async function updateStudent(id, fields) {
+  const current = await getStudent(id);
+  if (!current) throw new Error("تعذّر إيجاد بيانات الطالب");
+  if (!String(fields.name || current.name || "").trim()) throw new Error("اسم الطالب مطلوب");
+  const updated = await save("students", {
+    ...current,
+    ...fields,
+    id: current.id,
+    name: String(fields.name ?? current.name).trim(),
+    updatedAt: new Date().toISOString(),
+  });
+  invalidateStudentsCache();
+  return updated;
 }
 
 function uniqueSorted(values) {

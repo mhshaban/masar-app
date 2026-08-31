@@ -1,7 +1,7 @@
-import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent } from "./students-service.js";
+import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent, updateStudent } from "./students-service.js?v=2026-08-31-record-edit-1";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
-import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js";
+import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
@@ -13,6 +13,48 @@ function esc(str) {
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/);
   return parts.slice(0, 2).map((p) => p[0] || "").join("");
+}
+
+const studentField = (label, name, value = "", type = "text", required = false) => `<label class="forms-field"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" value="${esc(value)}" ${required ? "required" : ""}></label>`;
+
+async function renderStudentEdit(container, student, onCancel, onSaved) {
+  container.innerHTML = `
+    <button class="backlink" id="student-edit-cancel-top">رجوع لبيانات الطالب</button>
+    <div class="topbar"><div><h1>تعديل بيانات الطالب الأساسية</h1><div class="sub">يبقى معرّف السجل ثابتًا لحماية ارتباط الدرجات والحالات والخطط بالطالب.</div></div></div>
+    <div class="card forms-card"><form id="student-edit-form" class="forms-grid">
+      ${studentField("اسم الطالب", "name", student.name, "text", true)}
+      ${studentField("الاسم بالإنجليزية", "nameEn", student.nameEn)}
+      ${studentField("الرقم الأكاديمي", "academicId", student.academicId)}
+      ${studentField("الرقم الشخصي", "civilId", student.civilId)}
+      ${studentField("البريد الإلكتروني", "email", student.email, "email")}
+      ${studentField("المستوى", "level", student.level)}
+      ${studentField("الشعبة", "section", student.section)}
+      ${studentField("القسم", "department", student.department)}
+      ${studentField("المسار / التخصص", "track", student.track)}
+      ${studentField("أرقام الاتصال (افصل بينها بفاصلة)", "phones", (student.phones || []).join("، "))}
+      ${studentField("المواصلات", "transport", student.transport)}
+      ${studentField("رقم المجمع", "complexNumber", student.complexNumber)}
+      <label class="forms-field forms-wide"><span>ملاحظات الطالب</span><textarea name="notes" rows="5">${esc(student.notes || "")}</textarea></label>
+      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ التعديلات</button><button class="btn btn-ghost" type="button" id="student-edit-cancel">إلغاء</button></div>
+    </form></div>`;
+  const cancel = () => onCancel();
+  container.querySelector("#student-edit-cancel-top").addEventListener("click", cancel);
+  container.querySelector("#student-edit-cancel").addEventListener("click", cancel);
+  container.querySelector("#student-edit-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.submitter;
+    button.disabled = true;
+    try {
+      const data = Object.fromEntries(new FormData(event.target).entries());
+      data.phones = String(data.phones || "").split(/[،,]/).map((value) => value.trim()).filter(Boolean);
+      await updateStudent(student.id, data);
+      alert("تم تحديث بيانات الطالب");
+      await onSaved();
+    } catch (error) {
+      alert(error.message);
+      button.disabled = false;
+    }
+  });
 }
 
 // يستورد شيت "كشف الطلاب" من نفس ملف كشف الطلاب الكامل المستخدم لبقية
@@ -180,6 +222,7 @@ async function renderDetail(container, id, onBack) {
         </div>
       </div>
       <div class="meta">الرقم الأكاديمي ${esc(s.academicId) || "—"}</div>
+      <button class="btn btn-primary" id="student-edit">تعديل بيانات الطالب</button>
     </div>
 
     ${hasGuidanceFlags ? `
@@ -232,6 +275,7 @@ async function renderDetail(container, id, onBack) {
           <tr><td>رغبة التخصص</td><td>${esc(s.specializationPreference) || "—"}</td></tr>
           <tr><td>الحد الأدنى للتخصص</td><td class="num">${esc(s.minSpecializationThreshold) || "—"}</td></tr>
           <tr><td>رقم المقعد / اللجنة</td><td class="num"><span dir="ltr">${esc(s.seatNumber) || "—"} / ${esc(s.committee) || "—"}</span></td></tr>
+          <tr><td>ملاحظات الطالب</td><td>${esc(s.notes) || "—"}</td></tr>
         </tbody>
       </table></div>
     </div>
@@ -243,6 +287,7 @@ async function renderDetail(container, id, onBack) {
   `;
 
   container.querySelector("#students-back").addEventListener("click", onBack);
+  container.querySelector("#student-edit").addEventListener("click", () => renderStudentEdit(container, s, () => renderDetail(container, id, onBack), () => renderDetail(container, id, onBack)));
 
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
