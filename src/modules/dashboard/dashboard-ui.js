@@ -1,6 +1,6 @@
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
 import { NEED_LABELS } from "./followup-needs-service.js";
-import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-egress-1";
+import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-priorities-2";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -14,6 +14,13 @@ function daysSince(dateStr) {
   if (!dateStr) return null;
   const ms = Date.now() - new Date(dateStr).getTime();
   return Math.max(0, Math.floor(ms / 86400000));
+}
+
+function planActionRow(entry, badge, badgeClass = "pill-warning") {
+  return `<li class="row-item">
+    <div class="body"><div class="title">${esc(entry.action) || "—"}</div><div class="meta">${esc(entry.project_title || entry.program_name || entry.pillar) || "خطة القسم"}</div></div>
+    <span class="pill ${badgeClass}">${esc(badge)}</span>
+  </li>`;
 }
 
 // نُسخة "التذكيرات" كاملة (عرض + إضافة + تبديل/حذف) منقولة داخل الرئيسية —
@@ -97,8 +104,10 @@ async function renderRemindersCard(root) {
 }
 
 export async function mountDashboardView(container, { onGoto }) {
-  const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions } = await loadDashboardSnapshot();
+  const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions, planPriorities = { overdue: [], upcoming: [], undated: [] } } = await loadDashboardSnapshot();
   const todayLabel = new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  const completionPct = agenda.total ? Math.round((agenda.done / agenda.total) * 100) : 0;
+  const highPriorityRows = attentionRows.filter((row) => row.needs.length >= 3);
 
   container.innerHTML = `
     <div class="topbar">
@@ -106,10 +115,14 @@ export async function mountDashboardView(container, { onGoto }) {
     </div>
 
     <div class="grid g4" style="margin-bottom:16px;">
+      <div class="card stat"><div class="label">أولوية عالية ظاهرة</div><div class="value">${highPriorityRows.length}</div></div>
       <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${attentionCount}</div></div>
       <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${staleCases.length}</div></div>
       <div class="card stat"><div class="label">إجراءات دعم متأخرة</div><div class="value">${overdueSupportActions.length}</div></div>
-      <div class="card stat"><div class="label">إجراءات خطة لم تبدأ</div><div class="value">${agenda.notStarted} <span style="font-size:13px; color:var(--ink-500);">من ${agenda.total}</span></div></div>
+      <div class="card stat"><div class="label">إنجاز خطة القسم</div><div class="value">${completionPct}%</div><div class="hint">${agenda.done} من ${agenda.total}</div></div>
+      <div class="card stat"><div class="label">إجراءات الخطة المتأخرة</div><div class="value">${planPriorities.overdue.length}</div></div>
+      <div class="card stat"><div class="label">قادمة خلال 14 يومًا</div><div class="value">${planPriorities.upcoming.length}</div></div>
+      <div class="card stat"><div class="label">إجراءات بلا تاريخ</div><div class="value">${planPriorities.undated.length}</div></div>
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -117,16 +130,18 @@ export async function mountDashboardView(container, { onGoto }) {
         <h2>طلاب يحتاجون متابعة</h2>
         <span class="pill pill-critical">${attentionCount}</span>
       </div>
-      <p class="hint">مُجمَّعة من ثلاث شاشات مستقلة (الحالات الإرشادية، خطط الدعم، التوجيه المهني) بحسب الطالب — قد يحتاج نفس الطالب أكثر من واحدة معًا.</p>
+      <p class="hint">اتحاد الاحتياج الأكاديمي والحالات وخطط الدعم والتوجيه المهني ومقررات الترفيع. الأولوية العالية تعني اجتماع 3 احتياجات مختلفة أو أكثر.</p>
       ${attentionRows.length ? `
         <ul class="plain">
-          ${attentionRows.slice(0, 8).map((row) => `
+          ${attentionRows.map((row) => `
             <li class="row-item">
               <div class="body">
                 <div class="title">${esc(row.student?.name) || row.studentId}</div>
                 <div class="meta">${esc(row.student?.level) || ""} ${esc(row.student?.section) || ""}</div>
+                <div class="meta">${esc(row.needs.flatMap((need) => need.reasons || []).join(" · "))}</div>
               </div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${row.needs.length >= 3 ? '<span class="pill pill-critical">أولوية عالية</span>' : ""}
                 ${row.needs.map((n) => `<button class="pill pill-warning" style="border:none; cursor:pointer;" data-goto="${esc(NEED_TARGET_VIEW[n.type])}">${esc(NEED_LABELS[n.type])}</button>`).join("")}
               </div>
             </li>
@@ -134,6 +149,15 @@ export async function mountDashboardView(container, { onGoto }) {
         </ul>
         ${attentionCount > attentionRows.length ? `<p class="hint" style="margin:10px 0 0;">و${attentionCount - attentionRows.length} طالبًا آخرين...</p>` : ""}
       ` : '<p class="hint">لا يوجد طلاب مرشَّحون حاليًا.</p>'}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h2>أولويات خطة القسم</h2><button class="link-btn" data-goto="agenda">فتح الأجندة التنفيذية</button></div>
+      <div class="grid g3">
+        <div><h3>متأخرة (${planPriorities.overdue.length})</h3>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.slice(0, 6).map((entry) => planActionRow(entry, entry.periodEnd || entry.periodStart, "pill-critical")).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</div>
+        <div><h3>قادمة خلال 14 يومًا (${planPriorities.upcoming.length})</h3>${planPriorities.upcoming.length ? `<ul class="plain">${planPriorities.upcoming.slice(0, 6).map((entry) => planActionRow(entry, entry.periodStart)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات قادمة خلال 14 يومًا.</p>'}</div>
+        <div><h3>بلا تاريخ (${planPriorities.undated.length})</h3>${planPriorities.undated.length ? `<ul class="plain">${planPriorities.undated.slice(0, 6).map((entry) => planActionRow(entry, "بلا تاريخ", "pill-neutral")).join("")}</ul>` : '<p class="hint">كل الإجراءات مجدولة.</p>'}</div>
+      </div>
     </div>
 
     <div class="grid g2" style="margin-bottom:16px;">
