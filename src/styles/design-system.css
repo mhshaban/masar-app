@@ -105,6 +105,12 @@
   }
 
   * { box-sizing: border-box; }
+  button, input, textarea, select, optgroup, option {
+    font-family: var(--font-ui);
+  }
+  input::file-selector-button {
+    font-family: var(--font-ui);
+  }
   html, body {
     margin: 0;
     padding: 0;
@@ -235,7 +241,7 @@
   .card.stat.on { border-color: var(--teal-600); box-shadow: 0 0 0 1px var(--teal-600); }
 
   /* pills / badges */
-  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 100px; white-space: nowrap; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-ui); font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 100px; white-space: nowrap; }
   .pill.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .pill-success { background: var(--success-bg); color: var(--success); }
   .pill-warning { background: var(--warning-bg); color: var(--warning); }
