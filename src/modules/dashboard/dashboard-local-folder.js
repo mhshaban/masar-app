@@ -89,6 +89,28 @@ export function buildLocalDashboardSnapshot(backup, now = new Date()) {
   const upcoming = pending.filter((a) => a.periodStart >= today && a.periodStart <= through).sort((a,b) => a.periodStart.localeCompare(b.periodStart));
   const undated = pending.filter((a) => !a.periodStart && !a.periodEnd);
   const attentionRows = needsForBackup(c);
+  const studentMap = new Map((c.students || []).map((s) => [String(s.id), s]));
+  const attentionBreakdown = { case: 0, support: 0, career: 0, promoted: 0 };
+  for (const row of attentionRows) for (const need of row.needs) if (need.type in attentionBreakdown) attentionBreakdown[need.type] += 1;
+  const highPriorityCount = attentionRows.filter((row) => priorityLevel(priorityScore(row.needs)) === "high").length;
+  const academicWeak = (c.academicFlags || []).map((flag) => {
+    const reasons = [];
+    const pct = Number(flag.overallPct);
+    const failing = (flag.subjects || []).filter((s) => Number(s.pct) < 50).length;
+    if (Number.isFinite(pct) && pct < 50) reasons.push(`المعدل العام ${pct}% أقل من 50%`);
+    if (failing) reasons.push(`رسوب في ${failing} ${failing === 1 ? "مادة" : "مواد"}`);
+    if (Number(flag.barredCount) > 0) reasons.push(`محروم في ${flag.barredCount} مادة`);
+    return { studentId: String(flag.studentId), student: studentMap.get(String(flag.studentId)) || null, overallPct: Number.isFinite(pct) ? pct : null, barredCount: Number(flag.barredCount || 0), reasons };
+  }).filter((row) => row.reasons.length).sort((a, b) => (a.overallPct ?? 101) - (b.overallPct ?? 101) || b.barredCount - a.barredCount).slice(0, 10);
+  const promotedByStudent = new Map();
+  for (const row of c.promotedSubjects || []) {
+    if (row.cleared) continue;
+    const id = String(row.studentId || "");
+    if (!promotedByStudent.has(id)) promotedByStudent.set(id, new Set());
+    promotedByStudent.get(id).add(String(row.subjectCode || "غير محدد"));
+  }
+  const promotedTop = [...promotedByStudent].map(([studentId, subjects]) => ({ studentId, student: studentMap.get(studentId) || null, subjects: [...subjects] }))
+    .sort((a, b) => b.subjects.length - a.subjects.length || String(a.student?.name || a.studentId).localeCompare(String(b.student?.name || b.studentId), "ar")).slice(0, 10);
   const sessionsByCase = new Map();
   for (const s of c.caseSessions || []) {
     const key = String(s.caseId || "");
@@ -103,9 +125,12 @@ export function buildLocalDashboardSnapshot(backup, now = new Date()) {
   const overdueSupportActions = (c.supportPlanActions || []).filter((a) => {
     const p = planMap.get(String(a.planId)); return p?.status === "active" && a.status !== "done" && a.dueDate && a.dueDate < today;
   }).map((a) => ({ ...a, plan: planMap.get(String(a.planId)) }));
+  const pillarCounts = actions.reduce((acc, action) => { const key = action.pillar || "غير محدد"; acc[key] = (acc[key] || 0) + 1; return acc; }, {});
   return {
     agenda: { total: actions.length, done: actions.filter((a) => a.status === "done").length, ongoing: actions.filter((a) => a.status === "ongoing").length, notStarted: actions.filter((a) => a.status === "not_started").length },
-    attentionRows: attentionRows.slice(0, 50), attentionCount: attentionRows.length, staleCases, overdueSupportActions,
+    attentionRows: attentionRows.slice(0, 50), attentionCount: attentionRows.length, totalStudents: (c.students || []).length,
+    attentionBreakdown, highPriorityCount, academicWeak, promotedTop, staleCases, overdueSupportActions,
+    planSummary: { projectCount: (c.departmentPlanProjects || []).length, pillarCounts },
     planPriorities: { overdueCount: overdue.length, upcomingCount: upcoming.length, undatedCount: undated.length, overdue: overdue.slice(0, 12), upcoming: upcoming.slice(0, 12), undated: undated.slice(0, 12) },
     source: "onedrive-local", sourceUpdatedAt: backup.exportedAt || null,
   };
