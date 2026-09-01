@@ -23,6 +23,7 @@ function planActionRow(entry, badge, badgeClass = "pill-warning", decisionKey = 
   return `<li class="row-item">
     <div class="body"><div class="title">${esc(entry.action) || "—"}</div><div class="meta">${esc(entry.project_title || entry.program_name || entry.pillar) || "خطة القسم"}</div></div>
     <span class="pill ${badgeClass}">${esc(badge)}</span>
+    <button class="link-btn" data-goto="agenda">فتح</button>
     ${decisionKey ? decisionControls(decisionKey) : ""}
   </li>`;
 }
@@ -236,6 +237,7 @@ export async function mountDashboardView(container, { onGoto }) {
                   <div class="meta">${esc(c.category) || ""}</div>
                 </div>
                 <span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا بلا متابعة</span>
+                <button class="link-btn" data-goto="cases">فتح</button>
                 ${decisionControls(`case:${c.id}`)}
               </li>
             `).join("")}
@@ -254,6 +256,7 @@ export async function mountDashboardView(container, { onGoto }) {
                   <div class="meta">${esc(a.action)}</div>
                 </div>
                 <span class="pill pill-critical">${esc(a.dueDate)}</span>
+                <button class="link-btn" data-goto="support">فتح</button>
                 ${decisionControls(`support:${a.id}`)}
               </li>
             `).join("")}
