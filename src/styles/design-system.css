@@ -419,6 +419,20 @@
   .daily-pillar-grid > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface) 86%, var(--paper-100)); }
   .daily-pillar-grid span { color: var(--ink-600); font-size: 12.5px; }
   .daily-pillar-grid b { color: var(--clay-500); font-size: 24px; }
+  .daily-plan-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+  .daily-plan-group { padding: 17px 18px 8px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface) 94%, var(--paper-100)); }
+  .daily-plan-group-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .daily-plan-group-head > div { display: flex; align-items: center; gap: 9px; }
+  .daily-plan-group-head h3 { margin: 0; font-size: 13.5px; }
+  .daily-plan-group-head b { display: grid; place-items: center; min-width: 31px; height: 27px; padding: 0 8px; border-radius: 999px; background: var(--paper-100); font-size: 12px; }
+  .daily-plan-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-500); }
+  .daily-plan-overdue .daily-plan-dot { background: var(--critical); }
+  .daily-plan-overdue .daily-plan-group-head b { color: var(--critical); background: var(--critical-bg); }
+  .daily-plan-upcoming .daily-plan-dot { background: var(--warning); }
+  .daily-plan-upcoming .daily-plan-group-head b { color: var(--warning); background: var(--warning-bg); }
+  .daily-plan-undated .daily-plan-dot { background: var(--ink-500); }
+  .daily-plan-group > ul, .daily-plan-group > .hint { margin-top: 8px; }
+  .daily-plan-group .row-item { padding: 11px 2px; }
   .daily-disclosure { padding: 0 !important; overflow: hidden; }
   .daily-disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; list-style: none; padding: 18px 22px; }
   .daily-disclosure > summary::-webkit-details-marker { display: none; }
