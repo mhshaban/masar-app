@@ -3,7 +3,7 @@ import { listStudentsNeedingAttention } from "./followup-needs-service.js";
 import { listStaleOpenCases } from "../cases/guidance-service.js";
 import { listOverdueActions } from "../support/support-service.js";
 import { rpc, list, listActionProgressStatuses } from "../../services/cloud-runtime.js?v=2026-08-31-priorities-3";
-import { getCachedLocalSnapshot, refreshMasarFolder } from "./dashboard-local-folder.js?v=2026-08-31-priorities-3";
+import { getCachedLocalSnapshot, refreshMasarFolder } from "./dashboard-local-folder.js?v=2026-09-01-priorities-4";
 
 function bahrainIsoDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bahrain", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
