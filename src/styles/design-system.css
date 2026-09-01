@@ -354,6 +354,50 @@
   .source-card .hint { margin: 4px 0 0; }
   .priority-actions { display: inline-flex; align-items: center; gap: 8px; padding-inline-start: 4px; }
   details.card summary { cursor: pointer; font-weight: 700; }
+
+  /* ---------- Daily priorities report ---------- */
+  .daily-dashboard { max-width: 1240px; margin: 0 auto; }
+  .daily-hero {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, .72fr); gap: 18px 28px;
+    align-items: center; margin: -4px 0 28px; padding: 22px 0 20px; border-bottom: 1px solid var(--border);
+  }
+  .daily-hero-title { display: flex; align-items: center; gap: 15px; min-width: 0; }
+  .daily-accent { width: 5px; height: 58px; border-radius: 10px; background: var(--clay-500); box-shadow: 0 0 24px rgba(226,168,80,.28); }
+  .daily-hero h1 { margin: 0; font-size: clamp(27px, 3vw, 40px); line-height: 1.2; letter-spacing: -.5px; }
+  .daily-hero p { margin: 7px 0 0; color: var(--ink-500); font-size: 13px; }
+  .daily-hero-meta { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); padding: 15px 17px; box-shadow: var(--shadow); }
+  .daily-hero-meta strong, .daily-hero-meta span, .daily-hero-meta small { display: block; }
+  .daily-hero-meta strong { font-size: 12.5px; }
+  .daily-hero-meta span, .daily-hero-meta small { margin-top: 6px; color: var(--ink-500); font-size: 11.5px; }
+  .daily-status-dot { display: inline-block; width: 7px; height: 7px; margin-inline-end: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent); }
+  .daily-hero-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: -5px; }
+  .daily-section-title { display: flex; align-items: center; gap: 13px; margin: 27px 0 14px; }
+  .daily-section-title > span { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 50%; background: var(--clay-500); color: var(--on-gold); font-weight: 800; font-size: 13px; flex: 0 0 auto; }
+  .daily-section-title h2 { margin: 0; font-size: 18px; }
+  .daily-section-title p { margin: 2px 0 0; color: var(--ink-500); font-size: 12px; }
+  .daily-dashboard .card { box-shadow: none; }
+  .daily-dashboard .daily-panel, .daily-dashboard .daily-stats .card { border-color: color-mix(in srgb, var(--border) 82%, var(--teal-700)); }
+  .daily-stats .stat { min-height: 142px; justify-content: space-between; padding: 20px; }
+  .daily-stats .stat .value { color: var(--clay-500); font-size: 36px; }
+  .daily-stats .stat .label { color: var(--ink-600); }
+  .daily-panel { padding: 20px; }
+  .daily-panel .card-head { padding-bottom: 11px; border-bottom: 1px solid var(--border); }
+  .daily-student-panel .row-item { padding: 14px 4px; align-items: flex-start; }
+  .daily-student-panel .row-item .title { font-size: 14px; }
+  .daily-student-panel .row-item .meta { line-height: 1.75; }
+  .daily-dashboard .link-btn { border-radius: 7px; padding: 5px 8px; }
+  .daily-dashboard .link-btn:hover { background: var(--paper-100); }
+  .daily-dashboard .priority-actions { border-inline-start: 1px solid var(--border); margin-inline-start: 3px; }
+  @media (max-width: 820px) {
+    .daily-hero { grid-template-columns: 1fr; }
+    .daily-hero-actions { grid-column: auto; justify-content: flex-start; }
+  }
+  @media (max-width: 650px) {
+    .daily-section-title { align-items: flex-start; }
+    .daily-section-title h2 { font-size: 16px; }
+    .daily-stats { grid-template-columns: 1fr 1fr; }
+    .daily-stats .stat { min-height: 120px; padding: 15px; }
+  }
   .forms-student { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 14px; margin: 8px 0 16px; border-radius: 10px; background: var(--teal-50); border: 1px solid var(--teal-100); font-size: 12.5px; }
   .forms-student strong { width: 100%; color: var(--teal-900); font-size: 14px; }
   .forms-student.empty { display: block; margin-top: 4px; }
