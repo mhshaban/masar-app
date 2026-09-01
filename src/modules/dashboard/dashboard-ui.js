@@ -164,19 +164,23 @@ export async function mountDashboardView(container, { onGoto }) {
   ].filter((item, index, all) => all.findIndex((x) => x.key === item.key) === index)
     .map((item) => ({ ...item, ...priorityDecisionState(item.key) })).filter((item) => item.hidden);
 
-  container.innerHTML = `
-    <div class="topbar">
-      <div><h1>أولويات اليوم</h1><div class="sub">شنو يحتاجني اليوم؟ — ${esc(todayLabel)}</div></div>
-      <div class="forms-actions"><button class="btn btn-ghost" id="daily-word">تصدير Word</button><button class="btn btn-ghost" id="daily-print">طباعة</button></div>
-    </div>
+  container.innerHTML = `<div class="daily-dashboard">
+    <header class="daily-hero">
+      <div class="daily-hero-title"><span class="daily-accent" aria-hidden="true"></span><div><h1>شنو يحتاجني اليوم؟</h1><p>لوحة العمل اليومية — قراءة مباشرة من بيانات مسار الحقيقية</p></div></div>
+      <div class="daily-hero-meta">
+        <strong>${esc(todayLabel)} · قسم الإرشاد الأكاديمي والتوجيه المهني</strong>
+        <span><i class="daily-status-dot"></i>${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase · استعلام مخفف"}</span>
+        <small>${snapshot.source === "onedrive-local" ? `آخر نسخة: ${esc(snapshot.localFileName || "")} — ${esc(snapshot.sourceUpdatedAt || snapshot.localFileModifiedAt || "")}` : "قراءة خفيفة بلا تنزيل للمرفقات أو الصور"}</small>
+      </div>
+      <div class="daily-hero-actions">
+        <button class="btn btn-ghost" id="folder-connect">${snapshot.source === "onedrive-local" ? "تحديث من المجلد" : "ربط مجلد مسار"}</button>
+        <button class="btn btn-ghost" id="daily-word">تصدير Word</button><button class="btn btn-ghost" id="daily-print">طباعة</button>
+      </div>
+    </header>
 
-    <div class="card source-card" style="margin-bottom:16px;">
-      <div><strong>مصدر البيانات: ${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase — استعلام مخفف"}</strong>
-      <div class="hint">${snapshot.source === "onedrive-local" ? `آخر نسخة: ${esc(snapshot.localFileName || "")} — ${esc(snapshot.sourceUpdatedAt || snapshot.localFileModifiedAt || "")}` : "لا تُنزّل المرفقات أو الصور ضمن شاشة الأولويات."}</div></div>
-      <div class="forms-actions"><button class="btn btn-ghost" id="folder-connect">${snapshot.source === "onedrive-local" ? "تحديث من المجلد" : "ربط مجلد مسار"}</button></div>
-    </div>
+    <div class="daily-section-title"><span>1</span><div><h2>شنو يحتاجني اليوم بخصوص الطلبة والحالات؟</h2><p>من أصل ${attentionCount} طالبًا مرشحًا للمتابعة</p></div></div>
 
-    <div class="grid g4" style="margin-bottom:16px;">
+    <div class="grid g4 daily-stats" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">أولوية عالية ظاهرة</div><div class="value">${highPriorityRows.length}</div></div>
       <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${visibleAttentionRows.length}</div><div class="hint">الإجمالي قبل المراجعة: ${attentionCount}</div></div>
       <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${visibleStaleCases.length}</div></div>
@@ -187,9 +191,9 @@ export async function mountDashboardView(container, { onGoto }) {
       <div class="card stat"><div class="label">إجراءات بلا تاريخ</div><div class="value">${undatedPlanCount}</div></div>
     </div>
 
-    ${decidedItems.length ? `<details class="card" style="margin-bottom:16px;"><summary>تمت مراجعتها أو تأجيلها (${decidedItems.length})</summary><ul class="plain" style="margin-top:12px;">${decidedItems.map((item) => `<li class="row-item"><div class="body"><div class="title">${esc(item.label)}</div><div class="meta">${item.decision.status === "reviewed" ? "تمت المراجعة اليوم" : `مؤجل إلى ${esc(item.decision.snoozedUntil)} — السبب: ${esc(item.decision.reason)}`}</div></div><button class="link-btn" data-priority-restore="${esc(item.key)}">إعادة للقائمة</button></li>`).join("")}</ul></details>` : ""}
+    ${decidedItems.length ? `<details class="card daily-panel" style="margin-bottom:16px;"><summary>تمت مراجعتها أو تأجيلها (${decidedItems.length})</summary><ul class="plain" style="margin-top:12px;">${decidedItems.map((item) => `<li class="row-item"><div class="body"><div class="title">${esc(item.label)}</div><div class="meta">${item.decision.status === "reviewed" ? "تمت المراجعة اليوم" : `مؤجل إلى ${esc(item.decision.snoozedUntil)} — السبب: ${esc(item.decision.reason)}`}</div></div><button class="link-btn" data-priority-restore="${esc(item.key)}">إعادة للقائمة</button></li>`).join("")}</ul></details>` : ""}
 
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card daily-panel daily-student-panel" style="margin-bottom:16px;">
       <div class="card-head">
         <h2>طلاب يحتاجون متابعة</h2>
         <span class="pill pill-critical">${attentionCount}</span>
@@ -216,7 +220,9 @@ export async function mountDashboardView(container, { onGoto }) {
       ` : '<p class="hint">لا يوجد طلاب مرشَّحون حاليًا.</p>'}
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
+    <div class="daily-section-title"><span>2</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
+
+    <div class="card daily-panel" style="margin-bottom:16px;">
       <div class="card-head"><h2>أولويات خطة القسم</h2><button class="link-btn" data-goto="agenda">فتح الأجندة التنفيذية</button></div>
       <div class="grid g3">
         <div><h3>متأخرة (${overduePlanCount})</h3>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_end || entry.periodEnd || entry.period_start || entry.periodStart, "pill-critical", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</div>
@@ -225,8 +231,8 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
     </div>
 
-    <div class="grid g2" style="margin-bottom:16px;">
-      <div class="card">
+    <div class="grid g2 daily-split" style="margin-bottom:16px;">
+      <div class="card daily-panel">
         <div class="card-head"><h2>حالات إرشادية بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح المتابعات والحالات</button></div>
         ${visibleStaleCases.length ? `
           <ul class="plain">
@@ -245,7 +251,7 @@ export async function mountDashboardView(container, { onGoto }) {
           ${staleCases.length > 6 ? `<p class="hint" style="margin:10px 0 0;">و${staleCases.length - 6} حالة أخرى...</p>` : ""}
         ` : '<p class="hint">كل الحالات المفتوحة تمت متابعتها مؤخرًا.</p>'}
       </div>
-      <div class="card">
+      <div class="card daily-panel">
         <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
         ${visibleSupportActions.length ? `
           <ul class="plain">
@@ -266,8 +272,9 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
     </div>
 
-    <div class="card" id="dashboard-reminders"></div>
-  `;
+    <div class="daily-section-title"><span>3</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
+    <div class="card daily-panel" id="dashboard-reminders"></div>
+  </div>`;
 
   container.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => onGoto(btn.dataset.goto));
