@@ -189,15 +189,15 @@ export async function mountDashboardView(container, { onGoto }) {
     </header>
 
     <nav class="daily-view-tabs" aria-label="أقسام أولويات اليوم">
-      <button class="active" type="button" data-daily-tab="summary" aria-selected="true">ملخص اليوم</button>
+      <button class="active" type="button" data-daily-tab="reminders" aria-selected="true">التذكيرات والقرارات</button>
+      <button type="button" data-daily-tab="summary" aria-selected="false">ملخص اليوم</button>
       <button type="button" data-daily-tab="academic" aria-selected="false">التحليل الأكاديمي</button>
       <button type="button" data-daily-tab="plan" aria-selected="false">خطة القسم</button>
-      <button type="button" data-daily-tab="reminders" aria-selected="false">التذكيرات</button>
     </nav>
 
-    <section class="daily-page" data-daily-page="summary">
+    <section class="daily-page" data-daily-page="summary" hidden>
 
-    <div class="daily-section-title"><span>1</span><div><h2>شنو يحتاجني اليوم بخصوص الطلبة والحالات؟</h2><p>${totalStudents ? `من أصل ${totalStudents.toLocaleString("ar-BH")} طالبًا` : "قراءة موحدة من سجلات الطلبة والحالات والدعم والتوجيه المهني"}</p></div></div>
+    <div class="daily-section-title"><span>2</span><div><h2>شنو يحتاجني اليوم بخصوص الطلبة والحالات؟</h2><p>${totalStudents ? `من أصل ${totalStudents.toLocaleString("ar-BH")} طالبًا` : "قراءة موحدة من سجلات الطلبة والحالات والدعم والتوجيه المهني"}</p></div></div>
 
     <div class="grid g4 daily-stats" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${visibleStaleCases.length}</div></div>
@@ -255,7 +255,7 @@ export async function mountDashboardView(container, { onGoto }) {
     </section>
 
     <section class="daily-page" data-daily-page="academic" hidden>
-      <div class="daily-section-title"><span>2</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
+      <div class="daily-section-title"><span>3</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
       <div class="card daily-disclosure daily-disclosure-static" style="margin-bottom:20px;">
       <div class="grid g2 daily-split daily-disclosure-body">
         <div class="daily-inner-panel"><div class="card-head"><h2>الأضعف أكاديميًا — أعلى 10</h2><button class="link-btn" data-goto="grades">فتح الدرجات والتحليلات</button></div><p class="hint">مرتبة حسب المعدل العام والإشارات الأكاديمية المتاحة من النسخة المحلية.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>المعدل</th><th>السبب</th></tr></thead><tbody>${academicWeak.length ? academicWeak.map((row) => `<tr data-goto="grades"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.overallPct == null ? "—" : `${row.overallPct}%`}</td><td>${esc(row.reasons.join(" · "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
@@ -265,7 +265,7 @@ export async function mountDashboardView(container, { onGoto }) {
     </section>
 
     <section class="daily-page" data-daily-page="plan" hidden>
-    <div class="daily-section-title"><span>3</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
+    <div class="daily-section-title"><span>4</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
 
     <div class="grid g4 daily-stats" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">نسبة الإنجاز</div><div class="value">${completionPct}%</div><div class="hint">${agenda.done} من ${agenda.total}</div></div>
@@ -278,18 +278,18 @@ export async function mountDashboardView(container, { onGoto }) {
 
     <div class="card daily-panel" style="margin-bottom:16px;">
       <div class="card-head"><h2>أولويات خطة القسم</h2><button class="link-btn" data-goto="agenda">فتح الأجندة التنفيذية</button></div>
-      <div class="grid g3">
-        <div><h3>متأخرة (${overduePlanCount})</h3>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_end || entry.periodEnd || entry.period_start || entry.periodStart, "pill-critical", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</div>
-        <div><h3>قادمة خلال 14 يومًا (${upcomingPlanCount})</h3>${planPriorities.upcoming.length ? `<ul class="plain">${planPriorities.upcoming.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_start || entry.periodStart, "pill-warning", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات قادمة خلال 14 يومًا.</p>'}</div>
-        <div><h3>بلا تاريخ (${undatedPlanCount})</h3>${planPriorities.undated.length ? `<ul class="plain">${planPriorities.undated.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, "بلا تاريخ", "pill-neutral", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">كل الإجراءات مجدولة.</p>'}</div>
+      <div class="daily-plan-stack">
+        <section class="daily-plan-group daily-plan-overdue"><div class="daily-plan-group-head"><div><span class="daily-plan-dot"></span><h3>متأخرة</h3></div><b>${overduePlanCount}</b></div>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_end || entry.periodEnd || entry.period_start || entry.periodStart, "pill-critical", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</section>
+        <section class="daily-plan-group daily-plan-upcoming"><div class="daily-plan-group-head"><div><span class="daily-plan-dot"></span><h3>قادمة خلال 14 يومًا</h3></div><b>${upcomingPlanCount}</b></div>${planPriorities.upcoming.length ? `<ul class="plain">${planPriorities.upcoming.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_start || entry.periodStart, "pill-warning", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات قادمة خلال 14 يومًا.</p>'}</section>
+        <section class="daily-plan-group daily-plan-undated"><div class="daily-plan-group-head"><div><span class="daily-plan-dot"></span><h3>بلا تاريخ</h3></div><b>${undatedPlanCount}</b></div>${planPriorities.undated.length ? `<ul class="plain">${planPriorities.undated.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, "بلا تاريخ", "pill-neutral", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">كل الإجراءات مجدولة.</p>'}</section>
       </div>
       ${undatedPlanCount ? `<div class="daily-note daily-note-warning"><b>يحتاج قرارك: جدولة الإجراءات.</b> يوجد ${undatedPlanCount} إجراءً بلا تاريخ بداية أو نهاية؛ وهذا يمنع احتساب المتأخر والقادم بصورة موثوقة. افتح الأجندة وحدد موعدًا أو فترة تنفيذ لكل إجراء.</div>` : ""}
     </div>
 
     </section>
 
-    <section class="daily-page" data-daily-page="reminders" hidden>
-    <div class="daily-section-title"><span>4</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
+    <section class="daily-page" data-daily-page="reminders">
+    <div class="daily-section-title"><span>1</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
     <div class="card daily-panel" id="dashboard-reminders"></div>
     </section>
   </div>`;
