@@ -188,14 +188,18 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
     </header>
 
+    <section class="daily-reminders-priority">
+      <div class="daily-section-title"><span>1</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
+      <div class="card daily-panel" id="dashboard-reminders"></div>
+    </section>
+
     <nav class="daily-view-tabs" aria-label="أقسام أولويات اليوم">
-      <button class="active" type="button" data-daily-tab="reminders" aria-selected="true">التذكيرات والقرارات</button>
-      <button type="button" data-daily-tab="summary" aria-selected="false">ملخص اليوم</button>
-      <button type="button" data-daily-tab="academic" aria-selected="false">التحليل الأكاديمي</button>
+      <button class="active" type="button" data-daily-tab="summary" aria-selected="true">ملخص اليوم</button>
       <button type="button" data-daily-tab="plan" aria-selected="false">خطة القسم</button>
+      <button type="button" data-daily-tab="academic" aria-selected="false">التحليل الأكاديمي</button>
     </nav>
 
-    <section class="daily-page" data-daily-page="summary" hidden>
+    <section class="daily-page" data-daily-page="summary">
 
     <div class="daily-section-title"><span>2</span><div><h2>شنو يحتاجني اليوم بخصوص الطلبة والحالات؟</h2><p>${totalStudents ? `من أصل ${totalStudents.toLocaleString("ar-BH")} طالبًا` : "قراءة موحدة من سجلات الطلبة والحالات والدعم والتوجيه المهني"}</p></div></div>
 
@@ -255,7 +259,7 @@ export async function mountDashboardView(container, { onGoto }) {
     </section>
 
     <section class="daily-page" data-daily-page="academic" hidden>
-      <div class="daily-section-title"><span>3</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
+      <div class="daily-section-title"><span>4</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
       <div class="card daily-disclosure daily-disclosure-static" style="margin-bottom:20px;">
       <div class="grid g2 daily-split daily-disclosure-body">
         <div class="daily-inner-panel"><div class="card-head"><h2>الأضعف أكاديميًا — أعلى 10</h2><button class="link-btn" data-goto="grades">فتح الدرجات والتحليلات</button></div><p class="hint">مرتبة حسب المعدل العام والإشارات الأكاديمية المتاحة من النسخة المحلية.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>المعدل</th><th>السبب</th></tr></thead><tbody>${academicWeak.length ? academicWeak.map((row) => `<tr data-goto="grades"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.overallPct == null ? "—" : `${row.overallPct}%`}</td><td>${esc(row.reasons.join(" · "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
@@ -265,7 +269,7 @@ export async function mountDashboardView(container, { onGoto }) {
     </section>
 
     <section class="daily-page" data-daily-page="plan" hidden>
-    <div class="daily-section-title"><span>4</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
+    <div class="daily-section-title"><span>3</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
 
     <div class="grid g4 daily-stats" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">نسبة الإنجاز</div><div class="value">${completionPct}%</div><div class="hint">${agenda.done} من ${agenda.total}</div></div>
@@ -288,10 +292,6 @@ export async function mountDashboardView(container, { onGoto }) {
 
     </section>
 
-    <section class="daily-page" data-daily-page="reminders">
-    <div class="daily-section-title"><span>1</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
-    <div class="card daily-panel" id="dashboard-reminders"></div>
-    </section>
   </div>`;
 
   container.querySelectorAll("[data-goto]").forEach((btn) => {
