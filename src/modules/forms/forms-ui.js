@@ -5,11 +5,44 @@ import {
 } from "./forms-service.js?v=2026-08-31-record-edit-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js";
 import { downloadAsWordDoc } from "../../services/word-export.js";
+import { ensureXlsx } from "../../services/vendor-loader.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
 const field = (label, name, type = "text", required = false, value = "") => `<label class="forms-field"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
 const area = (label, name, required = false, value = "") => `<label class="forms-field forms-wide"><span>${label}${required ? " *" : ""}</span><textarea name="${name}" rows="3" ${required ? "required" : ""}>${esc(value)}</textarea></label>`;
+
+const FORM_FIELD_LABELS = { reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات الاستمارة", requestKind: "نوع الطلب", guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم تواصل ولي الأمر", currentPlacement: "الشعبة/التخصص الحالي", requestedPlacement: "الشعبة/التخصص المطلوب", guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي", registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان", subject: "الموضوع/الفعالية", consentText: "نص طلب الموافقة", guardianResponse: "رد ولي الأمر", responseDate: "تاريخ رد ولي الأمر", signature: "التوقيع/الإقرار" };
+const FORM_VALUE_LABELS = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
+const STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
+
+function formExcelRow(item) {
+  const row = {
+    "رقم السجل": item.id || "", "تاريخ الطلب": item.createdDate || "", "نوع الاستمارة": item.title || FORM_TYPES[item.type]?.label || item.type || "",
+    "الجهة المحال إليها": item.destination || "", "حالة الطلب": STATUS_LABELS[item.status] || item.status || "غير محدد",
+    "اسم الطالب": item.student?.name || "", "الرقم الأكاديمي": item.student?.academicId || item.studentId || "", "الرقم الشخصي للطالب": item.student?.civilId || "",
+    "المستوى": item.student?.level || "", "الشعبة": item.student?.section || "", "المسار/التخصص": item.student?.track || item.student?.specialization || "",
+  };
+  for (const [key, label] of Object.entries(FORM_FIELD_LABELS)) row[label] = FORM_VALUE_LABELS[item.fields?.[key]] || item.fields?.[key] || "";
+  return { ...row, "التغذية الراجعة/الإجراء المتخذ": item.feedback || "", "تاريخ التغذية الراجعة": item.feedbackDate || "", "آخر تحديث": item.updatedAt || "" };
+}
+
+async function exportFormsExcel(forms) {
+  if (!forms.length) throw new Error("لا توجد استمارات لتصديرها");
+  const XLSX = await ensureXlsx();
+  const rows = forms.map(formExcelRow);
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  sheet["!cols"] = Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] || "").length + 2))) }));
+  const counts = Object.entries(forms.reduce((acc, item) => { const key = item.title || FORM_TYPES[item.type]?.label || "غير محدد"; acc[key] = (acc[key] || 0) + 1; return acc; }, {})).map(([type, count]) => ({ "نوع الاستمارة": type, "العدد": count }));
+  const summary = XLSX.utils.json_to_sheet([{ "البيان": "إجمالي الاستمارات", "القيمة": forms.length }, { "البيان": "تاريخ التصدير", "القيمة": new Date().toLocaleString("ar-BH") }]);
+  XLSX.utils.sheet_add_json(summary, counts.map((row) => ({ "البيان": row["نوع الاستمارة"], "القيمة": row["العدد"] })), { origin: -1, skipHeader: true });
+  summary["!cols"] = [{ wch: 42 }, { wch: 18 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "سجل الاستمارات");
+  XLSX.utils.book_append_sheet(workbook, summary, "الملخص");
+  workbook.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(workbook, `سجل-الاستمارات-${today()}.xlsx`, { compression: true });
+}
 
 function studentCard(student) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
@@ -71,7 +104,7 @@ const statusPill = (status) => ({ pending: '<span class="pill pill-warning">با
 
 async function renderLog(root, openDetail) {
   const forms = await listDepartmentForms();
-  root.innerHTML = `<div class="card"><div class="forms-toolbar"><div class="search"><input id="forms-search" type="search" placeholder="بحث بالطالب أو نوع الاستمارة..."></div><select id="forms-status"><option value="">كل الحالات</option><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></div><div id="forms-table"></div></div>`;
+  root.innerHTML = `<div class="card"><div class="forms-toolbar"><div class="search"><input id="forms-search" type="search" placeholder="بحث بالطالب أو نوع الاستمارة..."></div><div class="forms-actions"><select id="forms-status"><option value="">كل الحالات</option><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select><button class="btn btn-primary" id="forms-export-excel" type="button" ${forms.length ? "" : "disabled"}>تصدير جماعي Excel</button></div></div><div id="forms-table"></div></div>`;
   const table = root.querySelector("#forms-table");
   function draw() {
     const q = root.querySelector("#forms-search").value.trim().toLowerCase(); const status = root.querySelector("#forms-status").value;
@@ -79,13 +112,17 @@ async function renderLog(root, openDetail) {
     table.innerHTML = filtered.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الاستمارة</th><th>الطالب</th><th>الجهة/الحالة</th><th></th></tr></thead><tbody>${filtered.map((item) => `<tr><td class="num">${esc(item.createdDate)}</td><td>${esc(item.title)}</td><td><strong>${esc(item.student?.name)}</strong><div class="hint">${esc(item.student?.academicId)}</div></td><td>${item.destination ? `${esc(item.destination)}<br>` : ""}${statusPill(item.status)}</td><td><button class="btn btn-ghost" data-open="${esc(item.id)}">فتح</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد استمارات مطابقة</div>';
     table.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openDetail(button.dataset.open)));
   }
+  root.querySelector("#forms-export-excel").addEventListener("click", async (event) => {
+    const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ إعداد الملف…";
+    try { await exportFormsExcel(forms); }
+    catch (error) { alert(error.message || "تعذر تصدير ملف Excel"); }
+    finally { button.disabled = false; button.textContent = original; }
+  });
   root.querySelector("#forms-search").addEventListener("input", draw); root.querySelector("#forms-status").addEventListener("change", draw); draw();
 }
 
 function detailFields(item) {
-  const labels = { reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات", requestKind: "نوع الطلب", guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم التواصل", currentPlacement: "الوضع الحالي", requestedPlacement: "الوضع المطلوب", guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي", registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان", subject: "الموضوع", consentText: "نص الموافقة", guardianResponse: "رد ولي الأمر", responseDate: "تاريخ الرد", signature: "التوقيع/الإقرار" };
-  const translations = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
-  return Object.entries(item.fields || {}).filter(([key, value]) => value && key !== "createdDate").map(([key, value]) => `<div class="forms-detail-row"><span>${esc(labels[key] || key)}</span><strong>${esc(translations[value] || value)}</strong></div>`).join("");
+  return Object.entries(item.fields || {}).filter(([key, value]) => value && key !== "createdDate").map(([key, value]) => `<div class="forms-detail-row"><span>${esc(FORM_FIELD_LABELS[key] || key)}</span><strong>${esc(FORM_VALUE_LABELS[value] || value)}</strong></div>`).join("");
 }
 
 async function renderDetail(root, id, back) {
