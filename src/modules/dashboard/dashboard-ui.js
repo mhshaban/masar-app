@@ -188,6 +188,15 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
     </header>
 
+    <nav class="daily-view-tabs" aria-label="أقسام أولويات اليوم">
+      <button class="active" type="button" data-daily-tab="summary" aria-selected="true">ملخص اليوم</button>
+      <button type="button" data-daily-tab="academic" aria-selected="false">التحليل الأكاديمي</button>
+      <button type="button" data-daily-tab="plan" aria-selected="false">خطة القسم</button>
+      <button type="button" data-daily-tab="reminders" aria-selected="false">التذكيرات</button>
+    </nav>
+
+    <section class="daily-page" data-daily-page="summary">
+
     <div class="daily-section-title"><span>1</span><div><h2>شنو يحتاجني اليوم بخصوص الطلبة والحالات؟</h2><p>${totalStudents ? `من أصل ${totalStudents.toLocaleString("ar-BH")} طالبًا` : "قراءة موحدة من سجلات الطلبة والحالات والدعم والتوجيه المهني"}</p></div></div>
 
     <div class="grid g4 daily-stats" style="margin-bottom:16px;">
@@ -233,15 +242,30 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
     </div>
 
-    <details class="card daily-disclosure" style="margin-bottom:20px;">
-      <summary><span><b>التحليلات الأكاديمية التفصيلية</b><small>الأضعف أكاديميًا والمقررات المعلقة — افتحها عند الحاجة</small></span><i>عرض التفاصيل</i></summary>
+    ${(visibleStaleCases.length || visibleSupportActions.length) ? `<div class="grid g2 daily-split daily-operational" style="margin-bottom:20px;">
+      ${visibleStaleCases.length ? `<div class="card daily-panel">
+        <div class="card-head"><h2>حالات بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح الحالات</button></div>
+        <ul class="plain">${visibleStaleCases.slice(0, 3).map((c) => `<li class="row-item"><div class="body"><div class="title">${esc(c.studentName) || c.studentId}</div><div class="meta">${esc(c.category) || ""}</div></div><span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا</span><button class="link-btn" data-goto="cases">فتح</button>${decisionControls(`case:${c.id}`)}</li>`).join("")}</ul>
+      </div>` : ""}
+      ${visibleSupportActions.length ? `<div class="card daily-panel">
+        <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
+        <ul class="plain">${visibleSupportActions.slice(0, 3).map((a) => `<li class="row-item"><div class="body"><div class="title">${esc(a.plan?.studentName) || a.plan?.studentId || "—"}</div><div class="meta">${esc(a.action)}</div></div><span class="pill pill-critical">${esc(a.dueDate)}</span><button class="link-btn" data-goto="support">فتح</button>${decisionControls(`support:${a.id}`)}</li>`).join("")}</ul>
+      </div>` : ""}
+    </div>` : ""}
+    </section>
+
+    <section class="daily-page" data-daily-page="academic" hidden>
+      <div class="daily-section-title"><span>2</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
+      <div class="card daily-disclosure daily-disclosure-static" style="margin-bottom:20px;">
       <div class="grid g2 daily-split daily-disclosure-body">
         <div class="daily-inner-panel"><div class="card-head"><h2>الأضعف أكاديميًا — أعلى 10</h2><button class="link-btn" data-goto="grades">فتح الدرجات والتحليلات</button></div><p class="hint">مرتبة حسب المعدل العام والإشارات الأكاديمية المتاحة من النسخة المحلية.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>المعدل</th><th>السبب</th></tr></thead><tbody>${academicWeak.length ? academicWeak.map((row) => `<tr data-goto="grades"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.overallPct == null ? "—" : `${row.overallPct}%`}</td><td>${esc(row.reasons.join(" · "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
         <div class="daily-inner-panel"><div class="card-head"><h2>أكثر مقررات معلّقة (مرفّع) — أعلى 10</h2><button class="link-btn" data-goto="promoted">فتح سجل المرفعين</button></div><p class="hint">الطلاب ذوو أكبر عدد من المقررات التي لم تُجتز بعد.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>العدد</th><th>المقررات</th></tr></thead><tbody>${promotedTop.length ? promotedTop.map((row) => `<tr data-goto="promoted"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.subjects.length}</td><td>${esc(row.subjects.join("، "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
       </div>
-    </details>
+      </div>
+    </section>
 
-    <div class="daily-section-title"><span>2</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
+    <section class="daily-page" data-daily-page="plan" hidden>
+    <div class="daily-section-title"><span>3</span><div><h2>شنو المطلوب مني إنجازه بناءً على خطة القسم؟</h2><p>${agenda.done} من ${agenda.total} إجراءً أُنجز · نسبة الإنجاز ${completionPct}%</p></div></div>
 
     <div class="grid g4 daily-stats" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">نسبة الإنجاز</div><div class="value">${completionPct}%</div><div class="hint">${agenda.done} من ${agenda.total}</div></div>
@@ -262,54 +286,21 @@ export async function mountDashboardView(container, { onGoto }) {
       ${undatedPlanCount ? `<div class="daily-note daily-note-warning"><b>يحتاج قرارك: جدولة الإجراءات.</b> يوجد ${undatedPlanCount} إجراءً بلا تاريخ بداية أو نهاية؛ وهذا يمنع احتساب المتأخر والقادم بصورة موثوقة. افتح الأجندة وحدد موعدًا أو فترة تنفيذ لكل إجراء.</div>` : ""}
     </div>
 
-    ${(visibleStaleCases.length || visibleSupportActions.length) ? `<div class="grid g2 daily-split" style="margin-bottom:20px;">
-      <div class="card daily-panel">
-        <div class="card-head"><h2>حالات إرشادية بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح المتابعات والحالات</button></div>
-        ${visibleStaleCases.length ? `
-          <ul class="plain">
-            ${visibleStaleCases.slice(0, 6).map((c) => `
-              <li class="row-item">
-                <div class="body">
-                  <div class="title">${esc(c.studentName) || c.studentId}</div>
-                  <div class="meta">${esc(c.category) || ""}</div>
-                </div>
-                <span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا بلا متابعة</span>
-                <button class="link-btn" data-goto="cases">فتح</button>
-                ${decisionControls(`case:${c.id}`)}
-              </li>
-            `).join("")}
-          </ul>
-          ${staleCases.length > 6 ? `<p class="hint" style="margin:10px 0 0;">و${staleCases.length - 6} حالة أخرى...</p>` : ""}
-        ` : '<p class="hint">كل الحالات المفتوحة تمت متابعتها مؤخرًا.</p>'}
-      </div>
-      <div class="card daily-panel">
-        <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
-        ${visibleSupportActions.length ? `
-          <ul class="plain">
-            ${visibleSupportActions.slice(0, 6).map((a) => `
-              <li class="row-item">
-                <div class="body">
-                  <div class="title">${esc(a.plan?.studentName) || a.plan?.studentId || "—"}</div>
-                  <div class="meta">${esc(a.action)}</div>
-                </div>
-                <span class="pill pill-critical">${esc(a.dueDate)}</span>
-                <button class="link-btn" data-goto="support">فتح</button>
-                ${decisionControls(`support:${a.id}`)}
-              </li>
-            `).join("")}
-          </ul>
-          ${overdueSupportActions.length > 6 ? `<p class="hint" style="margin:10px 0 0;">و${overdueSupportActions.length - 6} إجراء آخر...</p>` : ""}
-        ` : '<p class="hint">لا توجد إجراءات دعم متأخرة حاليًا.</p>'}
-      </div>
-    </div>` : ""}
+    </section>
 
-    <div class="daily-section-title"><span>3</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
+    <section class="daily-page" data-daily-page="reminders" hidden>
+    <div class="daily-section-title"><span>4</span><div><h2>التذكيرات والقرارات اليومية</h2><p>أضف تذكيرًا، راجع المستحق، أو أجّل البند مع توثيق السبب</p></div></div>
     <div class="card daily-panel" id="dashboard-reminders"></div>
+    </section>
   </div>`;
 
   container.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => onGoto(btn.dataset.goto));
   });
+  container.querySelectorAll("[data-daily-tab]").forEach((btn) => btn.addEventListener("click", () => {
+    container.querySelectorAll("[data-daily-tab]").forEach((item) => { const active = item === btn; item.classList.toggle("active", active); item.setAttribute("aria-selected", String(active)); });
+    container.querySelectorAll("[data-daily-page]").forEach((page) => { page.hidden = page.dataset.dailyPage !== btn.dataset.dailyTab; });
+  }));
 
   container.querySelectorAll("[data-priority-review]").forEach((btn) => btn.addEventListener("click", async () => {
     markPriorityReviewed(btn.dataset.priorityReview); await mountDashboardView(container, { onGoto });
