@@ -350,6 +350,10 @@
   }
   .forms-field textarea { resize: vertical; line-height: 1.7; }
   .forms-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .source-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .source-card .hint { margin: 4px 0 0; }
+  .priority-actions { display: inline-flex; align-items: center; gap: 8px; padding-inline-start: 4px; }
+  details.card summary { cursor: pointer; font-weight: 700; }
   .forms-student { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 14px; margin: 8px 0 16px; border-radius: 10px; background: var(--teal-50); border: 1px solid var(--teal-100); font-size: 12.5px; }
   .forms-student strong { width: 100%; color: var(--teal-900); font-size: 14px; }
   .forms-student.empty { display: block; margin-top: 4px; }

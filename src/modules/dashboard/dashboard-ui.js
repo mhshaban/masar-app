@@ -1,6 +1,9 @@
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
 import { NEED_LABELS } from "./followup-needs-service.js";
-import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-priorities-2";
+import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-daily-priorities-1";
+import { connectMasarFolder, refreshMasarFolder, folderAccessSupported, priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-08-31-priorities-3";
+import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
+import { downloadAsWordDoc } from "../../services/word-export.js";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -16,20 +19,57 @@ function daysSince(dateStr) {
   return Math.max(0, Math.floor(ms / 86400000));
 }
 
-function planActionRow(entry, badge, badgeClass = "pill-warning") {
+function planActionRow(entry, badge, badgeClass = "pill-warning", decisionKey = null) {
   return `<li class="row-item">
     <div class="body"><div class="title">${esc(entry.action) || "—"}</div><div class="meta">${esc(entry.project_title || entry.program_name || entry.pillar) || "خطة القسم"}</div></div>
     <span class="pill ${badgeClass}">${esc(badge)}</span>
+    ${decisionKey ? decisionControls(decisionKey) : ""}
   </li>`;
+}
+
+function decisionControls(key) {
+  return `<div class="priority-actions">
+    <button class="link-btn" data-priority-review="${esc(key)}">تمت المراجعة</button>
+    <button class="link-btn" data-priority-snooze="${esc(key)}">تأجيل</button>
+  </div>`;
+}
+
+function isVisiblePriority(key) { return !priorityDecisionState(key).hidden; }
+
+function priorityLabel(score) {
+  const level = priorityLevel(score);
+  if (level === "high") return '<span class="pill pill-critical">أولوية عالية</span>';
+  if (level === "medium") return '<span class="pill pill-warning">أولوية متوسطة</span>';
+  return '<span class="pill pill-neutral">متابعة عادية</span>';
+}
+
+function dailyReportHtml(snapshot, generatedAt, reminders = []) {
+  const { attentionRows = [], staleCases = [], overdueSupportActions = [], planPriorities = {} } = snapshot;
+  const rows = attentionRows.filter((r) => isVisiblePriority(`student:${r.studentId}`)).map((r) => `<tr><td>${esc(r.student?.name || r.studentId)}</td><td>${priorityScore(r.needs)}</td><td>${esc(r.needs.flatMap((n) => n.reasons || []).join("؛ "))}</td></tr>`).join("");
+  const planRows = [...(planPriorities.overdue || []), ...(planPriorities.upcoming || [])].filter((r) => isVisiblePriority(`plan:${r.id}`)).map((r) => `<tr><td>${esc(r.project_title || r.program_name || r.pillar)}</td><td>${esc(r.action)}</td><td>${esc(r.period_end || r.periodEnd || r.period_start || r.periodStart || "—")}</td></tr>`).join("");
+  return `<h1>تقرير أولويات اليوم</h1><p class="meta">تاريخ الإنشاء: ${esc(generatedAt)} — المصدر: ${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase (استعلام مخفف)"}</p>
+    <h2>الطلاب الأعلى أولوية</h2><table><tr><th>الطالب</th><th>الدرجة</th><th>الأسباب</th></tr>${rows || '<tr><td colspan="3">لا توجد أولويات ظاهرة</td></tr>'}</table>
+    <h2>الحالات الإرشادية المتأخرة</h2><table><tr><th>الطالب</th><th>الفئة</th><th>آخر متابعة</th></tr>${staleCases.filter((r) => isVisiblePriority(`case:${r.id}`)).map((r) => `<tr><td>${esc(r.studentName || r.studentId)}</td><td>${esc(r.category)}</td><td>${esc(r.lastActivity)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
+    <h2>إجراءات الدعم المتأخرة</h2><table><tr><th>الطالب</th><th>الإجراء</th><th>الاستحقاق</th></tr>${overdueSupportActions.filter((r) => isVisiblePriority(`support:${r.id}`)).map((r) => `<tr><td>${esc(r.plan?.studentName || r.plan?.studentId)}</td><td>${esc(r.action)}</td><td>${esc(r.dueDate)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
+    <h2>إجراءات خطة القسم</h2><table><tr><th>المشروع</th><th>الإجراء</th><th>التاريخ</th></tr>${planRows || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
+    <h2>تذكيرات اليوم والمتأخرة</h2><table><tr><th>التذكير</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr>${reminders.map((r) => `<tr><td>${esc(r.title)}</td><td>${esc(r.dueDate || "—")}</td><td>${isOverdue(r) ? "متأخر" : "اليوم"}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>`;
+}
+
+function printDailyReport(html) {
+  const w = window.open("", "_blank");
+  if (!w) return alert("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>أولويات اليوم</title><style>body{font-family:Cairo,Arial,sans-serif;padding:24px;direction:rtl}table{width:100%;border-collapse:collapse;margin:12px 0 22px}th,td{border:1px solid #999;padding:7px;text-align:right}th{background:#1a2744;color:#fff}h1,h2{color:#1a2744}.meta{color:#666}</style></head><body>${html}</body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
 }
 
 // نُسخة "التذكيرات" كاملة (عرض + إضافة + تبديل/حذف) منقولة داخل الرئيسية —
 // لم تعد شاشة مستقلة، فالمستخدم ما يحتاج يتنقل لتبويب ثانٍ عشان تذكيراته.
 async function renderRemindersCard(root) {
-  const reminders = await listReminders();
+  const allReminders = await listReminders();
+  const reminders = allReminders.filter((r) => r.status !== "done" && (isDueToday(r) || isOverdue(r)));
 
   root.innerHTML = `
-    <div class="card-head"><h2>التذكيرات</h2></div>
+      <div class="card-head"><h2>تذكيرات اليوم والمتأخرة</h2><span class="pill pill-warning">${reminders.length}</span></div>
     <form id="dashboard-reminder-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
       <div style="flex:2; min-width:180px;">
         <label class="hint" for="dashboard-reminder-title" style="display:block;margin-bottom:4px;">عنوان تذكير جديد</label>
@@ -47,7 +87,7 @@ async function renderRemindersCard(root) {
   const drawList = () => {
     const listRoot = root.querySelector("#dashboard-reminders-list");
     if (!reminders.length) {
-      listRoot.innerHTML = '<p class="hint">لا توجد تذكيرات بعد — أضف أول تذكير من الأعلى.</p>';
+      listRoot.innerHTML = '<p class="hint">لا توجد تذكيرات مستحقة اليوم أو متأخرة.</p>';
       return;
     }
     listRoot.innerHTML = `<ul class="plain">${reminders.map((r) => {
@@ -104,26 +144,49 @@ async function renderRemindersCard(root) {
 }
 
 export async function mountDashboardView(container, { onGoto }) {
-  const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions, planPriorities = { overdue: [], upcoming: [], undated: [] } } = await loadDashboardSnapshot();
+  const snapshot = await loadDashboardSnapshot();
+  const { agenda, attentionRows, attentionCount = attentionRows.length, staleCases, overdueSupportActions, planPriorities = { overdue: [], upcoming: [], undated: [] } } = snapshot;
   const todayLabel = new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
   const completionPct = agenda.total ? Math.round((agenda.done / agenda.total) * 100) : 0;
-  const highPriorityRows = attentionRows.filter((row) => row.needs.length >= 3);
+  const visibleAttentionRows = attentionRows.filter((row) => isVisiblePriority(`student:${row.studentId}`));
+  const visibleStaleCases = staleCases.filter((row) => isVisiblePriority(`case:${row.id}`));
+  const visibleSupportActions = overdueSupportActions.filter((row) => isVisiblePriority(`support:${row.id}`));
+  const highPriorityRows = visibleAttentionRows.filter((row) => priorityLevel(priorityScore(row.needs)) === "high");
+  const overduePlanCount = Number(planPriorities.overdueCount ?? planPriorities.overdue.length);
+  const upcomingPlanCount = Number(planPriorities.upcomingCount ?? planPriorities.upcoming.length);
+  const undatedPlanCount = Number(planPriorities.undatedCount ?? planPriorities.undated.length);
+  const decidedItems = [
+    ...attentionRows.map((r) => ({ key: `student:${r.studentId}`, label: r.student?.name || r.studentId })),
+    ...staleCases.map((r) => ({ key: `case:${r.id}`, label: `حالة: ${r.studentName || r.studentId}` })),
+    ...overdueSupportActions.map((r) => ({ key: `support:${r.id}`, label: `دعم: ${r.plan?.studentName || r.plan?.studentId || r.action}` })),
+    ...[...(planPriorities.overdue || []), ...(planPriorities.upcoming || []), ...(planPriorities.undated || [])].map((r) => ({ key: `plan:${r.id}`, label: `الخطة: ${r.action}` })),
+  ].filter((item, index, all) => all.findIndex((x) => x.key === item.key) === index)
+    .map((item) => ({ ...item, ...priorityDecisionState(item.key) })).filter((item) => item.hidden);
 
   container.innerHTML = `
     <div class="topbar">
       <div><h1>أولويات اليوم</h1><div class="sub">شنو يحتاجني اليوم؟ — ${esc(todayLabel)}</div></div>
+      <div class="forms-actions"><button class="btn btn-ghost" id="daily-word">تصدير Word</button><button class="btn btn-ghost" id="daily-print">طباعة</button></div>
+    </div>
+
+    <div class="card source-card" style="margin-bottom:16px;">
+      <div><strong>مصدر البيانات: ${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase — استعلام مخفف"}</strong>
+      <div class="hint">${snapshot.source === "onedrive-local" ? `آخر نسخة: ${esc(snapshot.localFileName || "")} — ${esc(snapshot.sourceUpdatedAt || snapshot.localFileModifiedAt || "")}` : "لا تُنزّل المرفقات أو الصور ضمن شاشة الأولويات."}</div></div>
+      <div class="forms-actions"><button class="btn btn-ghost" id="folder-connect">${snapshot.source === "onedrive-local" ? "تحديث من المجلد" : "ربط مجلد مسار"}</button></div>
     </div>
 
     <div class="grid g4" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">أولوية عالية ظاهرة</div><div class="value">${highPriorityRows.length}</div></div>
-      <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${attentionCount}</div></div>
-      <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${staleCases.length}</div></div>
-      <div class="card stat"><div class="label">إجراءات دعم متأخرة</div><div class="value">${overdueSupportActions.length}</div></div>
+      <div class="card stat"><div class="label">طلاب يحتاجون متابعة</div><div class="value">${visibleAttentionRows.length}</div><div class="hint">الإجمالي قبل المراجعة: ${attentionCount}</div></div>
+      <div class="card stat"><div class="label">حالات إرشادية بلا متابعة حديثة</div><div class="value">${visibleStaleCases.length}</div></div>
+      <div class="card stat"><div class="label">إجراءات دعم متأخرة</div><div class="value">${visibleSupportActions.length}</div></div>
       <div class="card stat"><div class="label">إنجاز خطة القسم</div><div class="value">${completionPct}%</div><div class="hint">${agenda.done} من ${agenda.total}</div></div>
-      <div class="card stat"><div class="label">إجراءات الخطة المتأخرة</div><div class="value">${planPriorities.overdue.length}</div></div>
-      <div class="card stat"><div class="label">قادمة خلال 14 يومًا</div><div class="value">${planPriorities.upcoming.length}</div></div>
-      <div class="card stat"><div class="label">إجراءات بلا تاريخ</div><div class="value">${planPriorities.undated.length}</div></div>
+      <div class="card stat"><div class="label">إجراءات الخطة المتأخرة</div><div class="value">${overduePlanCount}</div></div>
+      <div class="card stat"><div class="label">قادمة خلال 14 يومًا</div><div class="value">${upcomingPlanCount}</div></div>
+      <div class="card stat"><div class="label">إجراءات بلا تاريخ</div><div class="value">${undatedPlanCount}</div></div>
     </div>
+
+    ${decidedItems.length ? `<details class="card" style="margin-bottom:16px;"><summary>تمت مراجعتها أو تأجيلها (${decidedItems.length})</summary><ul class="plain" style="margin-top:12px;">${decidedItems.map((item) => `<li class="row-item"><div class="body"><div class="title">${esc(item.label)}</div><div class="meta">${item.decision.status === "reviewed" ? "تمت المراجعة اليوم" : `مؤجل إلى ${esc(item.decision.snoozedUntil)} — السبب: ${esc(item.decision.reason)}`}</div></div><button class="link-btn" data-priority-restore="${esc(item.key)}">إعادة للقائمة</button></li>`).join("")}</ul></details>` : ""}
 
     <div class="card" style="margin-bottom:16px;">
       <div class="card-head">
@@ -131,9 +194,9 @@ export async function mountDashboardView(container, { onGoto }) {
         <span class="pill pill-critical">${attentionCount}</span>
       </div>
       <p class="hint">اتحاد الاحتياج الأكاديمي والحالات وخطط الدعم والتوجيه المهني ومقررات الترفيع. الأولوية العالية تعني اجتماع 3 احتياجات مختلفة أو أكثر.</p>
-      ${attentionRows.length ? `
+      ${visibleAttentionRows.length ? `
         <ul class="plain">
-          ${attentionRows.map((row) => `
+          ${visibleAttentionRows.map((row) => `
             <li class="row-item">
               <div class="body">
                 <div class="title">${esc(row.student?.name) || row.studentId}</div>
@@ -141,8 +204,9 @@ export async function mountDashboardView(container, { onGoto }) {
                 <div class="meta">${esc(row.needs.flatMap((need) => need.reasons || []).join(" · "))}</div>
               </div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                ${row.needs.length >= 3 ? '<span class="pill pill-critical">أولوية عالية</span>' : ""}
+                ${priorityLabel(priorityScore(row.needs))}<span class="pill pill-neutral">${priorityScore(row.needs)} نقطة</span>
                 ${row.needs.map((n) => `<button class="pill pill-warning" style="border:none; cursor:pointer;" data-goto="${esc(NEED_TARGET_VIEW[n.type])}">${esc(NEED_LABELS[n.type])}</button>`).join("")}
+                ${decisionControls(`student:${row.studentId}`)}
               </div>
             </li>
           `).join("")}
@@ -154,24 +218,25 @@ export async function mountDashboardView(container, { onGoto }) {
     <div class="card" style="margin-bottom:16px;">
       <div class="card-head"><h2>أولويات خطة القسم</h2><button class="link-btn" data-goto="agenda">فتح الأجندة التنفيذية</button></div>
       <div class="grid g3">
-        <div><h3>متأخرة (${planPriorities.overdue.length})</h3>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.slice(0, 6).map((entry) => planActionRow(entry, entry.periodEnd || entry.periodStart, "pill-critical")).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</div>
-        <div><h3>قادمة خلال 14 يومًا (${planPriorities.upcoming.length})</h3>${planPriorities.upcoming.length ? `<ul class="plain">${planPriorities.upcoming.slice(0, 6).map((entry) => planActionRow(entry, entry.periodStart)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات قادمة خلال 14 يومًا.</p>'}</div>
-        <div><h3>بلا تاريخ (${planPriorities.undated.length})</h3>${planPriorities.undated.length ? `<ul class="plain">${planPriorities.undated.slice(0, 6).map((entry) => planActionRow(entry, "بلا تاريخ", "pill-neutral")).join("")}</ul>` : '<p class="hint">كل الإجراءات مجدولة.</p>'}</div>
+        <div><h3>متأخرة (${overduePlanCount})</h3>${planPriorities.overdue.length ? `<ul class="plain">${planPriorities.overdue.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_end || entry.periodEnd || entry.period_start || entry.periodStart, "pill-critical", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات متأخرة.</p>'}</div>
+        <div><h3>قادمة خلال 14 يومًا (${upcomingPlanCount})</h3>${planPriorities.upcoming.length ? `<ul class="plain">${planPriorities.upcoming.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, entry.period_start || entry.periodStart, "pill-warning", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">لا توجد إجراءات قادمة خلال 14 يومًا.</p>'}</div>
+        <div><h3>بلا تاريخ (${undatedPlanCount})</h3>${planPriorities.undated.length ? `<ul class="plain">${planPriorities.undated.filter((entry) => isVisiblePriority(`plan:${entry.id}`)).slice(0, 6).map((entry) => planActionRow(entry, "بلا تاريخ", "pill-neutral", `plan:${entry.id}`)).join("")}</ul>` : '<p class="hint">كل الإجراءات مجدولة.</p>'}</div>
       </div>
     </div>
 
     <div class="grid g2" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-head"><h2>حالات إرشادية بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح المتابعات والحالات</button></div>
-        ${staleCases.length ? `
+        ${visibleStaleCases.length ? `
           <ul class="plain">
-            ${staleCases.slice(0, 6).map((c) => `
+            ${visibleStaleCases.slice(0, 6).map((c) => `
               <li class="row-item">
                 <div class="body">
                   <div class="title">${esc(c.studentName) || c.studentId}</div>
                   <div class="meta">${esc(c.category) || ""}</div>
                 </div>
                 <span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا بلا متابعة</span>
+                ${decisionControls(`case:${c.id}`)}
               </li>
             `).join("")}
           </ul>
@@ -180,15 +245,16 @@ export async function mountDashboardView(container, { onGoto }) {
       </div>
       <div class="card">
         <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
-        ${overdueSupportActions.length ? `
+        ${visibleSupportActions.length ? `
           <ul class="plain">
-            ${overdueSupportActions.slice(0, 6).map((a) => `
+            ${visibleSupportActions.slice(0, 6).map((a) => `
               <li class="row-item">
                 <div class="body">
                   <div class="title">${esc(a.plan?.studentName) || a.plan?.studentId || "—"}</div>
                   <div class="meta">${esc(a.action)}</div>
                 </div>
                 <span class="pill pill-critical">${esc(a.dueDate)}</span>
+                ${decisionControls(`support:${a.id}`)}
               </li>
             `).join("")}
           </ul>
@@ -203,6 +269,33 @@ export async function mountDashboardView(container, { onGoto }) {
   container.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => onGoto(btn.dataset.goto));
   });
+
+  container.querySelectorAll("[data-priority-review]").forEach((btn) => btn.addEventListener("click", async () => {
+    markPriorityReviewed(btn.dataset.priorityReview); await mountDashboardView(container, { onGoto });
+  }));
+  container.querySelectorAll("[data-priority-snooze]").forEach((btn) => btn.addEventListener("click", async () => {
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const until = prompt("إلى أي تاريخ تريد التأجيل؟ (YYYY-MM-DD)", tomorrow.toISOString().slice(0,10));
+    if (!until) return;
+    const reason = prompt("اكتب سبب التأجيل");
+    if (!reason) return;
+    try { snoozePriority(btn.dataset.prioritySnooze, until, reason); await mountDashboardView(container, { onGoto }); } catch (error) { alert(error.message); }
+  }));
+  container.querySelectorAll("[data-priority-restore]").forEach((btn) => btn.addEventListener("click", async () => {
+    clearPriorityDecision(btn.dataset.priorityRestore); await mountDashboardView(container, { onGoto });
+  }));
+  container.querySelector("#folder-connect").addEventListener("click", async () => {
+    try {
+      if (!folderAccessSupported()) throw new Error("افتح نسخة مسار المنشورة عبر Chrome أو Edge ثم أعد المحاولة");
+      const updated = snapshot.source === "onedrive-local" ? await refreshMasarFolder({ prompt: true }) : await connectMasarFolder();
+      if (!updated) throw new Error("لم تُمنح صلاحية قراءة المجلد");
+      await mountDashboardView(container, { onGoto });
+    } catch (error) { alert(error.message); }
+  });
+  const reportReminders = (await listReminders()).filter((r) => r.status !== "done" && (isDueToday(r) || isOverdue(r)));
+  const reportHtml = dailyReportHtml(snapshot, new Intl.DateTimeFormat("ar-BH", { dateStyle: "full", timeStyle: "short", timeZone: "Asia/Bahrain" }).format(new Date()), reportReminders);
+  container.querySelector("#daily-word").addEventListener("click", () => downloadAsWordDoc("تقرير أولويات اليوم", reportHtml, `أولويات-اليوم-${new Date().toISOString().slice(0,10)}`));
+  container.querySelector("#daily-print").addEventListener("click", () => printDailyReport(reportHtml));
 
   await renderRemindersCard(container.querySelector("#dashboard-reminders"));
 }

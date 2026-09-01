@@ -1,5 +1,9 @@
 import { list as listAll, save, remove } from "../../services/cloud-runtime.js";
 
+function todayBahrain() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bahrain", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
 export async function listReminders() {
   const reminders = await listAll("reminders");
   return reminders.sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
@@ -26,12 +30,12 @@ export async function removeReminder(id) {
 
 export function isOverdue(reminder) {
   if (!reminder.dueDate || reminder.status === "done") return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBahrain();
   return reminder.dueDate < today;
 }
 
 export function isDueToday(reminder) {
   if (!reminder.dueDate || reminder.status === "done") return false;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBahrain();
   return reminder.dueDate === today;
 }

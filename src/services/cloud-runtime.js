@@ -145,6 +145,18 @@ export async function listWhere(collection, field, value) {
   return allRows.map(rowToRecord);
 }
 
+// قراءة حالة تنفيذ إجراءات الخطة فقط، دون الحقول النصية أو المرفقات
+// الموجودة داخل data. يُستخدم كمسار احتياطي خفيف لشاشة أولويات اليوم.
+export async function listActionProgressStatuses() {
+  const backend = testBackend();
+  if (backend) {
+    const rows = await backend.list("actionProgress");
+    return rows.map((row) => ({ id: row.id, status: row.status || "not_started" }));
+  }
+  const res = await request('actionProgress?select=id,status:data->>status&order=id.asc');
+  return res.json();
+}
+
 // يستدعي دالة SQL جاهزة بجانب قاعدة البيانات (Postgres RPC عبر PostgREST) —
 // للحسابات التجميعية اللي تكلف كثير لو صارت بالمتصفح بعد تنزيل كل الصفوف
 // (راجع masar_search_students كمثال: supabase/migrations/20260823_student_search_rpc.sql).

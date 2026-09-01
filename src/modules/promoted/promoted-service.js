@@ -78,16 +78,27 @@ export async function parsePromotedFile(file) {
 export async function commitPromotedBatch(rows, meta) {
   const matched = rows.filter((r) => r.matchStatus === "matched");
   const batchId = `promotedbatch-${Date.now().toString(36)}`;
-
-  const records = matched.map((r, i) => ({
-    id: `${batchId}-p${i}`,
+  const existing = await listAll("promotedSubjects");
+  const keyFor = (r) => `${String(r.studentId).trim()}::${String(r.subjectCode || "").trim()}`;
+  const existingByKey = new Map(existing.map((r) => [keyFor(r), r]));
+  const uniqueIncoming = new Map();
+  for (const row of matched) uniqueIncoming.set(keyFor(row), row);
+  const previousRecords = [];
+  const newRecordIds = [];
+  const records = [...uniqueIncoming].map(([key, r], i) => {
+    const previous = existingByKey.get(key);
+    if (previous) previousRecords.push(previous);
+    const id = previous?.id || `${batchId}-p${i}`;
+    if (!previous) newRecordIds.push(id);
+    return {
+    id,
     studentId: r.studentId,
     subjectCode: r.subjectCode,
     stage: r.stage ?? null,
     prepSchool: r.prepSchool ?? null,
     cleared: r.cleared,
     sourceBatchId: batchId,
-  }));
+  }; });
   await bulkPut("promotedSubjects", records);
 
   const batch = {
@@ -97,6 +108,9 @@ export async function commitPromotedBatch(rows, meta) {
     totalRows: rows.length,
     matchedCount: matched.length,
     unmatchedCount: rows.length - matched.length,
+    duplicateRowsRemoved: matched.length - uniqueIncoming.size,
+    previousRecords,
+    newRecordIds,
     status: "Committed",
   };
   await save("promotedImportBatches", batch);
@@ -109,11 +123,14 @@ export async function listPromotedBatches() {
 }
 
 export async function rollbackPromotedBatch(batchId) {
-  const records = await listAll("promotedSubjects");
-  for (const r of records.filter((r) => r.sourceBatchId === batchId)) {
-    await remove("promotedSubjects", r.id);
-  }
   const batch = await get("promotedImportBatches", batchId);
+  if (batch?.newRecordIds || batch?.previousRecords) {
+    for (const id of batch.newRecordIds || []) await remove("promotedSubjects", id);
+    if (batch.previousRecords?.length) await bulkPut("promotedSubjects", batch.previousRecords);
+  } else {
+    const records = await listAll("promotedSubjects");
+    for (const r of records.filter((r) => r.sourceBatchId === batchId)) await remove("promotedSubjects", r.id);
+  }
   if (batch) await save("promotedImportBatches", { ...batch, status: "RolledBack" });
 }
 
@@ -132,7 +149,7 @@ export async function listStudentsWithPendingSubjects() {
 
   const rows = [];
   for (const [studentId, subjectRows] of byStudent) {
-    const pending = subjectRows.filter((r) => !r.cleared);
+    const pending = [...new Set(subjectRows.filter((r) => !r.cleared).map((r) => String(r.subjectCode || "غير محدد")))];
     if (!pending.length) continue;
     const student = studentById.get(String(studentId));
     rows.push({
@@ -140,8 +157,8 @@ export async function listStudentsWithPendingSubjects() {
       studentName: student ? student.name : null,
       level: student ? student.level : null,
       section: student ? student.section : null,
-      pendingSubjects: pending.map((r) => r.subjectCode),
-      totalSubjects: subjectRows.length,
+      pendingSubjects: pending,
+      totalSubjects: new Set(subjectRows.map((r) => String(r.subjectCode || "غير محدد"))).size,
     });
   }
 
