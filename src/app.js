@@ -12,7 +12,7 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-01-daily-priorities-7")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-02-a4-print-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-2027-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js")).mountAgendaView,
   students: async () => (await import("./modules/students/students-ui.js?v=2026-08-31-record-edit-1")).mountStudentsView,
@@ -21,7 +21,7 @@ const VIEW_LOADERS = {
   support: async () => (await import("./modules/support/support-ui.js")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-01-bulk-excel-1")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-02-a4-print-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-08-31-egress-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
   imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
