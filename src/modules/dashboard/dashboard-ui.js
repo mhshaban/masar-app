@@ -3,7 +3,7 @@ import { NEED_LABELS } from "./followup-needs-service.js";
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-daily-priorities-1";
 import { connectMasarFolder, refreshMasarFolder, folderAccessSupported, priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-01-priorities-4";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
-import { downloadAsWordDoc } from "../../services/word-export.js";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-a4-print-1";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -59,7 +59,7 @@ function dailyReportHtml(snapshot, generatedAt, reminders = []) {
 function printDailyReport(html) {
   const w = window.open("", "_blank");
   if (!w) return alert("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>أولويات اليوم</title><style>body{font-family:Cairo,Arial,sans-serif;padding:24px;direction:rtl}table{width:100%;border-collapse:collapse;margin:12px 0 22px}th,td{border:1px solid #999;padding:7px;text-align:right}th{background:#1a2744;color:#fff}h1,h2{color:#1a2744}.meta{color:#666}</style></head><body>${html}</body></html>`);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>أولويات اليوم</title><style>@page{size:A4 portrait;margin:9mm}body{font-family:Cairo,Arial,sans-serif;padding:0;direction:rtl;font-size:9pt;line-height:1.3}table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}th,td{border:1px solid #999;padding:3px 5px;text-align:right}th{background:#1a2744;color:#fff}tr,h1,h2{page-break-inside:avoid;page-break-after:auto}h1{font-size:16pt;margin:0 0 6px}h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}.meta{color:#666;font-size:8pt}</style></head><body>${html}</body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
 }
 
