@@ -9,6 +9,7 @@ function escTitle(str) {
 }
 
 export function downloadAsWordDoc(title, bodyHtml, filename) {
+  const defaultApproval = bodyHtml.includes('class="document-approval"') ? "" : '<div class="document-approval"><strong>الإجراء والتوثيق</strong><table><tr><td>المسؤول: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>';
   const html = `<!doctype html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -29,11 +30,12 @@ export function downloadAsWordDoc(title, bodyHtml, filename) {
   .document-header { padding-bottom: 7px; margin-bottom: 12px; border-bottom: 1.5px solid #c8923a; color: #1A2744; font-size: 11pt; font-weight: 700; }
   .document-approval { margin-top: 18px; padding-top: 9px; border-top: 1px solid #999; page-break-inside: avoid; }
   .document-approval strong { display: block; margin-bottom: 12px; color: #1A2744; }
+  .document-approval p { margin: 0 0 10px; }
   .document-approval table { margin: 0; }
   .document-approval td { width: 33.333%; border: 0; padding: 5px 0; }
 </style>
 </head>
-<body dir="rtl"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}<div class="document-approval"><strong>الاعتماد</strong><table><tr><td>يعتمد من: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div></body>
+<body dir="rtl"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}${defaultApproval}</body>
 </html>`;
 
   const blob = new Blob(["﻿", html], { type: "application/msword" });
