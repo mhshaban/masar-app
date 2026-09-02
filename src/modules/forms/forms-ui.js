@@ -1,9 +1,9 @@
 import { mountStudentPicker } from "../shared/student-picker.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
-  updateDepartmentForm, removeDepartmentForm, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
-} from "./forms-service.js?v=2026-08-31-record-edit-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-print-approval-1";
+  updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
+} from "./forms-service.js?v=2026-09-02-final-average-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-final-average-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 
@@ -22,6 +22,7 @@ function formExcelRow(item) {
     "الجهة المحال إليها": item.destination || "", "حالة الطلب": STATUS_LABELS[item.status] || item.status || "غير محدد",
     "اسم الطالب": item.student?.name || "", "الرقم الأكاديمي": item.student?.academicId || item.studentId || "", "الرقم الشخصي للطالب": item.student?.civilId || "",
     "المستوى": item.student?.level || "", "الشعبة": item.student?.section || "", "المسار/التخصص": item.student?.track || item.student?.specialization || "",
+    "المعدل التراكمي النهائي": item.student?.finalCumulativeAverage ?? "",
   };
   for (const [key, label] of Object.entries(FORM_FIELD_LABELS)) row[label] = FORM_VALUE_LABELS[item.fields?.[key]] || item.fields?.[key] || "";
   return { ...row, "التغذية الراجعة/الإجراء المتخذ": item.feedback || "", "تاريخ التغذية الراجعة": item.feedbackDate || "", "آخر تحديث": item.updatedAt || "" };
@@ -30,7 +31,7 @@ function formExcelRow(item) {
 async function exportFormsExcel(forms) {
   if (!forms.length) throw new Error("لا توجد استمارات لتصديرها");
   const XLSX = await ensureXlsx();
-  const rows = forms.map(formExcelRow);
+  const rows = (await addFinalCumulativeAverages(forms)).map(formExcelRow);
   const sheet = XLSX.utils.json_to_sheet(rows);
   sheet["!cols"] = Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] || "").length + 2))) }));
   const counts = Object.entries(forms.reduce((acc, item) => { const key = item.title || FORM_TYPES[item.type]?.label || "غير محدد"; acc[key] = (acc[key] || 0) + 1; return acc; }, {})).map(([type, count]) => ({ "نوع الاستمارة": type, "العدد": count }));
@@ -46,7 +47,8 @@ async function exportFormsExcel(forms) {
 
 function studentCard(student) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
-  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span></div>`;
+  const average = student.finalCumulativeAverage ?? student.cumulativeAverage ?? student.overallPct;
+  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
 function typeFields(type) {
