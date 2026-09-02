@@ -13,6 +13,21 @@ const AGENDA_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد ا
 const FOLLOWUP_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم", not_done: "لم ينجز", unknown: "غير محدد" };
 const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد التنفيذ", done: "تم" };
 
+const DEPARTMENT_FORM_FIELD_ORDER = {
+  referral: ["reason", "requestedAction", "notes"],
+  section_change: ["requestKind", "guardianName", "guardianPersonalNo", "guardianPhone", "currentPlacement", "requestedPlacement", "reason", "guidanceOpinion", "socialOpinion", "registrationOpinion", "finalDecision"],
+  consent: ["guardianName", "address", "subject", "consentText", "guardianResponse", "guardianPersonalNo", "guardianPhone", "responseDate", "signature"],
+};
+
+function departmentFormWorkflow(item) {
+  if (item.kind === "section_change") return `<div class="document-approval"><strong>القرار والتوثيق</strong><p>☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</p><table><tr><td>مدير المدرسة/من ينوب عنه: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>`;
+  if (item.kind === "consent") {
+    const response = item.fields?.guardianResponse;
+    return `<div class="document-approval"><strong>إقرار ولي الأمر</strong><p>${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</p><table><tr><td>الاسم: ${esc(item.fields?.guardianName || "................................")}</td><td>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</td><td>التاريخ والتوقيع: ${esc(item.fields?.responseDate || "........ / ........ / ................")} &nbsp; ${esc(item.fields?.signature || "................................")}</td></tr></table></div>`;
+  }
+  return `<div class="document-approval"><strong>استلام ومتابعة الجهة المحال إليها</strong><p>☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</p><table><tr><td>اسم المستلم: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>`;
+}
+
 export function buildDepartmentFormReportHtml(item, exportedAt) {
   const labels = {
     reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات", requestKind: "نوع الطلب",
@@ -26,7 +41,21 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
   const values = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
   const statuses = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
   const student = item.student || {};
-  const rows = Object.entries(item.fields || {}).filter(([key, value]) => key !== "createdDate" && value).map(([key, value]) => `<tr><th>${esc(labels[key] || key)}</th><td>${esc(values[value] || value)}</td></tr>`).join("");
+  const fields = item.fields || {};
+  const fieldLabel = (key) => {
+    if (item.kind === "section_change" && key === "reason") return "سبب الطلب";
+    if (item.kind === "referral" && key === "reason") return "سبب التحويل وملخص الحالة";
+    if (item.kind === "section_change" && key === "socialOpinion") return "رأي قسم الإرشاد الاجتماعي (للحالات الخاصة والمرضية)";
+    if (item.kind === "section_change" && key === "registrationOpinion") return "رأي قسم التسجيل";
+    if (item.kind === "section_change" && key === "finalDecision") return "قرار إدارة المدرسة النهائي";
+    return labels[key] || key;
+  };
+  const requiredKeys = DEPARTMENT_FORM_FIELD_ORDER[item.kind] || [];
+  const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
+  const rows = [...requiredKeys, ...extraKeys].map((key) => {
+    const value = values[fields[key]] || fields[key] || "";
+    return `<tr><th>${esc(fieldLabel(key))}</th><td class="${value ? "" : "blank-value"}">${value ? esc(value) : "........................................................................................"}</td></tr>`;
+  }).join("");
   return `
     <h1>${esc(item.title || "استمارة القسم")}</h1>
     <p class="meta">تاريخ الطلب: ${esc(item.createdDate || "—")} — تاريخ التصدير: ${esc(exportedAt)}</p>
@@ -38,8 +67,8 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
       <tr><th>المعدل التراكمي النهائي</th><td colspan="3">${student.finalCumulativeAverage == null ? "—" : `${esc(student.finalCumulativeAverage)}٪`}</td></tr>
     </table>
     <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>
-    <h2>الإجراء والتغذية الراجعة</h2>
-    <table><tr><th>الحالة</th><td>${esc(statuses[item.status] || item.status || "—")}</td><th>تاريخ الرد</th><td>${esc(item.feedbackDate || "—")}</td></tr><tr><th>التغذية الراجعة</th><td colspan="3">${esc(item.feedback || "—")}</td></tr></table>`;
+    ${item.feedback || item.feedbackDate ? `<h2>الإجراء والتغذية الراجعة</h2><table><tr><th>الحالة</th><td>${esc(statuses[item.status] || item.status || "—")}</td><th>تاريخ الرد</th><td>${esc(item.feedbackDate || "—")}</td></tr><tr><th>التغذية الراجعة</th><td colspan="3">${esc(item.feedback || "—")}</td></tr></table>` : ""}
+    ${departmentFormWorkflow(item)}`;
 }
 
 export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
