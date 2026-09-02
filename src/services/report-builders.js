@@ -29,7 +29,7 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
   const rows = Object.entries(item.fields || {}).filter(([key, value]) => key !== "createdDate" && value).map(([key, value]) => `<tr><th>${esc(labels[key] || key)}</th><td>${esc(values[value] || value)}</td></tr>`).join("");
   return `
     <h1>${esc(item.title || "استمارة القسم")}</h1>
-    <p class="meta">رقم السجل: ${esc(item.id)} — تاريخ الطلب: ${esc(item.createdDate)} — تاريخ التصدير: ${esc(exportedAt)}</p>
+    <p class="meta">تاريخ الطلب: ${esc(item.createdDate || "—")} — تاريخ التصدير: ${esc(exportedAt)}</p>
     <h2>بيانات الطالب</h2>
     <table>
       <tr><th>اسم الطالب</th><td>${esc(student.name)}</td><th>الرقم الأكاديمي</th><td>${esc(student.academicId || "—")}</td></tr>
