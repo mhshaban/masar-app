@@ -491,7 +491,9 @@
   .teachers-table a { color: var(--teal-700); text-decoration: none; font-size: 12px; }
   @media (max-width: 650px) { .forms-grid { grid-template-columns: 1fr; } .forms-wide { grid-column: auto; } .forms-detail-row { grid-template-columns: 1fr; gap: 3px; } }
 
-  @page { size: A4 portrait; margin: 8mm; }
+  /* Zero browser margin suppresses Chrome's automatic title/URL header and footer.
+     The printable form supplies its own controlled A4 padding and department header. */
+  @page { size: A4 portrait; margin: 0; }
 
   @media print {
     html, body { width: 210mm; min-height: 297mm; background: #fff !important; color: #000 !important; }
@@ -500,7 +502,8 @@
     .main { width: 100% !important; padding: 0 !important; margin: 0 !important; }
     body * { visibility: hidden !important; }
     .forms-print, .forms-print * { visibility: visible !important; }
-    .forms-print { position: static; width: 100%; padding: 0; margin: 0; color: #000 !important; background: #fff !important; font-size: 9.5pt; line-height: 1.35; }
+    .forms-print { position: static; width: 100%; padding: 8mm 9mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.35; }
+    .forms-print::before { content: "قسم الإرشاد الأكاديمي والتوجيه المهني"; display: block; visibility: visible !important; padding-bottom: 2.5mm; margin-bottom: 4mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
     .forms-print .forms-actions, .forms-print form select, .forms-print form input, .forms-print form textarea, .backlink { display: none !important; }
     .forms-print .forms-print-feedback { display: block !important; }
     .forms-print .topbar { margin: 0 0 3mm; gap: 2mm; }
