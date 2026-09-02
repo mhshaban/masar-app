@@ -3,7 +3,7 @@ import { NEED_LABELS } from "./followup-needs-service.js";
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-daily-priorities-1";
 import { connectMasarFolder, refreshMasarFolder, folderAccessSupported, priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-01-priorities-4";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-a4-print-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -59,7 +59,7 @@ function dailyReportHtml(snapshot, generatedAt, reminders = []) {
 function printDailyReport(html) {
   const w = window.open("", "_blank");
   if (!w) return alert("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسم الإرشاد الأكاديمي والتوجيه المهني</title><style>@page{size:A4 portrait;margin:0}body{font-family:Cairo,Arial,sans-serif;padding:8mm 9mm;direction:rtl;font-size:9pt;line-height:1.3}body:before{content:"قسم الإرشاد الأكاديمي والتوجيه المهني";display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}th,td{border:1px solid #999;padding:3px 5px;text-align:right}th{background:#1a2744;color:#fff}tr,h1,h2{page-break-inside:avoid;page-break-after:auto}h1{font-size:16pt;margin:0 0 6px}h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}.meta{color:#666;font-size:8pt}</style></head><body>${html}</body></html>`);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسم الإرشاد الأكاديمي والتوجيه المهني</title><style>@page{size:A4 portrait;margin:0}body{font-family:Cairo,Arial,sans-serif;padding:8mm 9mm;direction:rtl;font-size:9pt;line-height:1.3}body:before{content:"قسم الإرشاد الأكاديمي والتوجيه المهني";display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}th,td{border:1px solid #999;padding:3px 5px;text-align:right}th{background:#1a2744;color:#fff}tr,h1,h2{page-break-inside:avoid;page-break-after:auto}h1{font-size:16pt;margin:0 0 6px}h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}.meta{color:#666;font-size:8pt}.document-approval{margin-top:7mm;padding-top:3mm;border-top:.25mm solid #999;page-break-inside:avoid}.document-approval strong{display:block;margin-bottom:3mm;color:#1a2744}.document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}</style></head><body>${html}<div class="document-approval"><strong>الاعتماد</strong><div><span>يعتمد من: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
 }
 
