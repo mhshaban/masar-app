@@ -68,6 +68,7 @@ export function parseCertificateRows(rawRows) {
   }
 
   const terms = [];
+  let finalCumulativeAverage = null;
   let current = null;
   for (const row of rows) {
     const line = row.join(" ");
@@ -82,6 +83,9 @@ export function parseCertificateRows(rawRows) {
         current.average = Number(m[1]);
         current.rating = m[2];
       }
+    } else if (line.includes("المعدل التراكمي النهائي")) {
+      const m = line.match(/المعدل\s*التراكمي\s*النهائي\s*:?\s*([\d.]+)%/);
+      if (m) finalCumulativeAverage = Number(m[1]);
     }
   }
 
@@ -91,5 +95,6 @@ export function parseCertificateRows(rawRows) {
     civilId: civilMatch ? civilMatch[1] : null,
     track,
     terms,
+    finalCumulativeAverage,
   };
 }
