@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove, bulkPut, rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
+import { list as listAll, listWhere, get, save, remove, bulkPut, rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 
 export const FORM_TYPES = {
   school_admin: { label: "تحويل إلى إدارة المدرسة", kind: "referral", destination: "إدارة المدرسة" },
@@ -11,6 +11,24 @@ export const FORM_TYPES = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+function normalizeAverage(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number * 100) / 100 : null;
+}
+
+function averageFrom(student, flag) {
+  return normalizeAverage(
+    student?.finalCumulativeAverage ?? student?.cumulativeAverage ?? student?.overallPct ?? flag?.overallPct,
+  );
+}
+
+async function finalCumulativeAverageFor(student) {
+  const embedded = averageFrom(student);
+  if (embedded != null) return embedded;
+  const [flag] = await listWhere("academicFlags", "studentId", String(student?.id || student?.academicId || ""));
+  return averageFrom(student, flag);
+}
+
 export function studentSnapshot(student) {
   if (!student?.id) throw new Error("يجب اختيار الطالب أولًا");
   return {
@@ -18,6 +36,7 @@ export function studentSnapshot(student) {
     academicId: student.academicId || "", civilId: student.civilId || "",
     level: student.level || "", section: student.section || "", department: student.department || "",
     track: student.track || "", specialization: student.specialization || student.program || "",
+    finalCumulativeAverage: averageFrom(student),
     phone: student.phone || student.mobile || "", guardianPhone: student.guardianPhone || "",
   };
 }
@@ -26,6 +45,7 @@ export async function createDepartmentForm(type, student, fields = {}) {
   const definition = FORM_TYPES[type];
   if (!definition) throw new Error("نوع الاستمارة غير معروف");
   const snapshot = studentSnapshot(student);
+  snapshot.finalCumulativeAverage = await finalCumulativeAverageFor(student);
   const base = {
     type, title: definition.label, kind: definition.kind, destination: definition.destination || null,
     studentId: snapshot.id, student: snapshot, status: "pending", createdDate: fields.createdDate || today(),
@@ -46,7 +66,23 @@ export async function listDepartmentForms() {
   return rows.sort((a, b) => `${b.createdDate || ""}${b.updatedAt || ""}`.localeCompare(`${a.createdDate || ""}${a.updatedAt || ""}`));
 }
 
-export const getDepartmentForm = (id) => get("departmentForms", id);
+export async function getDepartmentForm(id) {
+  const item = await get("departmentForms", id);
+  if (!item?.student || item.student.finalCumulativeAverage != null) return item;
+  return { ...item, student: { ...item.student, finalCumulativeAverage: await finalCumulativeAverageFor(item.student) } };
+}
+
+export async function addFinalCumulativeAverages(forms) {
+  const flags = await listAll("academicFlags");
+  const byStudent = new Map(flags.map((flag) => [String(flag.studentId), flag]));
+  return forms.map((item) => ({
+    ...item,
+    student: item.student ? {
+      ...item.student,
+      finalCumulativeAverage: averageFrom(item.student, byStudent.get(String(item.studentId || item.student.id))),
+    } : item.student,
+  }));
+}
 
 export async function updateDepartmentForm(id, patch) {
   const current = await getDepartmentForm(id);
