@@ -482,6 +482,8 @@
   .forms-danger { color: var(--critical) !important; }
   .forms-print-feedback { display: none; }
   .print-approval { display: none; }
+  .forms-empty-print { display: none; }
+  .forms-empty-screen { color: var(--ink-500); font-size: 12px; font-style: normal; font-weight: 400; }
   .teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
   .teacher-card { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
   .teacher-card img, .teacher-avatar { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; background: var(--teal-100); color: var(--teal-700); display: grid; place-items: center; font-weight: 800; font-size: 20px; }
@@ -503,10 +505,13 @@
     .main { width: 100% !important; padding: 0 !important; margin: 0 !important; }
     body * { visibility: hidden !important; }
     .forms-print, .forms-print * { visibility: visible !important; }
-    .forms-print { position: static; width: 100%; padding: 8mm 9mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.35; }
-    .forms-print::before { content: "قسم الإرشاد الأكاديمي والتوجيه المهني"; display: block; visibility: visible !important; padding-bottom: 2.5mm; margin-bottom: 4mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
+    .forms-print { position: static; width: 100%; padding: 5mm 9mm 7mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.3; }
+    .forms-print::before { content: "قسم الإرشاد الأكاديمي والتوجيه المهني"; display: block; visibility: visible !important; padding-bottom: 1.5mm; margin-bottom: 2.5mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
     .forms-print .forms-actions, .forms-print form select, .forms-print form input, .forms-print form textarea, .backlink { display: none !important; }
     .forms-print .forms-print-feedback { display: block !important; }
+    .forms-print .print-hide-empty-feedback { display: none !important; }
+    .forms-print .forms-empty-screen { display: none !important; }
+    .forms-print .forms-empty-print { display: inline !important; visibility: visible !important; color: #777 !important; font-style: normal; font-weight: 400; letter-spacing: .2mm; }
     .forms-print .topbar { margin: 0 0 3mm; gap: 2mm; }
     .forms-print .topbar h1 { font-size: 16pt; line-height: 1.2; }
     .forms-print .topbar .sub { font-size: 8.5pt; }
@@ -520,9 +525,10 @@
     .forms-print table { font-size: 8.5pt; }
     .forms-print th, .forms-print td { padding: 1.5mm 2mm; break-inside: avoid; }
     .forms-print img { max-width: 100%; }
-    .forms-print .print-approval { display: block !important; visibility: visible !important; margin-top: 6mm; padding-top: 3mm; border-top: .25mm solid #999; break-inside: avoid-page; color: #000 !important; }
-    .forms-print .print-approval strong { display: block; margin-bottom: 3mm; color: #1a2744 !important; font-size: 10pt; }
-    .forms-print .print-approval > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; font-size: 8.7pt; }
+    .forms-print .print-approval { display: block !important; visibility: visible !important; min-height: 22mm; margin-top: 4mm; padding-top: 2.5mm; border-top: .25mm solid #999; break-inside: avoid-page; color: #000 !important; }
+    .forms-print .print-approval strong { display: block; margin-bottom: 2mm; color: #1a2744 !important; font-size: 10pt; }
+    .forms-print .workflow-options { margin-bottom: 3mm; font-size: 8.7pt; }
+    .forms-print .workflow-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; font-size: 8.5pt; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
