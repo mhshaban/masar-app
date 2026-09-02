@@ -4,7 +4,7 @@ import {
   updateDepartmentForm, removeDepartmentForm, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-08-31-record-edit-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js";
-import { downloadAsWordDoc } from "../../services/word-export.js";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-a4-print-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
