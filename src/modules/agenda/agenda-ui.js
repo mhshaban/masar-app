@@ -1,7 +1,7 @@
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
 import { saveProgress, addAttachment, removeAttachment } from "../execution/execution-service.js";
-import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-02-print-approval-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
+import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
