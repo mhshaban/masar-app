@@ -3,8 +3,8 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-02-official-cumulative-2";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-final-average-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -15,6 +15,19 @@ const area = (label, name, required = false, value = "") => `<label class="forms
 const FORM_FIELD_LABELS = { reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات الاستمارة", requestKind: "نوع الطلب", guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم تواصل ولي الأمر", currentPlacement: "الشعبة/التخصص الحالي", requestedPlacement: "الشعبة/التخصص المطلوب", guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي", registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان", subject: "الموضوع/الفعالية", consentText: "نص طلب الموافقة", guardianResponse: "رد ولي الأمر", responseDate: "تاريخ رد ولي الأمر", signature: "التوقيع/الإقرار" };
 const FORM_VALUE_LABELS = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
 const STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
+const FORM_FIELD_ORDER = {
+  referral: ["reason", "requestedAction", "notes"],
+  section_change: ["requestKind", "guardianName", "guardianPersonalNo", "guardianPhone", "currentPlacement", "requestedPlacement", "reason", "guidanceOpinion", "socialOpinion", "registrationOpinion", "finalDecision"],
+  consent: ["guardianName", "address", "subject", "consentText", "guardianResponse", "guardianPersonalNo", "guardianPhone", "responseDate", "signature"],
+};
+const formFieldLabel = (item, key) => {
+  if (item.kind === "section_change" && key === "reason") return "سبب الطلب";
+  if (item.kind === "referral" && key === "reason") return "سبب التحويل وملخص الحالة";
+  if (item.kind === "section_change" && key === "socialOpinion") return "رأي قسم الإرشاد الاجتماعي (للحالات الخاصة والمرضية)";
+  if (item.kind === "section_change" && key === "registrationOpinion") return "رأي قسم التسجيل";
+  if (item.kind === "section_change" && key === "finalDecision") return "قرار إدارة المدرسة النهائي";
+  return FORM_FIELD_LABELS[key] || key;
+};
 
 function formExcelRow(item) {
   const row = {
@@ -47,7 +60,7 @@ async function exportFormsExcel(forms) {
 
 function studentCard(student) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
-  const average = student.finalCumulativeAverage ?? student.cumulativeAverage ?? student.overallPct;
+  const average = student.finalCumulativeAverage;
   return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
@@ -124,7 +137,22 @@ async function renderLog(root, openDetail) {
 }
 
 function detailFields(item) {
-  return Object.entries(item.fields || {}).filter(([key, value]) => value && key !== "createdDate").map(([key, value]) => `<div class="forms-detail-row"><span>${esc(FORM_FIELD_LABELS[key] || key)}</span><strong>${esc(FORM_VALUE_LABELS[value] || value)}</strong></div>`).join("");
+  const fields = item.fields || {};
+  const requiredKeys = FORM_FIELD_ORDER[item.kind] || [];
+  const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
+  return [...requiredKeys, ...extraKeys].map((key) => {
+    const value = FORM_VALUE_LABELS[fields[key]] || fields[key] || "";
+    return `<div class="forms-detail-row${value ? "" : " forms-detail-empty"}"><span>${esc(formFieldLabel(item, key))}</span><strong>${value ? esc(value) : '<i class="forms-empty-screen">لم يُعبّأ</i><i class="forms-empty-print">........................................................................................</i>'}</strong></div>`;
+  }).join("");
+}
+
+function workflowBlock(item) {
+  if (item.kind === "section_change") return `<div class="print-approval form-workflow"><strong>القرار والتوثيق</strong><div class="workflow-options">☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</div><div class="workflow-signatures"><span>مدير المدرسة/من ينوب عنه: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
+  if (item.kind === "consent") {
+    const response = item.fields?.guardianResponse;
+    return `<div class="print-approval form-workflow"><strong>إقرار ولي الأمر</strong><div class="workflow-options">${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</div><div class="workflow-signatures"><span>الاسم: ${esc(item.fields?.guardianName || "................................")}</span><span>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</span><span>التاريخ والتوقيع: ${esc(item.fields?.responseDate || "........ / ........ / ................")} &nbsp; ${esc(item.fields?.signature || "................................")}</span></div></div>`;
+  }
+  return `<div class="print-approval form-workflow"><strong>استلام ومتابعة الجهة المحال إليها</strong><div class="workflow-options">☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</div><div class="workflow-signatures"><span>اسم المستلم: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
 }
 
 async function renderDetail(root, id, back) {
@@ -133,11 +161,11 @@ async function renderDetail(root, id, back) {
     <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
     <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student)}</div>
     <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
-    <div class="card"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
+    <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
       <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
       ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
       <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
-    </form></div><div class="print-approval" aria-label="الاعتماد"><strong>الاعتماد</strong><div><span>يعتمد من: ................................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................................</span></div></div></div>`;
+    </form></div>${workflowBlock(item)}</div>`;
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
   root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); alert("تم حفظ المتابعة"); await renderDetail(root, id, back); });
