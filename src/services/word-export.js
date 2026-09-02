@@ -15,14 +15,17 @@ export function downloadAsWordDoc(title, bodyHtml, filename) {
 <meta charset="utf-8">
 <title>${escTitle(title)}</title>
 <style>
-  body { font-family: "Arial", "Cairo", sans-serif; direction: rtl; }
+  @page { size: A4 portrait; margin: 12mm; }
+  html, body { width: 100%; }
+  body { font-family: "Arial", "Cairo", sans-serif; direction: rtl; font-size: 10pt; line-height: 1.35; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
-  th, td { border: 1px solid #999; padding: 6px 8px; text-align: right; font-size: 12px; }
+  th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 9pt; page-break-inside: avoid; }
   th { background: #1A2744; color: #fff; }
-  h1 { font-size: 18px; color: #1A2744; }
-  h2 { font-size: 15px; color: #1A2744; margin-top: 20px; }
-  h3 { font-size: 13px; color: #1A2744; }
-  .meta { color: #666; font-size: 11px; }
+  h1 { font-size: 16pt; color: #1A2744; margin: 0 0 8px; }
+  h2 { font-size: 12pt; color: #1A2744; margin: 12px 0 5px; page-break-after: avoid; }
+  h3 { font-size: 10pt; color: #1A2744; page-break-after: avoid; }
+  .meta { color: #666; font-size: 8.5pt; }
+  p, tr, .card { page-break-inside: avoid; }
 </style>
 </head>
 <body dir="rtl">${bodyHtml}</body>
