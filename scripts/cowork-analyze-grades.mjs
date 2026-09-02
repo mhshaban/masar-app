@@ -109,6 +109,7 @@ async function collectFromXlsx(files) {
 async function collectFromPdfs(files) {
   const allRows = [];
   const termSummaries = [];
+  const finalCumulativeSummaries = [];
   const errors = [];
   const scheduleSkipped = [];
   const suspicious = [];
@@ -154,6 +155,9 @@ async function collectFromPdfs(files) {
           termSummaries.push({ studentId: cert.academicId, term: term.label, averagePct: term.average, rating: term.rating || null });
         }
       }
+      if (cert.finalCumulativeAverage != null) {
+        finalCumulativeSummaries.push({ studentId: cert.academicId, finalCumulativeAverage: cert.finalCumulativeAverage, sourceFile: baseName });
+      }
       ok += 1;
       console.log(`✓ ${cert.studentName || cert.academicId} (${subjectCount} مقرر)`);
     } catch (err) {
@@ -161,7 +165,7 @@ async function collectFromPdfs(files) {
       errors.push({ file, reason: err.message });
     }
   }
-  return { rows: allRows, termSummaries, errors, scheduleSkipped, suspicious, ok };
+  return { rows: allRows, termSummaries, finalCumulativeSummaries, errors, scheduleSkipped, suspicious, ok };
 }
 
 // نفس منطق achievement-service.js/grade-flags-service.js القديم بالضبط —
@@ -250,9 +254,9 @@ async function main() {
     : { rows: [], skipped: [] };
 
   console.log("\nجارٍ قراءة ملفات الشهادات (PDF)...");
-  const { rows: pdfRows, termSummaries, errors: pdfErrors, scheduleSkipped, suspicious, ok: pdfOk } = pdfFiles.length
+  const { rows: pdfRows, termSummaries, finalCumulativeSummaries, errors: pdfErrors, scheduleSkipped, suspicious, ok: pdfOk } = pdfFiles.length
     ? await collectFromPdfs(pdfFiles)
-    : { rows: [], termSummaries: [], errors: [], scheduleSkipped: [], suspicious: [], ok: 0 };
+    : { rows: [], termSummaries: [], finalCumulativeSummaries: [], errors: [], scheduleSkipped: [], suspicious: [], ok: 0 };
 
   const token = await loginInteractive();
 
@@ -265,6 +269,7 @@ async function main() {
   const matchedRows = allRows.filter((r) => byAcademicId.has(String(r.studentId)));
   const unmatchedIds = new Set(allRows.filter((r) => !byAcademicId.has(String(r.studentId))).map((r) => r.studentId));
   const matchedTerms = termSummaries.filter((t) => byAcademicId.has(String(t.studentId)));
+  const matchedFinalCumulative = finalCumulativeSummaries.filter((t) => byAcademicId.has(String(t.studentId)));
   const unmatchedTermIds = new Set(termSummaries.filter((t) => !byAcademicId.has(String(t.studentId))).map((t) => t.studentId));
 
   const rowsByStudent = new Map();
@@ -274,7 +279,21 @@ async function main() {
     rowsByStudent.get(id).push(r);
   }
 
-  const academicFlagsRecords = [...rowsByStudent.entries()].map(([studentId, rows]) => aggregateStudent(studentId, rows));
+  const finalCumulativeByStudent = new Map();
+  const finalCumulativeConflicts = [];
+  for (const item of matchedFinalCumulative) {
+    const key = String(item.studentId);
+    const existing = finalCumulativeByStudent.get(key);
+    if (existing && existing.finalCumulativeAverage !== item.finalCumulativeAverage) {
+      finalCumulativeConflicts.push({ studentId: key, values: [existing.finalCumulativeAverage, item.finalCumulativeAverage], files: [existing.sourceFile, item.sourceFile] });
+    }
+    finalCumulativeByStudent.set(key, item);
+  }
+
+  const academicFlagsRecords = [...rowsByStudent.entries()].map(([studentId, rows]) => ({
+    ...aggregateStudent(studentId, rows),
+    finalCumulativeAverage: finalCumulativeByStudent.get(String(studentId))?.finalCumulativeAverage ?? null,
+  }));
 
   // نفس الطالب/الفترة قد يظهر أكثر من مرة (شهادة مكرَّرة بمجلد فرعي تاني،
   // نسخة قديمة تُركت جنب نسخة مُعاد إصدارها، نسخة تعارض OneDrive) — بدون
@@ -334,6 +353,11 @@ async function main() {
     console.log(`⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة (${termConflicts.length}) — على الأغلب ملف مكرَّر بقيمة مختلفة، اعتمدنا آخر ملف قُرئ وتجاهلنا الباقي، راجعها يدويًا:`);
     printCapped(termConflicts, (c) => `  - ${c.studentId} / ${c.term}: ${c.values.join(" ثم ")}`);
   }
+  if (finalCumulativeConflicts.length) {
+    console.log(`⚠ تعارض بالمعدل التراكمي النهائي لنفس الطالب (${finalCumulativeConflicts.length}) — اعتمدنا آخر شهادة قُرئت، راجعها يدويًا:`);
+    printCapped(finalCumulativeConflicts, (c) => `  - ${c.studentId}: ${c.values.join(" ثم ")} (${c.files.join(" / ")})`);
+  }
+  console.log(`معدلات تراكمية نهائية رسمية مستخرجة: ${matchedFinalCumulative.length} (${finalCumulativeByStudent.size} طالبًا).`);
   console.log(`\nسيُكتب: ${academicFlagsRecords.length} صف academicFlags، ${termAveragesRecords.length} صف termAverages.`);
 
   if (dryRun) {
