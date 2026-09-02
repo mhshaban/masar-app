@@ -15,8 +15,8 @@ import {
 import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js";
 import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js";
 import { saveProgress } from "../execution/execution-service.js";
-import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-02-print-approval-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
+import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
