@@ -4,8 +4,8 @@ import {
 } from "./guidance-service.js";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js";
-import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js";
-import { downloadAsWordDoc } from "../../services/word-export.js";
+import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-02-print-approval-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
