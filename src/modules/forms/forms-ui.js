@@ -2,7 +2,7 @@ import { mountStudentPicker } from "../shared/student-picker.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
-} from "./forms-service.js?v=2026-09-02-official-cumulative-1";
+} from "./forms-service.js?v=2026-09-02-official-cumulative-2";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-final-average-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
