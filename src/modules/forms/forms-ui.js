@@ -3,8 +3,8 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-08-31-record-edit-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-a4-print-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-print-approval-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -18,7 +18,7 @@ const STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "
 
 function formExcelRow(item) {
   const row = {
-    "رقم السجل": item.id || "", "تاريخ الطلب": item.createdDate || "", "نوع الاستمارة": item.title || FORM_TYPES[item.type]?.label || item.type || "",
+    "تاريخ الطلب": item.createdDate || "", "نوع الاستمارة": item.title || FORM_TYPES[item.type]?.label || item.type || "",
     "الجهة المحال إليها": item.destination || "", "حالة الطلب": STATUS_LABELS[item.status] || item.status || "غير محدد",
     "اسم الطالب": item.student?.name || "", "الرقم الأكاديمي": item.student?.academicId || item.studentId || "", "الرقم الشخصي للطالب": item.student?.civilId || "",
     "المستوى": item.student?.level || "", "الشعبة": item.student?.section || "", "المسار/التخصص": item.student?.track || item.student?.specialization || "",
@@ -128,14 +128,14 @@ function detailFields(item) {
 async function renderDetail(root, id, back) {
   const item = await getDepartmentForm(id); if (!item) return back();
   root.innerHTML = `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><div class="forms-print" id="form-printable">
-    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">رقم السجل: ${esc(item.id)} · ${esc(item.createdDate)}</div></div>${statusPill(item.status)}</div>
+    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
     <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student)}</div>
     <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
     <div class="card"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
       <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
       ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
       <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
-    </form></div></div>`;
+    </form></div><div class="print-approval" aria-label="الاعتماد"><strong>الاعتماد</strong><div><span>يعتمد من: ................................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................................</span></div></div></div>`;
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
   root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); alert("تم حفظ المتابعة"); await renderDetail(root, id, back); });
