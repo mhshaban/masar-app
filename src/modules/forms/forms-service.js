@@ -17,9 +17,7 @@ function normalizeAverage(value) {
 }
 
 function averageFrom(student, flag) {
-  return normalizeAverage(
-    student?.finalCumulativeAverage ?? student?.cumulativeAverage ?? student?.overallPct ?? flag?.overallPct,
-  );
+  return normalizeAverage(student?.finalCumulativeAverage ?? flag?.finalCumulativeAverage);
 }
 
 async function finalCumulativeAverageFor(student) {
@@ -68,8 +66,8 @@ export async function listDepartmentForms() {
 
 export async function getDepartmentForm(id) {
   const item = await get("departmentForms", id);
-  if (!item?.student || item.student.finalCumulativeAverage != null) return item;
-  return { ...item, student: { ...item.student, finalCumulativeAverage: await finalCumulativeAverageFor(item.student) } };
+  if (!item?.student) return item;
+  return { ...item, student: { ...item.student, finalCumulativeAverage: await finalCumulativeAverageFor({ ...item.student, finalCumulativeAverage: null }) } };
 }
 
 export async function addFinalCumulativeAverages(forms) {
