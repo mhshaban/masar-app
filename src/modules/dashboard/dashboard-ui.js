@@ -3,7 +3,7 @@ import { NEED_LABELS } from "./followup-needs-service.js";
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-08-31-daily-priorities-1";
 import { connectMasarFolder, refreshMasarFolder, folderAccessSupported, priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-01-priorities-4";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-print-approval-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
