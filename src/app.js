@@ -21,7 +21,7 @@ const VIEW_LOADERS = {
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-02-print-approval-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-02-official-cumulative-1")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-02-official-cumulative-2")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-08-31-egress-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
   imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
