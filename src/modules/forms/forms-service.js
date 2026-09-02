@@ -17,14 +17,12 @@ function normalizeAverage(value) {
 }
 
 function averageFrom(student, flag) {
-  return normalizeAverage(student?.finalCumulativeAverage ?? flag?.finalCumulativeAverage);
+  return normalizeAverage(flag?.finalCumulativeAverage ?? student?.finalCumulativeAverage);
 }
 
 async function finalCumulativeAverageFor(student) {
-  const embedded = averageFrom(student);
-  if (embedded != null) return embedded;
   const [flag] = await listWhere("academicFlags", "studentId", String(student?.id || student?.academicId || ""));
-  return averageFrom(student, flag);
+  return normalizeAverage(flag?.finalCumulativeAverage);
 }
 
 export function studentSnapshot(student) {
