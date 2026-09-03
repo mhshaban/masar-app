@@ -64,34 +64,34 @@ function studentCard(student) {
   return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
-function typeFields(type) {
+function typeFields(type, values = {}) {
   const def = FORM_TYPES[type];
   if (def.kind === "referral") return `
-    ${area("سبب التحويل وملخص الحالة", "reason", true)}
-    ${area("الإجراء المطلوب من الجهة المحال إليها", "requestedAction")}
-    ${area("مرفقات أو ملاحظات", "notes")}`;
+    ${area("سبب التحويل وملخص الحالة", "reason", true, values.reason || "")}
+    ${area("الإجراء المطلوب من الجهة المحال إليها", "requestedAction", false, values.requestedAction || "")}
+    ${area("مرفقات أو ملاحظات", "notes", false, values.notes || "")}`;
   if (def.kind === "section_change") return `
-    <label class="forms-field"><span>نوع الطلب *</span><select name="requestKind" required><option value="">اختر</option><option value="section">تغيير شعبة</option><option value="specialization">تحويل تخصص</option></select></label>
-    ${field("اسم ولي الأمر (مقدم الطلب)", "guardianName", "text", true)}
-    ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo")}
-    ${field("رقم التواصل", "guardianPhone", "tel")}
-    ${field("الشعبة/التخصص الحالي", "currentPlacement")}
-    ${field("الشعبة/التخصص المطلوب", "requestedPlacement")}
-    ${area("سبب الطلب", "reason", true)}
-    ${area("رأي قسم الإرشاد الأكاديمي والتوجيه المهني", "guidanceOpinion")}
-    ${area("رأي قسم الإرشاد الاجتماعي (للحالات الخاصة والمرضية)", "socialOpinion")}
-    ${area("رأي قسم التسجيل", "registrationOpinion")}
-    ${area("قرار إدارة المدرسة النهائي", "finalDecision")}`;
+    <label class="forms-field"><span>نوع الطلب *</span><select name="requestKind" required><option value="">اختر</option><option value="section" ${values.requestKind === "section" ? "selected" : ""}>تغيير شعبة</option><option value="specialization" ${values.requestKind === "specialization" ? "selected" : ""}>تحويل تخصص</option></select></label>
+    ${field("اسم ولي الأمر (مقدم الطلب)", "guardianName", "text", true, values.guardianName || "")}
+    ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo", "text", false, values.guardianPersonalNo || "")}
+    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || "")}
+    ${field("الشعبة/التخصص الحالي", "currentPlacement", "text", false, values.currentPlacement || "")}
+    ${field("الشعبة/التخصص المطلوب", "requestedPlacement", "text", false, values.requestedPlacement || "")}
+    ${area("سبب الطلب", "reason", true, values.reason || "")}
+    ${area("رأي قسم الإرشاد الأكاديمي والتوجيه المهني", "guidanceOpinion", false, values.guidanceOpinion || "")}
+    ${area("رأي قسم الإرشاد الاجتماعي (للحالات الخاصة والمرضية)", "socialOpinion", false, values.socialOpinion || "")}
+    ${area("رأي قسم التسجيل", "registrationOpinion", false, values.registrationOpinion || "")}
+    ${area("قرار إدارة المدرسة النهائي", "finalDecision", false, values.finalDecision || "")}`;
   return `
-    ${field("اسم ولي الأمر", "guardianName", "text", true)}
-    ${field("العنوان", "address")}
-    ${field("الموضوع / اسم الفعالية", "subject", "text", true)}
-    ${area("نص طلب الموافقة", "consentText", true, "نرجو من حضرتكم موافاتنا بموافقتكم على مشاركة ابنكم في هذه الفعالية.")}
-    <label class="forms-field"><span>رد ولي الأمر</span><select name="guardianResponse"><option value="pending">بانتظار الرد</option><option value="approved">موافق</option><option value="declined">غير موافق</option></select></label>
-    ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo")}
-    ${field("رقم التواصل", "guardianPhone", "tel")}
-    ${field("التاريخ", "responseDate", "date")}
-    ${field("التوقيع / اسم ولي الأمر المقرّ", "signature")}`;
+    ${field("اسم ولي الأمر", "guardianName", "text", true, values.guardianName || "")}
+    ${field("العنوان", "address", "text", false, values.address || "")}
+    ${field("الموضوع / اسم الفعالية", "subject", "text", true, values.subject || "")}
+    ${area("نص طلب الموافقة", "consentText", true, values.consentText || "نرجو من حضرتكم موافاتنا بموافقتكم على مشاركة ابنكم في هذه الفعالية.")}
+    <label class="forms-field"><span>رد ولي الأمر</span><select name="guardianResponse"><option value="pending" ${!values.guardianResponse || values.guardianResponse === "pending" ? "selected" : ""}>بانتظار الرد</option><option value="approved" ${values.guardianResponse === "approved" ? "selected" : ""}>موافق</option><option value="declined" ${values.guardianResponse === "declined" ? "selected" : ""}>غير موافق</option></select></label>
+    ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo", "text", false, values.guardianPersonalNo || "")}
+    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || "")}
+    ${field("التاريخ", "responseDate", "date", false, values.responseDate || "")}
+    ${field("التوقيع / اسم ولي الأمر المقرّ", "signature", "text", false, values.signature || "")}`;
 }
 
 async function renderCreate(root, rerender) {
@@ -117,15 +117,16 @@ async function renderCreate(root, rerender) {
 
 const statusPill = (status) => ({ pending: '<span class="pill pill-warning">بانتظار الإجراء</span>', in_progress: '<span class="pill">قيد الإجراء</span>', completed: '<span class="pill pill-success">مكتملة</span>', rejected: '<span class="pill pill-critical">مرفوضة</span>' }[status] || '<span class="pill pill-neutral">غير محدد</span>');
 
-async function renderLog(root, openDetail) {
+async function renderLog(root, openDetail, openEdit) {
   const forms = await listDepartmentForms();
   root.innerHTML = `<div class="card"><div class="forms-toolbar"><div class="search"><input id="forms-search" type="search" placeholder="بحث بالطالب أو نوع الاستمارة..."></div><div class="forms-actions"><select id="forms-status"><option value="">كل الحالات</option><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select><button class="btn btn-primary" id="forms-export-excel" type="button" ${forms.length ? "" : "disabled"}>تصدير جماعي Excel</button></div></div><div id="forms-table"></div></div>`;
   const table = root.querySelector("#forms-table");
   function draw() {
     const q = root.querySelector("#forms-search").value.trim().toLowerCase(); const status = root.querySelector("#forms-status").value;
     const filtered = forms.filter((item) => (!status || item.status === status) && (!q || `${item.student?.name || ""} ${item.student?.academicId || ""} ${item.title || ""}`.toLowerCase().includes(q)));
-    table.innerHTML = filtered.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الاستمارة</th><th>الطالب</th><th>الجهة/الحالة</th><th></th></tr></thead><tbody>${filtered.map((item) => `<tr><td class="num">${esc(item.createdDate)}</td><td>${esc(item.title)}</td><td><strong>${esc(item.student?.name)}</strong><div class="hint">${esc(item.student?.academicId)}</div></td><td>${item.destination ? `${esc(item.destination)}<br>` : ""}${statusPill(item.status)}</td><td><button class="btn btn-ghost" data-open="${esc(item.id)}">فتح</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد استمارات مطابقة</div>';
+    table.innerHTML = filtered.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الاستمارة</th><th>الطالب</th><th>الجهة/الحالة</th><th></th></tr></thead><tbody>${filtered.map((item) => `<tr><td class="num">${esc(item.createdDate)}</td><td>${esc(item.title)}</td><td><strong>${esc(item.student?.name)}</strong><div class="hint">${esc(item.student?.academicId)}</div></td><td>${item.destination ? `${esc(item.destination)}<br>` : ""}${statusPill(item.status)}</td><td><div class="forms-actions"><button class="btn btn-ghost" data-open="${esc(item.id)}">فتح</button><button class="btn btn-ghost" data-edit-form="${esc(item.id)}">تعديل</button></div></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد استمارات مطابقة</div>';
     table.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openDetail(button.dataset.open)));
+    table.querySelectorAll("[data-edit-form]").forEach((button) => button.addEventListener("click", () => openEdit(button.dataset.editForm)));
   }
   root.querySelector("#forms-export-excel").addEventListener("click", async (event) => {
     const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ إعداد الملف…";
@@ -136,13 +137,39 @@ async function renderLog(root, openDetail) {
   root.querySelector("#forms-search").addEventListener("input", draw); root.querySelector("#forms-status").addEventListener("change", draw); draw();
 }
 
+async function renderEdit(root, id, back, openDetail) {
+  const item = await getDepartmentForm(id); if (!item) return back();
+  root.innerHTML = `<button class="backlink" id="forms-edit-back">رجوع لسجل الاستمارات</button>
+    <div class="card forms-card"><div class="topbar"><div><h1>تعديل الاستمارة</h1><div class="sub">${esc(item.title)} — ${esc(item.student?.name || "")}</div></div></div>
+      <div>${studentCard(item.student)}</div>
+      <form id="department-form-edit" class="forms-grid">
+        <div class="forms-grid forms-wide">${typeFields(item.type, item.fields || {})}</div>
+        ${field("تاريخ الطلب", "createdDate", "date", true, item.createdDate || today())}
+        <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ التعديلات</button><button class="btn btn-ghost" type="button" id="forms-edit-cancel">إلغاء</button></div>
+      </form>
+    </div>`;
+  const cancel = () => back();
+  root.querySelector("#forms-edit-back").addEventListener("click", cancel);
+  root.querySelector("#forms-edit-cancel").addEventListener("click", cancel);
+  root.querySelector("#department-form-edit").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.target).entries());
+    const createdDate = values.createdDate; delete values.createdDate;
+    try {
+      await updateDepartmentForm(id, { createdDate, fields: values });
+      alert("تم حفظ تعديلات الاستمارة");
+      await openDetail(id);
+    } catch (error) { alert(error.message); }
+  });
+}
+
 function detailFields(item) {
   const fields = item.fields || {};
   const requiredKeys = FORM_FIELD_ORDER[item.kind] || [];
   const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
   return [...requiredKeys, ...extraKeys].map((key) => {
     const value = FORM_VALUE_LABELS[fields[key]] || fields[key] || "";
-    return `<div class="forms-detail-row${value ? "" : " forms-detail-empty"}"><span>${esc(formFieldLabel(item, key))}</span><strong>${value ? esc(value) : '<i class="forms-empty-screen">لم يُعبّأ</i><i class="forms-empty-print">........................................................................................</i>'}</strong></div>`;
+    return `<div class="forms-detail-row${value ? "" : " forms-detail-empty"}"><span>${esc(formFieldLabel(item, key))}</span><strong>${value ? esc(value) : '<i class="forms-empty-screen">لم يُعبّأ</i><i class="forms-empty-print" aria-hidden="true">&nbsp;</i>'}</strong></div>`;
   }).join("");
 }
 
@@ -235,7 +262,12 @@ export async function mountFormsView(container) {
     content.innerHTML = '<div class="empty" role="status">جارٍ تحميل البيانات…</div>';
     try {
       if (tab === "new") await renderCreate(content, show);
-      else if (tab === "log") await renderLog(content, (id) => renderDetail(content, id, () => show("log")));
+      else if (tab === "log") {
+        const back = () => show("log");
+        const openDetail = (id) => renderDetail(content, id, back);
+        const openEdit = (id) => renderEdit(content, id, back, openDetail);
+        await renderLog(content, openDetail, openEdit);
+      }
       else await renderTeachers(content);
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);
