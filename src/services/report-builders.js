@@ -54,7 +54,7 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
   const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
   const rows = [...requiredKeys, ...extraKeys].map((key) => {
     const value = values[fields[key]] || fields[key] || "";
-    return `<tr><th>${esc(fieldLabel(key))}</th><td class="${value ? "" : "blank-value"}">${value ? esc(value) : "........................................................................................"}</td></tr>`;
+    return `<tr><th>${esc(fieldLabel(key))}</th><td class="${value ? "" : "blank-value"}">${value ? esc(value) : "&nbsp;"}</td></tr>`;
   }).join("");
   return `
     <h1>${esc(item.title || "استمارة القسم")}</h1>
