@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="مسار — منصة عربية لإدارة الإرشاد الأكاديمي والتوجيه المهني ومتابعة الطلبة.">
+<meta name="theme-color" content="#1a2744">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مسار">
+<title>قسم الإرشاد الأكاديمي والتوجيه المهني</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles/design-system.css?v=2026-09-02-form-edit-print-1">
+</head>
+<body>
+<a href="#main-view" class="skip-link">تخطَّ إلى المحتوى الرئيسي</a>
+<div class="app" id="app-shell" hidden>
+  <header class="mobile-topbar">
+    <div class="brand">
+      <div class="mark">م</div>
+      <div class="name">مسار</div>
+    </div>
+    <button id="nav-toggle" class="nav-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="فتح القائمة">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </header>
+  <div id="nav-backdrop" class="nav-backdrop" hidden></div>
+
+  <nav class="nav" id="main-nav" aria-label="التنقل الرئيسي">
+    <div class="brand">
+      <div class="mark">م</div>
+      <div>
+        <div class="name">مسار</div>
+        <div class="tagline">الإرشاد الأكاديمي والتوجيه المهني</div>
+      </div>
+    </div>
+
+    <button class="navitem" data-view="dashboard" aria-label="أولويات اليوم">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+      أولويات اليوم
+    </button>
+
+    <div class="navsplit"></div>
+    <div class="nav-group" role="group" aria-labelledby="nav-group-planning">
+      <div class="nav-group-label" id="nav-group-planning">التخطيط والدعم</div>
+      <button class="navitem" data-view="plan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>
+        خطة القسم
+      </button>
+      <button class="navitem" data-view="agenda">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/></svg>
+        الأجندة التنفيذية
+      </button>
+      <button class="navitem" data-view="support">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20.5s-7.6-4.6-7.6-10.3A4.4 4.4 0 0 1 12 7.2a4.4 4.4 0 0 1 7.6 3c0 5.7-7.6 10.3-7.6 10.3z"/></svg>
+        خطط الدعم
+      </button>
+      <button class="navitem" data-view="career">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="m15 9-4.2 2.8L9 16l4.2-2.8L15 9z"/></svg>
+        التوجيه المهني
+      </button>
+    </div>
+
+    <div class="navsplit"></div>
+    <div class="nav-group" role="group" aria-labelledby="nav-group-academic">
+      <div class="nav-group-label" id="nav-group-academic">المتابعة الأكاديمية</div>
+      <button class="navitem" data-view="students">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15 13.3c2.5.2 4.3 2.1 4.5 4.9"/></svg>
+        سجل الطلبة
+      </button>
+      <button class="navitem" data-view="grades">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+        الدرجات والتحليلات
+      </button>
+      <button class="navitem" data-view="cases">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M4 10h16"/></svg>
+        المتابعات والحالات
+      </button>
+      <button class="navitem" data-view="promoted">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 12 5 5L20 7"/></svg>
+        الطلاب المرفعين
+      </button>
+      <button class="navitem" data-view="forms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3.5h9l3 3V20H6z"/><path d="M15 3.5V7h3M9 11h6M9 15h6"/></svg>
+        الاستمارات والسجلات
+      </button>
+    </div>
+
+    <div class="navsplit"></div>
+    <div class="nav-group" role="group" aria-labelledby="nav-group-admin">
+      <div class="nav-group-label" id="nav-group-admin">الإدارة</div>
+      <button class="navitem" data-view="imports" id="imports-nav-item" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        الاستيراد
+      </button>
+      <button class="navitem" data-view="backup" id="backup-nav-item" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        النسخ الاحتياطي
+      </button>
+      <button class="navitem" data-view="users" id="users-nav-item" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="3"/><path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><path d="M17 11a2.5 2.5 0 1 0 0-5M18.5 19c0-2.6-1.5-4.5-3.7-5.2"/></svg>
+        إدارة المستخدمين
+      </button>
+    </div>
+
+    <div class="user-panel">
+      <div>الوضع الحالي</div>
+      <div class="row"><button class="on" id="current-user-name">مساحة المرشد</button></div>
+      <div class="user-role" id="current-user-role"></div>
+      <button id="logout-btn" class="btn btn-ghost" style="width:100%;margin-top:8px;padding:7px;font-size:12px;">
+        تسجيل خروج
+      </button>
+    </div>
+  </nav>
+
+  <main class="main" id="main-view" aria-live="polite" aria-busy="true" tabindex="-1">
+    <div class="empty">جارٍ التحميل…</div>
+  </main>
+</div>
+<div id="login-root"></div>
+
+<script type="module" src="src/app.js?v=2026-09-03-security-1"></script>
+</body>
+</html>
