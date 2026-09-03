@@ -1,4 +1,4 @@
-:root {
+.forms-print { position: absolute; inset: 0 0 auto 0; box-sizing: border-box; width: 210mm; min-height: 0; padding: 5mm 9mm 7mm; margin: 0;:root {
     --teal-900: #1a2744;
     --teal-700: #2c3e6b;
     --teal-600: #1a2744;
