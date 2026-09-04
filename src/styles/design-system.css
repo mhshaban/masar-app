@@ -227,6 +227,27 @@
   .card-head h2 { margin: 0; }
   .link-btn { font-size: 12.5px; color: var(--teal-600); background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 600; padding: 0; }
 
+  /* إدارة المستخدمين */
+  .users-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .user-edit-dialog {
+    width: min(520px, calc(100vw - 32px)); padding: 0; color: var(--ink-800);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: 0 24px 70px rgba(8, 24, 39, 0.28); font-family: var(--font-ar); direction: rtl;
+  }
+  .user-edit-dialog::backdrop { background: rgba(8, 24, 39, 0.66); backdrop-filter: blur(2px); }
+  .user-edit-dialog form { display: grid; gap: 16px; padding: 22px; }
+  .user-edit-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .user-edit-head h2 { margin: 0 0 4px; font-size: 18px; }
+  .user-edit-head p { margin: 0; color: var(--ink-500); font-size: 12.5px; }
+  .user-edit-close { border: 0; background: transparent; color: inherit; font: 28px/1 var(--font-ui); cursor: pointer; padding: 0 4px; }
+  .user-edit-field { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+  .user-edit-field input {
+    width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--surface); color: inherit; font-family: inherit; font-size: 14px;
+  }
+  .user-edit-field small { color: var(--ink-500); font-weight: 400; }
+  .user-edit-actions { display: flex; justify-content: flex-start; gap: 8px; margin-top: 4px; }
+
   /* stat tile */
   .stat { display: flex; flex-direction: column; gap: 6px; }
   .stat .label { font-size: 12.5px; color: var(--ink-500); font-weight: 600; }
