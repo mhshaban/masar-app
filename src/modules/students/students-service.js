@@ -1,5 +1,6 @@
 import { list as listAll, get, save, rpc } from "../../services/cloud-runtime.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 const ROSTER_CACHE_MS = 15_000;
 let rosterCache = null;
@@ -60,6 +61,7 @@ export async function updateStudent(id, fields) {
     updatedAt: new Date().toISOString(),
   });
   invalidateStudentsCache();
+  await logAuditEvent("update_student", { tableName: "students", recordId: String(updated.id) });
   return updated;
 }
 
