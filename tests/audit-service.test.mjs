@@ -13,5 +13,7 @@ test("normalizeAuditPage keeps only safe paging metadata", () => {
 test("audit labels cover the sensitive operations shown to the admin", () => {
   assert.equal(ACTION_LABELS.restore_backup, "استعادة نسخة احتياطية");
   assert.equal(ACTION_LABELS.update_student, "تعديل بيانات طالب");
+  assert.equal(ACTION_LABELS.update_user, "تعديل بيانات مستخدم");
   assert.equal(TABLE_LABELS.departmentForms, "الاستمارات");
+  assert.equal(TABLE_LABELS.profiles, "المستخدمون");
 });
