@@ -475,6 +475,21 @@
   .forms-toolbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .forms-toolbar .search { margin: 0; flex: 1; min-width: 230px; }
   .forms-toolbar select { width: auto; min-width: 160px; }
+  /* ---------- Audit log ---------- */
+  .audit-filters-card { margin-bottom: 16px; }
+  .audit-filters { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 12px; align-items: end; }
+  .audit-filters label { display: flex; flex-direction: column; gap: 5px; color: var(--ink-600); font-size: 12px; }
+  .audit-filters input, .audit-filters select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink-800); font-family: inherit; }
+  .audit-filter-actions { display: flex; gap: 8px; align-items: center; }
+  .audit-results-card .card-head { align-items: flex-start; }
+  .audit-results-card .card-head .hint { margin: 4px 0 0; }
+  .audit-table td:first-child { white-space: nowrap; }
+  .audit-table td:last-child { direction: ltr; text-align: right; max-width: 240px; overflow-wrap: anywhere; }
+  .audit-pagination { display: flex; justify-content: center; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .audit-pagination[hidden] { display: none; }
+  .audit-pagination span { color: var(--ink-500); font-size: 12px; }
+  @media (max-width: 900px) { .audit-filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }
+  @media (max-width: 600px) { .audit-filters { grid-template-columns: 1fr; } .audit-filter-actions .btn { flex: 1; } }
   .forms-detail-row { display: grid; grid-template-columns: minmax(150px, 28%) 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .forms-detail-row:last-child { border-bottom: 0; }
   .forms-detail-row span { color: var(--ink-500); }
