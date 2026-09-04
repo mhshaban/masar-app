@@ -226,3 +226,12 @@ export function setAccountRole(userId, role) {
 export function resetAccountPassword(userId, password) {
   return callAdminUsers({ action: "reset_password", user_id: userId, password });
 }
+
+export function updateAccount(userId, { fullName, identifier }) {
+  return callAdminUsers({
+    action: "update_user",
+    user_id: userId,
+    full_name: fullName,
+    identifier,
+  });
+}
