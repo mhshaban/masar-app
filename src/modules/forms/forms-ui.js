@@ -3,8 +3,8 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-04-form-actor-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-2";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-2";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -25,7 +25,7 @@ function formatAuditDate(value) {
 }
 
 function entryFooter(item) {
-  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "حساب الإدمن";
+  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "قسم الإرشاد الأكاديمي والتوجيه المهني";
   const createdAt = formatAuditDate(item.createdAt);
   const updatedBy = item.updatedByName || item.updatedBy?.name || item.updatedBy || "";
   const updatedAt = formatAuditDate(item.updatedAt);
@@ -59,7 +59,7 @@ function formExcelRow(item) {
   for (const [key, label] of Object.entries(FORM_FIELD_LABELS)) row[label] = FORM_VALUE_LABELS[item.fields?.[key]] || item.fields?.[key] || "";
   return {
     ...row,
-    "تم الإدخال بواسطة": item.createdByName || "حساب الإدمن",
+    "تم الإدخال بواسطة": item.createdByName || "قسم الإرشاد الأكاديمي والتوجيه المهني",
     "تاريخ الإدخال": item.createdAt || "",
     "آخر تعديل بواسطة": item.updatedByName || "",
     "التغذية الراجعة/الإجراء المتخذ": item.feedback || "",
