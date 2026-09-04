@@ -1,3 +1,5 @@
+import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-04-audit-1";
+
 // Downloads an HTML fragment as a .doc file — Word opens HTML content when
 // given a .doc extension + application/msword MIME type (the standard
 // "Office HTML" trick), so this needs no bundled document-generation
@@ -47,4 +49,5 @@ export function downloadAsWordDoc(title, bodyHtml, filename) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  void logAuditEvent("export_word", { tableName: "reports", recordId: a.download });
 }

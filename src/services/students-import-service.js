@@ -9,6 +9,7 @@ import { list, clear, bulkPut } from "./cloud-runtime.js";
 import { invalidateStudentsCache } from "../modules/students/students-service.js";
 import { readWorkbook } from "./xlsx-parser.js";
 import { resetStudentsSeedCache } from "./students-source.js";
+import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-04-audit-1";
 
 const SHEET_HINT = "كشف الطلاب";
 
@@ -132,5 +133,6 @@ export async function commitStudentsImport(students) {
   if (merged.length) await bulkPut("students", merged);
   invalidateStudentsCache();
   resetStudentsSeedCache();
+  await logAuditEvent("import_students", { tableName: "students", count: merged.length });
   return { count: students.length };
 }
