@@ -5,6 +5,9 @@ import { clear } from "../src/services/cloud-runtime.js";
 import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers } from "../src/modules/forms/forms-service.js";
 
 const student = { id: "s-1", name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" };
+globalThis.__MASAR_TEST_AUTH__ = {
+  getCurrentProfile: () => ({ id: "user-1", full_name: "مرشد تجريبي", email: "guide@example.com" }),
+};
 
 test.beforeEach(async () => { await clear("departmentForms"); await clear("schoolTeachers"); });
 
@@ -13,10 +16,15 @@ test("referral keeps a student snapshot and supports feedback workflow", async (
   assert.equal(form.student.name, student.name);
   assert.equal(form.destination, "قسم الإرشاد الاجتماعي");
   assert.equal(form.status, "pending");
+  assert.equal(form.createdById, "user-1");
+  assert.equal(form.createdByName, "مرشد تجريبي");
+  assert.ok(form.createdAt);
   await updateDepartmentForm(form.id, { status: "completed", feedback: "تم اتخاذ الإجراء" });
   const [saved] = await listDepartmentForms();
   assert.equal(saved.status, "completed");
   assert.equal(saved.feedback, "تم اتخاذ الإجراء");
+  assert.equal(saved.createdByName, "مرشد تجريبي");
+  assert.equal(saved.updatedByName, "مرشد تجريبي");
 });
 
 test("section change requires a guardian and a reason", async () => {

@@ -8,6 +8,8 @@ import {
 test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
   const html = buildDepartmentFormReportHtml({
     id: "f-1", title: "تحويل إلى قسم التسجيل", createdDate: "2026-09-01", status: "completed",
+    createdAt: "2026-09-01T08:00:00+03:00", createdByName: "مرشد تجريبي",
+    updatedAt: "2026-09-02T09:30:00+03:00", updatedByName: "مدير تجريبي",
     student: { name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" },
     fields: { reason: "تحديث البيانات", requestedAction: "مراجعة الملف" },
     feedbackDate: "2026-09-02", feedback: "تم تحديث السجل",
@@ -16,6 +18,19 @@ test("buildDepartmentFormReportHtml exports student data, form content, and feed
   assert.match(html, /تحديث البيانات/);
   assert.match(html, /تم تحديث السجل/);
   assert.match(html, /مكتملة/);
+  assert.match(html, /تم الإدخال بواسطة/);
+  assert.match(html, /مرشد تجريبي/);
+  assert.match(html, /آخر تعديل بواسطة/);
+  assert.match(html, /مدير تجريبي/);
+});
+
+test("buildDepartmentFormReportHtml attributes legacy forms to the admin account", () => {
+  const html = buildDepartmentFormReportHtml({
+    title: "استمارة قديمة", createdDate: "2026-08-01", kind: "referral",
+    student: { name: "طالب" }, fields: { reason: "متابعة" },
+  }, "2026-09-04");
+  assert.match(html, /حساب الإدمن/);
+  assert.doesNotMatch(html, /سجل سابق/);
 });
 
 test("buildFollowUpReportHtml includes stats, per-section table, and item rows", () => {
