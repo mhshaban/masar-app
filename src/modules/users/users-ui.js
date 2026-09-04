@@ -2,7 +2,7 @@
 // كل عملية هنا تمر عبر
 // admin-users Edge Function بمفتاح service_role من طرف الخادم — لا صلاحيات
 // إدارية تُتحقق أو تُمنح من الواجهة نفسها.
-import { listUsers, createAccount, setAccountActive, setAccountRole, resetAccountPassword } from "../../services/auth-service.js";
+import { listUsers, createAccount, setAccountActive, setAccountRole, resetAccountPassword, updateAccount } from "../../services/auth-service.js";
 import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 
 function esc(str) {
@@ -12,6 +12,72 @@ function esc(str) {
 }
 
 const ROLE_LABELS = { admin: "إدمن", counselor: "مرشد", read_only: "قراءة فقط" };
+
+function accountIdentifier(user) {
+  const email = String(user?.email || "");
+  return email.endsWith("@members.masar.local") ? email.split("@")[0] : email;
+}
+
+function openEditDialog(container, user) {
+  const profile = user.profile || {};
+  const dialog = document.createElement("dialog");
+  dialog.className = "user-edit-dialog";
+  dialog.setAttribute("aria-labelledby", "user-edit-title");
+  dialog.innerHTML = `
+    <form method="dialog" id="user-edit-form">
+      <div class="user-edit-head">
+        <div><h2 id="user-edit-title">تعديل بيانات المستخدم</h2><p>يُستخدم اسم المستخدم أو البريد الإلكتروني في تسجيل الدخول.</p></div>
+        <button class="user-edit-close" type="button" aria-label="إغلاق">×</button>
+      </div>
+      <label class="user-edit-field">
+        <span>الاسم الكامل</span>
+        <input name="fullName" value="${esc(profile.full_name || "")}" required maxlength="120" autocomplete="name">
+      </label>
+      <label class="user-edit-field">
+        <span>اسم المستخدم أو البريد الإلكتروني</span>
+        <input name="identifier" value="${esc(accountIdentifier(user))}" required maxlength="254" dir="ltr" autocomplete="username">
+        <small>يمكن استخدام اسم إنجليزي مثل m.ahmed أو بريد إلكتروني كامل.</small>
+      </label>
+      <div class="user-edit-actions">
+        <button class="btn btn-ghost" type="button" data-edit-cancel>إلغاء</button>
+        <button class="btn btn-primary" type="submit">حفظ التعديلات</button>
+      </div>
+    </form>`;
+  document.body.append(dialog);
+
+  const close = () => dialog.close();
+  dialog.querySelector(".user-edit-close").addEventListener("click", close);
+  dialog.querySelector("[data-edit-cancel]").addEventListener("click", close);
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) close();
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.querySelector("#user-edit-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const saveButton = form.querySelector("button[type='submit']");
+    saveButton.disabled = true;
+    try {
+      const result = await updateAccount(user.id, {
+        fullName: form.fullName.value,
+        identifier: form.identifier.value,
+      });
+      showToast("تم تحديث بيانات المستخدم");
+      close();
+      if (result.self_updated) {
+        window.setTimeout(() => window.location.reload(), 500);
+        return;
+      }
+      await renderList(container);
+    } catch (error) {
+      showToast(error.message || "تعذّر تحديث بيانات المستخدم", { type: "error" });
+      saveButton.disabled = false;
+    }
+  });
+
+  dialog.showModal();
+  dialog.querySelector("input[name='fullName']").focus();
+}
 
 async function renderList(container) {
   const listRoot = container.querySelector("#users-list");
@@ -32,7 +98,7 @@ async function renderList(container) {
 
   listRoot.innerHTML = `
     <table class="table">
-      <thead><tr><th>الاسم</th><th>الإيميل</th><th>الحالة</th><th>صلاحية</th><th><span class="sr-only">إجراءات</span></th></tr></thead>
+      <thead><tr><th>الاسم</th><th>اسم المستخدم / البريد</th><th>الحالة</th><th>صلاحية</th><th><span class="sr-only">إجراءات</span></th></tr></thead>
       <tbody>
         ${users.map((u) => {
           const profile = u.profile || {};
@@ -41,22 +107,32 @@ async function renderList(container) {
           return `
             <tr data-id="${esc(u.id)}">
               <td>${esc(profile.full_name || "—")}</td>
-              <td>${esc(u.email || "—")}</td>
+              <td dir="ltr">${esc(accountIdentifier(u) || "—")}</td>
               <td>${active ? '<span class="pill pill-success">نشط</span>' : '<span class="pill pill-critical">معطّل</span>'}</td>
               <td>
                 <select data-action="role" aria-label="دور ${esc(profile.full_name || u.email || "المستخدم")}" style="padding:7px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:inherit;font-family:inherit;">
                   ${Object.entries(ROLE_LABELS).map(([value, label]) => `<option value="${value}"${role === value ? " selected" : ""}>${label}</option>`).join("")}
                 </select>
               </td>
-              <td style="display:flex;gap:8px;">
-                <button class="link-btn" data-action="toggle" data-active="${active}">${active ? "تعطيل" : "تفعيل"}</button>
-                <button class="link-btn" data-action="reset-password">إعادة تعيين كلمة المرور</button>
+              <td>
+                <div class="users-actions">
+                  <button class="link-btn" data-action="edit">تعديل</button>
+                  <button class="link-btn" data-action="toggle" data-active="${active}">${active ? "تعطيل" : "تفعيل"}</button>
+                  <button class="link-btn" data-action="reset-password">إعادة تعيين كلمة المرور</button>
+                </div>
               </td>
             </tr>`;
         }).join("")}
       </tbody>
     </table>
   `;
+
+  listRoot.querySelectorAll("[data-action='edit']").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const user = users.find((item) => item.id === btn.closest("[data-id]").dataset.id);
+      if (user) openEditDialog(container, user);
+    });
+  });
 
   listRoot.querySelectorAll("[data-action='toggle']").forEach((btn) => {
     btn.addEventListener("click", async () => {
