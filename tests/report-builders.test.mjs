@@ -24,12 +24,12 @@ test("buildDepartmentFormReportHtml exports student data, form content, and feed
   assert.match(html, /مدير تجريبي/);
 });
 
-test("buildDepartmentFormReportHtml attributes legacy forms to the admin account", () => {
+test("buildDepartmentFormReportHtml attributes legacy forms to the department", () => {
   const html = buildDepartmentFormReportHtml({
     title: "استمارة قديمة", createdDate: "2026-08-01", kind: "referral",
     student: { name: "طالب" }, fields: { reason: "متابعة" },
   }, "2026-09-04");
-  assert.match(html, /حساب الإدمن/);
+  assert.match(html, /قسم الإرشاد الأكاديمي والتوجيه المهني/);
   assert.doesNotMatch(html, /سجل سابق/);
 });
 
