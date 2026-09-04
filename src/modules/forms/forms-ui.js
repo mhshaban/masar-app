@@ -2,9 +2,9 @@ import { mountStudentPicker } from "../shared/student-picker.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
-} from "./forms-service.js?v=2026-09-02-official-cumulative-2";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
+} from "./forms-service.js?v=2026-09-04-form-actor-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -16,6 +16,24 @@ const area = (label, name, required = false, value = "") => `<label class="forms
 const FORM_FIELD_LABELS = { reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات الاستمارة", requestKind: "نوع الطلب", guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم تواصل ولي الأمر", currentPlacement: "الشعبة/التخصص الحالي", requestedPlacement: "الشعبة/التخصص المطلوب", guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي", registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان", subject: "الموضوع/الفعالية", consentText: "نص طلب الموافقة", guardianResponse: "رد ولي الأمر", responseDate: "تاريخ رد ولي الأمر", signature: "التوقيع/الإقرار" };
 const FORM_VALUE_LABELS = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
 const STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
+
+function formatAuditDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ar-BH", { dateStyle: "short", timeStyle: "short" });
+}
+
+function entryFooter(item) {
+  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "حساب الإدمن";
+  const createdAt = formatAuditDate(item.createdAt);
+  const updatedBy = item.updatedByName || item.updatedBy?.name || item.updatedBy || "";
+  const updatedAt = formatAuditDate(item.updatedAt);
+  return `<footer class="forms-entry-footer">
+    <span>تم الإدخال بواسطة: <strong>${esc(createdBy)}</strong>${createdAt ? ` — <span dir="ltr">${esc(createdAt)}</span>` : ""}</span>
+    ${updatedBy ? `<span>آخر تعديل بواسطة: <strong>${esc(updatedBy)}</strong>${updatedAt ? ` — <span dir="ltr">${esc(updatedAt)}</span>` : ""}</span>` : ""}
+  </footer>`;
+}
 const FORM_FIELD_ORDER = {
   referral: ["reason", "requestedAction", "notes"],
   section_change: ["requestKind", "guardianName", "guardianPersonalNo", "guardianPhone", "currentPlacement", "requestedPlacement", "reason", "guidanceOpinion", "socialOpinion", "registrationOpinion", "finalDecision"],
@@ -39,7 +57,15 @@ function formExcelRow(item) {
     "المعدل التراكمي النهائي": item.student?.finalCumulativeAverage ?? "",
   };
   for (const [key, label] of Object.entries(FORM_FIELD_LABELS)) row[label] = FORM_VALUE_LABELS[item.fields?.[key]] || item.fields?.[key] || "";
-  return { ...row, "التغذية الراجعة/الإجراء المتخذ": item.feedback || "", "تاريخ التغذية الراجعة": item.feedbackDate || "", "آخر تحديث": item.updatedAt || "" };
+  return {
+    ...row,
+    "تم الإدخال بواسطة": item.createdByName || "حساب الإدمن",
+    "تاريخ الإدخال": item.createdAt || "",
+    "آخر تعديل بواسطة": item.updatedByName || "",
+    "التغذية الراجعة/الإجراء المتخذ": item.feedback || "",
+    "تاريخ التغذية الراجعة": item.feedbackDate || "",
+    "آخر تحديث": item.updatedAt || "",
+  };
 }
 
 async function exportFormsExcel(forms) {
@@ -194,7 +220,7 @@ async function renderDetail(root, id, back) {
       <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
       ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
       <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
-    </form></div>${workflowBlock(item)}</div>`;
+    </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
   root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); alert("تم حفظ المتابعة"); await renderDetail(root, id, back); });

@@ -1,5 +1,6 @@
 import { list as listAll, listWhere, get, save, remove, bulkPut, rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
+import { getCurrentProfile } from "../../services/auth-service.js?v=2026-09-04-form-actor-1";
 
 export const FORM_TYPES = {
   school_admin: { label: "تحويل إلى إدارة المدرسة", kind: "referral", destination: "إدارة المدرسة" },
@@ -11,6 +12,17 @@ export const FORM_TYPES = {
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function currentActor() {
+  try {
+    const profile = getCurrentProfile();
+    const name = String(profile?.full_name || profile?.name || profile?.email || "").trim();
+    if (!name) return null;
+    return { id: String(profile?.id || ""), name };
+  } catch {
+    return null;
+  }
+}
 
 function normalizeAverage(value) {
   const number = Number(value);
@@ -43,10 +55,13 @@ export async function createDepartmentForm(type, student, fields = {}) {
   if (!definition) throw new Error("نوع الاستمارة غير معروف");
   const snapshot = studentSnapshot(student);
   snapshot.finalCumulativeAverage = await finalCumulativeAverageFor(student);
+  const now = new Date().toISOString();
+  const actor = currentActor();
   const base = {
     type, title: definition.label, kind: definition.kind, destination: definition.destination || null,
     studentId: snapshot.id, student: snapshot, status: "pending", createdDate: fields.createdDate || today(),
-    updatedAt: new Date().toISOString(), fields: { ...fields }, feedback: "", feedbackDate: null,
+    createdAt: now, updatedAt: now, fields: { ...fields }, feedback: "", feedbackDate: null,
+    ...(actor ? { createdById: actor.id, createdByName: actor.name } : {}),
   };
   if (definition.kind === "referral" && !String(fields.reason || "").trim()) throw new Error("سبب التحويل مطلوب");
   if (definition.kind === "section_change") {
@@ -84,7 +99,16 @@ export async function addFinalCumulativeAverages(forms) {
 export async function updateDepartmentForm(id, patch) {
   const current = await getDepartmentForm(id);
   if (!current) throw new Error("الاستمارة غير موجودة");
-  const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+  const actor = currentActor();
+  const next = {
+    ...current,
+    ...patch,
+    createdAt: current.createdAt,
+    createdById: current.createdById,
+    createdByName: current.createdByName,
+    updatedAt: new Date().toISOString(),
+    ...(actor ? { updatedById: actor.id, updatedByName: actor.name } : {}),
+  };
   if (patch.fields) next.fields = { ...(current.fields || {}), ...patch.fields };
   return save("departmentForms", next);
 }
