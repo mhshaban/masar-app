@@ -2,6 +2,7 @@
 // اسم مستخدم يترجم لإيميل عبر دالة SQL عامة (masar_resolve_login_identifier)،
 // ثم /auth/v1/token?grant_type=password مباشرة — بدون أي SDK.
 import { SB_URL, SB_KEY, getAccessToken, setAccessToken, clearAccessToken } from "./supabase-config.js";
+import { clearSensitiveLocalData } from "./local-security.js";
 export { consumeSessionExpiredNotice } from "./supabase-config.js";
 
 const PROFILE_CACHE_KEY = "masar_profile_cache";
@@ -81,11 +82,15 @@ export async function login(identifier, password) {
   return profile;
 }
 
-export function logout() {
+export async function logout() {
   const backend = testBackend();
-  if (backend) return backend.logout();
-  clearAccessToken();
-  sessionStorage.removeItem(PROFILE_CACHE_KEY);
+  try {
+    if (backend) await backend.logout();
+  } finally {
+    clearAccessToken();
+    sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    await clearSensitiveLocalData();
+  }
 }
 
 // يرسل رابط استرجاع موحدًا دون كشف ما إذا كان المعرّف موجودًا. Supabase
@@ -145,7 +150,7 @@ export async function updateRecoveredPassword(password) {
     throw networkError();
   }
   if (!res.ok) throw new Error("تعذر تعيين كلمة المرور. قد يكون الرابط منتهيًا؛ اطلب رابطًا جديدًا.");
-  logout();
+  await logout();
 }
 
 async function fetchProfileFromNetwork() {

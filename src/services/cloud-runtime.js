@@ -86,6 +86,13 @@ function invalidateCollection(collection) {
   inFlightLists.delete(collection);
 }
 
+// عمليات RPC التي تستبدل أكثر من مجموعة (مثل الاستعادة الذرّية) تحتاج
+// إبطال كل القراءات المحفوظة دفعة واحدة بعد نجاح المعاملة.
+export function resetCloudReadCache() {
+  listCache.clear();
+  inFlightLists.clear();
+}
+
 export async function list(collection) {
   const backend = testBackend();
   if (backend) return backend.list(collection);

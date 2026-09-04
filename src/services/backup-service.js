@@ -1,4 +1,4 @@
-import { list as listAll, bulkPut, clear, rpc } from "./cloud-runtime.js?v=2026-08-31-egress-1";
+import { list as listAll, bulkPut, clear, rpc, resetCloudReadCache } from "./cloud-runtime.js?v=2026-09-03-safe-restore-1";
 import { COLLECTIONS, DB_VERSION } from "../core/config.js";
 
 const BACKUP_CACHE_MS = 10 * 60_000;
@@ -48,10 +48,29 @@ export function parseBackupFile(text) {
   } catch {
     throw new Error("الملف ليس JSON صالحًا.");
   }
-  if (!data || typeof data !== "object" || !data.collections || typeof data.collections !== "object") {
+  validateBackup(data);
+  return data;
+}
+
+function validateBackup(data) {
+  if (!data || typeof data !== "object" || data.app !== "masar" || !data.collections || typeof data.collections !== "object" || Array.isArray(data.collections)) {
     throw new Error("الملف لا يطابق بنية نسخة احتياطية من مسار.");
   }
-  return data;
+  for (const name of COLLECTIONS) {
+    const records = data.collections[name];
+    if (!Array.isArray(records)) {
+      throw new Error(`النسخة غير مكتملة: مجموعة ${name} مفقودة أو غير صالحة.`);
+    }
+    const ids = new Set();
+    for (const record of records) {
+      if (!record || typeof record !== "object" || Array.isArray(record) || record.id === undefined || record.id === null || !String(record.id).trim()) {
+        throw new Error(`النسخة تحتوي سجلًا بلا معرّف صالح في مجموعة ${name}.`);
+      }
+      const id = String(record.id);
+      if (ids.has(id)) throw new Error(`النسخة تحتوي معرّفًا مكررًا (${id}) في مجموعة ${name}.`);
+      ids.add(id);
+    }
+  }
 }
 
 export function summarizeBackup(data) {
@@ -66,19 +85,25 @@ export function summarizeBackup(data) {
 // merge with an unrelated existing DB would silently mix two datasets with
 // no way to tell which record came from where.
 export async function restoreBackup(data) {
+  validateBackup(data);
   const counts = summarizeBackup(data);
+  if (!globalThis.__MASAR_TEST_BACKEND__) {
+    try {
+      await rpc("masar_restore_backup", { p_backup: data });
+    } catch (error) {
+      throw new Error("تعذّرت الاستعادة الآمنة، ولم تُغيّر قاعدة البيانات. تأكد من تطبيق تحديث الاستعادة الذرّية في Supabase.", { cause: error });
+    }
+    backupCache = null;
+    resetCloudReadCache();
+    return counts;
+  }
+
   for (const name of COLLECTIONS) {
     await clear(name);
     const records = data.collections[name];
-    if (Array.isArray(records) && records.length) {
+    if (records.length) {
       await bulkPut(name, records);
     }
   }
-  // تسجيل تدقيق فقط — بدون await عمدًا: البيانات نفسها استُعيدت فعليًا
-  // بهذي اللحظة، فلا مبرر يخلي المستخدم ينتظر رسالة النجاح/إعادة التحميل
-  // لمجرد بطء أو تعذّر شبكي بطلب التسجيل وحده (مثلًا الدالة SQL لسه ما
-  // نُفِّذت بقاعدة بيانات محمد، أو مهلة اتصال طويلة) — يعمل بالخلفية ولا
-  // يُفشل ولا يُبطئ الاستعادة نفسها، نفس أسلوب audit() الاختياري بـ
-  // admin-users Edge Function.
-  rpc("masar_log_backup_restore", { p_summary: counts }).catch(() => {});
+  return counts;
 }
