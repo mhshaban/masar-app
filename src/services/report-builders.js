@@ -17,7 +17,7 @@ function formatAuditDate(value) {
 }
 
 function departmentFormEntryFooter(item) {
-  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "حساب الإدمن";
+  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "قسم الإرشاد الأكاديمي والتوجيه المهني";
   const createdAt = formatAuditDate(item.createdAt);
   const updatedBy = item.updatedByName || item.updatedBy?.name || item.updatedBy || "";
   const updatedAt = formatAuditDate(item.updatedAt);
