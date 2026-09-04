@@ -24,6 +24,7 @@ const VIEW_LOADERS = {
   forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-02-form-edit-print-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-03-safe-restore-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js")).mountUsersView,
+  audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-04-audit-1")).mountAuditView,
   imports: async () => (await import("./modules/imports/imports-ui.js")).mountImportsView,
 };
 const VIEW_OPTIONS = {
@@ -32,7 +33,7 @@ const VIEW_OPTIONS = {
   grades: () => ({ onGoto: renderView }),
   promoted: () => ({ onGoto: renderView }),
 };
-const ADMIN_VIEWS = new Set(["imports", "backup", "users"]);
+const ADMIN_VIEWS = new Set(["imports", "backup", "users", "audit"]);
 const loadedViews = new Map();
 let currentProfile = null;
 
@@ -328,6 +329,8 @@ function applyProfileToChrome(profile) {
   if (importsNavItem) importsNavItem.style.display = admin ? "" : "none";
   const backupNavItem = document.getElementById("backup-nav-item");
   if (backupNavItem) backupNavItem.style.display = admin ? "" : "none";
+  const auditNavItem = document.getElementById("audit-nav-item");
+  if (auditNavItem) auditNavItem.style.display = admin ? "" : "none";
   const roleEl = document.getElementById("current-user-role");
   if (roleEl) roleEl.textContent = ({ admin: "إدمن", counselor: "مرشد", read_only: "قراءة فقط" })[role] || "مرشد";
 }
