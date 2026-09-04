@@ -1,5 +1,5 @@
 import { ensureXlsx } from "../../services/vendor-loader.js";
-import { ACTION_LABELS, TABLE_LABELS, listAuditLogs } from "./audit-service.js?v=2026-09-04-audit-1";
+import { ACTION_LABELS, TABLE_LABELS, listAuditLogs } from "./audit-service.js?v=2026-09-04-users-1";
 import { loadingHtml, emptyHtml, errorHtml, showToast } from "../shared/ui-states.js";
 
 function esc(value) {
@@ -18,7 +18,7 @@ function formatDate(value) {
 
 function actionPill(action) {
   const critical = action === "delete" || action === "deactivate_user";
-  const warning = action === "update" || action === "set_role" || action === "restore_backup";
+  const warning = action === "update" || action === "update_user" || action === "set_role" || action === "restore_backup";
   const css = critical ? "pill-critical" : warning ? "pill-warning" : "pill-teal";
   return `<span class="pill ${css}">${esc(ACTION_LABELS[action] || action || "غير محدد")}</span>`;
 }
