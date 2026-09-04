@@ -33,12 +33,26 @@ test("summarizeBackup counts records per collection", async () => {
 test("parseBackupFile rejects invalid JSON and mis-shaped files", () => {
   assert.throws(() => parseBackupFile("not json"), /JSON صالحًا/);
   assert.throws(() => parseBackupFile(JSON.stringify({ app: "masar" })), /بنية نسخة احتياطية/);
+  assert.throws(
+    () => parseBackupFile(JSON.stringify({ app: "masar", collections: { students: [] } })),
+    /النسخة غير مكتملة/
+  );
 });
 
 test("parseBackupFile accepts a well-formed backup", () => {
-  const raw = JSON.stringify({ app: "masar", exportedAt: "2026-01-01", collections: { students: [] } });
+  const collections = Object.fromEntries(COLLECTIONS.map((name) => [name, []]));
+  const raw = JSON.stringify({ app: "masar", exportedAt: "2026-01-01", collections });
   const data = parseBackupFile(raw);
   assert.equal(data.app, "masar");
+});
+
+test("parseBackupFile rejects records without ids and duplicate ids", () => {
+  const collections = Object.fromEntries(COLLECTIONS.map((name) => [name, []]));
+  collections.students = [{ name: "بلا رقم" }];
+  assert.throws(() => parseBackupFile(JSON.stringify({ app: "masar", collections })), /بلا معرّف صالح/);
+
+  collections.students = [{ id: "s1" }, { id: "s1" }];
+  assert.throws(() => parseBackupFile(JSON.stringify({ app: "masar", collections })), /معرّفًا مكررًا/);
 });
 
 test("restoreBackup round-trips data through export and re-import", async () => {
