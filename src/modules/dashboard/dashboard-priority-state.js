@@ -1,4 +1,6 @@
-const STORAGE_KEY = "masar-daily-priority-decisions-v1";
+import { DAILY_PRIORITY_DECISIONS_KEY } from "../../services/local-security.js";
+
+const STORAGE_KEY = DAILY_PRIORITY_DECISIONS_KEY;
 
 function todayBahrain(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bahrain", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

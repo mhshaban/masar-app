@@ -1,7 +1,9 @@
-const HANDLE_DB = "masar-folder-access";
+import { LOCAL_DASHBOARD_CACHE_KEY, LOCAL_FOLDER_HANDLE_DB } from "../../services/local-security.js";
+
+const HANDLE_DB = LOCAL_FOLDER_HANDLE_DB;
 const HANDLE_STORE = "handles";
 const HANDLE_KEY = "masar-onedrive-folder";
-const CACHE_KEY = "masar-local-dashboard-snapshot-v1";
+const CACHE_KEY = LOCAL_DASHBOARD_CACHE_KEY;
 
 function bahrainDate(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bahrain", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
@@ -18,18 +20,30 @@ function openHandleDb() {
 
 async function saveHandle(handle) {
   const db = await openHandleDb();
-  await new Promise((resolve, reject) => {
-    const req = db.transaction(HANDLE_STORE, "readwrite").objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
-    req.onsuccess = resolve; req.onerror = () => reject(req.error);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(HANDLE_STORE, "readwrite");
+      transaction.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
 }
 
 async function getHandle() {
   const db = await openHandleDb();
-  return new Promise((resolve, reject) => {
-    const req = db.transaction(HANDLE_STORE, "readonly").objectStore(HANDLE_STORE).get(HANDLE_KEY);
-    req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error);
-  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction(HANDLE_STORE, "readonly").objectStore(HANDLE_STORE).get(HANDLE_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
 }
 
 function needsForBackup(c) {
