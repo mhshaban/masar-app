@@ -2,6 +2,7 @@ import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreB
 import { count } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS } from "../../core/config.js";
 import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -80,6 +81,7 @@ async function renderExportSection(root) {
     try {
       const fresh = await buildBackup();
       downloadBackup(fresh);
+      await logAuditEvent("export_backup", { tableName: "backup", count: Object.values(fresh.collections || {}).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0) });
       showToast("تم تنزيل النسخة الاحتياطية بنجاح");
     } catch (err) {
       statusRoot.innerHTML = errorHtml(`تعذّر التصدير: ${err.message}`);
