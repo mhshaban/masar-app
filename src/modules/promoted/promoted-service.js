@@ -1,6 +1,7 @@
 import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../services/cloud-runtime.js";
 import { readWorkbook } from "../../services/xlsx-parser.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 // "المرفعين" sheet inside the school's master roster workbook: students
 // promoted from prep school with one or more subjects still not cleared.
@@ -114,6 +115,7 @@ export async function commitPromotedBatch(rows, meta) {
     status: "Committed",
   };
   await save("promotedImportBatches", batch);
+  await logAuditEvent("import_promoted", { tableName: "promotedImportBatches", recordId: batch.id, count: records.length });
   return batch;
 }
 
