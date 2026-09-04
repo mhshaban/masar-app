@@ -5,6 +5,7 @@ export const ACTION_LABELS = {
   update: "تعديل سجل",
   delete: "حذف سجل",
   create_user: "إنشاء مستخدم",
+  update_user: "تعديل بيانات مستخدم",
   activate_user: "تفعيل مستخدم",
   deactivate_user: "تعطيل مستخدم",
   set_role: "تغيير صلاحية",
@@ -36,6 +37,7 @@ export const TABLE_LABELS = {
   reports: "التقارير",
   backup: "النسخ الاحتياطي",
   users: "المستخدمون",
+  profiles: "المستخدمون",
 };
 
 export function normalizeAuditPage(payload, page = 1, pageSize = 25) {
