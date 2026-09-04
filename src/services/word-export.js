@@ -35,6 +35,8 @@ export function downloadAsWordDoc(title, bodyHtml, filename) {
   .document-approval p { margin: 0 0 10px; }
   .document-approval table { margin: 0; }
   .document-approval td { width: 33.333%; border: 0; padding: 5px 0; }
+  .document-entry-footer { margin-top: 9px; padding-top: 6px; border-top: 1px solid #ddd; color: #666; font-size: 7.5pt; page-break-inside: avoid; }
+  .document-entry-footer span { display: block; margin-top: 2px; }
 </style>
 </head>
 <body dir="rtl"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}${defaultApproval}</body>

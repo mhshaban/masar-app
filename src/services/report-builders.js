@@ -9,6 +9,21 @@ function esc(str) {
   }[c]));
 }
 
+function formatAuditDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ar-BH", { dateStyle: "short", timeStyle: "short" });
+}
+
+function departmentFormEntryFooter(item) {
+  const createdBy = item.createdByName || item.createdBy?.name || item.createdBy || "حساب الإدمن";
+  const createdAt = formatAuditDate(item.createdAt);
+  const updatedBy = item.updatedByName || item.updatedBy?.name || item.updatedBy || "";
+  const updatedAt = formatAuditDate(item.updatedAt);
+  return `<div class="document-entry-footer"><span>تم الإدخال بواسطة: <strong>${esc(createdBy)}</strong>${createdAt ? ` — ${esc(createdAt)}` : ""}</span>${updatedBy ? `<span>آخر تعديل بواسطة: <strong>${esc(updatedBy)}</strong>${updatedAt ? ` — ${esc(updatedAt)}` : ""}</span>` : ""}</div>`;
+}
+
 const AGENDA_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم" };
 const FOLLOWUP_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم", not_done: "لم ينجز", unknown: "غير محدد" };
 const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد التنفيذ", done: "تم" };
@@ -68,7 +83,8 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
     </table>
     <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>
     ${item.feedback || item.feedbackDate ? `<h2>الإجراء والتغذية الراجعة</h2><table><tr><th>الحالة</th><td>${esc(statuses[item.status] || item.status || "—")}</td><th>تاريخ الرد</th><td>${esc(item.feedbackDate || "—")}</td></tr><tr><th>التغذية الراجعة</th><td colspan="3">${esc(item.feedback || "—")}</td></tr></table>` : ""}
-    ${departmentFormWorkflow(item)}`;
+    ${departmentFormWorkflow(item)}
+    ${departmentFormEntryFooter(item)}`;
 }
 
 export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
