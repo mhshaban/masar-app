@@ -520,6 +520,8 @@
   .print-approval { display: none; }
   .forms-empty-print { display: none; }
   .forms-empty-screen { color: var(--ink-500); font-size: 12px; font-style: normal; font-weight: 400; }
+  .forms-entry-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--ink-500); font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 10.5px; }
+  .forms-entry-footer strong { color: inherit; font-weight: 700; }
   .teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
   .teacher-card { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
   .teacher-card img, .teacher-avatar { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; background: var(--teal-100); color: var(--teal-700); display: grid; place-items: center; font-weight: 800; font-size: 20px; }
@@ -565,6 +567,8 @@
     .forms-print .print-approval strong { display: block; margin-bottom: 2mm; color: #1a2744 !important; font-size: 10pt; }
     .forms-print .workflow-options { margin-bottom: 3mm; font-size: 8.7pt; }
     .forms-print .workflow-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; font-size: 8.5pt; }
+    .forms-print .forms-entry-footer { display: block; margin-top: 2mm; padding-top: 1.5mm; border-top: .2mm solid #ddd; color: #666 !important; font-size: 7.2pt; line-height: 1.35; break-inside: avoid-page; }
+    .forms-print .forms-entry-footer span { color: #666 !important; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
