@@ -22,6 +22,7 @@ const fail = (message: string, status = 400) => json({ error: message }, status)
 
 const normalizeUsername = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '')
 const validUsername = (value: string) => /^[a-z0-9][a-z0-9._-]{2,31}$/.test(value)
+const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254
 const validRoles = new Set(['admin', 'counselor', 'read_only'])
 // إيميل داخلي اصطناعي عند إنشاء حساب باسم مستخدم فقط (بدون إيميل حقيقي) —
 // يطابق نفس منطق masar_resolve_login_identifier بملف SQL (يقارن الجزء قبل
@@ -174,6 +175,60 @@ Deno.serve(async (req) => {
       if (error) return fail(error.message)
       await audit('set_role', userId, oldProfile, { ...oldProfile, role, is_admin: role === 'admin' })
       return json({ ok: true })
+    }
+
+    if (action === 'update_user') {
+      const userId = String(input.user_id ?? '')
+      const fullName = String(input.full_name ?? '').trim()
+      const rawIdentifier = String(input.identifier ?? '').trim().toLowerCase()
+      const isEmail = rawIdentifier.includes('@')
+      const username = isEmail ? rawIdentifier.split('@')[0] : normalizeUsername(rawIdentifier)
+      const email = isEmail ? rawIdentifier : internalEmailFor(username)
+      if (!userId || !fullName || fullName.length > 120) return fail('الاسم الكامل مطلوب وبحد أقصى 120 حرفًا')
+      if ((isEmail && !validEmail(email)) || (!isEmail && !validUsername(username))) {
+        return fail('أدخل بريدًا إلكترونيًا صحيحًا أو اسم مستخدم من 3 إلى 32 حرفًا إنجليزيًا')
+      }
+
+      const { data: authUserData, error: authUserError } = await admin.auth.admin.getUserById(userId)
+      if (authUserError || !authUserData.user) return fail(authUserError?.message ?? 'الحساب غير موجود', 404)
+      const { data: oldProfile, error: readError } = await admin.from('profiles').select('*').eq('id', userId).maybeSingle()
+      if (readError) return fail(readError.message, 500)
+      if (!oldProfile) return fail('ملف المستخدم غير موجود', 404)
+      const { data: otherProfiles, error: duplicateReadError } = await admin
+        .from('profiles').select('id,email').neq('id', userId)
+      if (duplicateReadError) return fail(duplicateReadError.message, 500)
+      if ((otherProfiles ?? []).some((profile) => String(profile.email ?? '').toLowerCase().split('@')[0] === username)) {
+        return fail('اسم المستخدم مستخدم لحساب آخر')
+      }
+
+      const oldEmail = authUserData.user.email ?? oldProfile?.email ?? ''
+      const oldMetadata = authUserData.user.user_metadata ?? {}
+      const { error: authUpdateError } = await admin.auth.admin.updateUserById(userId, {
+        email,
+        email_confirm: true,
+        user_metadata: { ...oldMetadata, full_name: fullName, username },
+      })
+      if (authUpdateError) return fail(authUpdateError.message)
+
+      const { error: profileUpdateError } = await admin.from('profiles').update({
+        email,
+        full_name: fullName,
+      }).eq('id', userId)
+      if (profileUpdateError) {
+        // Auth وpublic.profiles ليسا ضمن معاملة واحدة؛ نعيد Auth لقيمه السابقة
+        // إذا فشل تحديث الملف حتى لا يصبح تسجيل الدخول غير متطابق.
+        await admin.auth.admin.updateUserById(userId, {
+          email: oldEmail,
+          email_confirm: true,
+          user_metadata: oldMetadata,
+        })
+        return fail(profileUpdateError.message)
+      }
+
+      await audit('update_user', userId,
+        { email: oldEmail, full_name: oldProfile?.full_name ?? '' },
+        { email, full_name: fullName })
+      return json({ ok: true, self_updated: userId === caller.id })
     }
 
     if (action === 'reset_password') {
