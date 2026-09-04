@@ -6,6 +6,7 @@ import {
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
@@ -56,6 +57,7 @@ async function exportFormsExcel(forms) {
   XLSX.utils.book_append_sheet(workbook, summary, "الملخص");
   workbook.Workbook = { Views: [{ RTL: true }] };
   XLSX.writeFile(workbook, `سجل-الاستمارات-${today()}.xlsx`, { compression: true });
+  await logAuditEvent("export_excel", { tableName: "departmentForms", count: forms.length });
 }
 
 function studentCard(student) {

@@ -1,4 +1,5 @@
 import { list as listAll, listWhere, get, save, remove, bulkPut, rpc } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 export const FORM_TYPES = {
   school_admin: { label: "تحويل إلى إدارة المدرسة", kind: "referral", destination: "إدارة المدرسة" },
@@ -110,11 +111,13 @@ export async function getTeacherPhoto(id) {
 
 export async function saveTeacher(fields) {
   if (!fields.name?.trim()) throw new Error("اسم المعلم مطلوب");
-  return save("schoolTeachers", {
+  const teacher = await save("schoolTeachers", {
     ...(fields.personalNo && !fields.id ? { id: `teacher-${fields.personalNo}` } : {}),
     ...fields, name: fields.name.trim(), updatedAt: new Date().toISOString(),
     createdAt: fields.createdAt || new Date().toISOString(),
   });
+  await logAuditEvent("update_teacher", { tableName: "schoolTeachers", recordId: String(teacher.id) });
+  return teacher;
 }
 
 export async function importTeachers(records) {
@@ -130,6 +133,7 @@ export async function importTeachers(records) {
     };
   });
   await bulkPut("schoolTeachers", cleaned);
+  await logAuditEvent("import_teachers", { tableName: "schoolTeachers", count: cleaned.length });
   return cleaned.length;
 }
 
