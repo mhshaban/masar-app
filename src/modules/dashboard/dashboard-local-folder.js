@@ -46,6 +46,19 @@ async function getHandle() {
   }
 }
 
+export async function getMasarFolderHandle({ prompt = false } = {}) {
+  if (!folderAccessSupported()) return null;
+  let handle = await getHandle();
+  if (!handle && prompt) {
+    handle = await window.showDirectoryPicker({ mode: "read", id: "masar-onedrive" });
+    await saveHandle(handle);
+  }
+  if (!handle) return null;
+  let permission = await handle.queryPermission({ mode: "read" });
+  if (permission !== "granted" && prompt) permission = await handle.requestPermission({ mode: "read" });
+  return permission === "granted" ? handle : null;
+}
+
 function needsForBackup(c) {
   const students = c.students || [];
   const flags = c.academicFlags || [];

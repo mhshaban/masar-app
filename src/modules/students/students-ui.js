@@ -3,6 +3,7 @@ import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
+import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-local.js?v=2026-09-06-student-schedule-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -280,6 +281,14 @@ async function renderDetail(container, id, onBack) {
       </table></div>
     </div>
 
+    <div class="card" id="student-schedule-card" style="margin-top:16px;">
+      <div class="card-head">
+        <div><h2>جدول الطالب</h2><div class="hint">جدول الشعبة ${esc(s.section) || "—"} من ملفات PDF في مجلد مسار على OneDrive.</div></div>
+        <button class="btn btn-ghost" id="student-schedule-open" ${s.section ? "" : "disabled"}>عرض الجدول</button>
+      </div>
+      <div id="student-schedule-result"></div>
+    </div>
+
     <div class="topbar" style="margin-top:22px;">
       <div><h1 style="font-size:17px;">المسار الأكاديمي</h1><div class="sub">تاريخ الطالب عبر الفترات الدراسية، من الدرجات والشهادات المستوردة</div></div>
     </div>
@@ -288,6 +297,31 @@ async function renderDetail(container, id, onBack) {
 
   container.querySelector("#students-back").addEventListener("click", onBack);
   container.querySelector("#student-edit").addEventListener("click", () => renderStudentEdit(container, s, () => renderDetail(container, id, onBack), () => renderDetail(container, id, onBack)));
+
+  const scheduleButton = container.querySelector("#student-schedule-open");
+  const scheduleResult = container.querySelector("#student-schedule-result");
+  scheduleButton.addEventListener("click", async () => {
+    scheduleButton.disabled = true;
+    scheduleResult.innerHTML = '<p class="hint">جارٍ البحث في مجلد مسار…</p>';
+    try {
+      const result = await findStudentScheduleFiles(s, { prompt: true, refresh: true });
+      if (!result.connected) {
+        scheduleResult.innerHTML = '<p class="hint" style="color:var(--critical);">تعذّر الوصول للمجلد. افتح التطبيق في Chrome أو Edge ثم اربط مجلد مسار.</p>';
+      } else if (!result.matches.length) {
+        scheduleResult.innerHTML = `<p class="hint" style="color:var(--critical);">لم أجد ملف PDF باسم الشعبة «${esc(s.section)}». تأكد أن الملف موجود داخل مجلد مسار أو أحد مجلداته الفرعية.</p>`;
+      } else if (result.matches.length === 1) {
+        await openScheduleFile(result.matches[0].handle);
+        scheduleResult.innerHTML = `<p class="hint">تم فتح ${esc(result.matches[0].name)}.</p>`;
+      } else {
+        scheduleResult.innerHTML = `<p class="hint">وُجد أكثر من ملف مطابق؛ اختر المطلوب:</p><div class="forms-actions">${result.matches.map((file, index) => `<button class="btn btn-ghost" data-schedule-index="${index}">${esc(file.relativePath)}</button>`).join("")}</div>`;
+        scheduleResult.querySelectorAll("[data-schedule-index]").forEach((button) => button.addEventListener("click", () => openScheduleFile(result.matches[Number(button.dataset.scheduleIndex)].handle)));
+      }
+    } catch (error) {
+      scheduleResult.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message || "تعذّر فتح جدول الطالب")}</p>`;
+    } finally {
+      scheduleButton.disabled = false;
+    }
+  });
 
   await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
 }
