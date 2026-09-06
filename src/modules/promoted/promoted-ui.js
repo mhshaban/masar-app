@@ -1,6 +1,6 @@
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
-} from "./promoted-service.js";
+} from "./promoted-service.js?v=2026-09-06-promoted-dedupe-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {

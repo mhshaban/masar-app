@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear, list, get } from "../src/services/cloud-runtime.js";
-import { commitPromotedBatch, rollbackPromotedBatch, listStudentsWithPendingSubjects, getPendingSubjectsForStudent } from "../src/modules/promoted/promoted-service.js";
+import { analyzeHistoricalPromotedDuplicates, commitPromotedBatch, rollbackPromotedBatch, listStudentsWithPendingSubjects, getPendingSubjectsForStudent } from "../src/modules/promoted/promoted-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -63,4 +63,32 @@ test("getPendingSubjectsForStudent returns every subject row (cleared and pendin
   const rows = await getPendingSubjectsForStudent("111");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].subjectCode, "دين");
+});
+
+test("historical duplicate analysis removes safe copies but leaves an unresolved status conflict", () => {
+  const existing = [
+    { id: "p1", studentId: "111", subjectCode: "دين", cleared: false },
+    { id: "p2", studentId: "111", subjectCode: "دين", cleared: false },
+    { id: "p3", studentId: "222", subjectCode: "ريض", cleared: false },
+    { id: "p4", studentId: "222", subjectCode: "ريض", cleared: true },
+  ];
+  const result = analyzeHistoricalPromotedDuplicates(existing, []);
+  assert.equal(result.duplicateGroupCount, 2);
+  assert.deepEqual(result.removableRecords.map((record) => record.id), ["p1"]);
+  assert.equal(result.conflictGroupCount, 1);
+});
+
+test("commit removes old duplicates covered by the incoming file and rollback restores them", async () => {
+  await bulkPut("promotedSubjects", [
+    { id: "p1", studentId: "111", subjectCode: "دين", cleared: false },
+    { id: "p2", studentId: "111", subjectCode: "دين", cleared: true },
+  ]);
+  const batch = await commitPromotedBatch([
+    { studentId: "111", matchStatus: "matched", subjectCode: "دين", cleared: false },
+  ], { fileName: "كشف.xlsx" });
+  assert.equal(batch.historicalDuplicatesRemoved, 1);
+  assert.equal((await list("promotedSubjects")).length, 1);
+  assert.equal((await list("promotedSubjects"))[0].cleared, false);
+  await rollbackPromotedBatch(batch.id);
+  assert.equal((await list("promotedSubjects")).length, 2);
 });

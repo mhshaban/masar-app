@@ -20,12 +20,12 @@ const VIEW_LOADERS = {
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-02-form-layout-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-02-form-layout-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
-  promoted: async () => (await import("./modules/promoted/promoted-ui.js")).mountPromotedView,
+  promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-06-promoted-dedupe-1")).mountPromotedView,
   forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-04-form-actor-2")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-03-safe-restore-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-04-users-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-04-users-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-06-current-roster-1")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-06-promoted-dedupe-1")).mountImportsView,
 };
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),

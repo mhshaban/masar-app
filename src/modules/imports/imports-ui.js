@@ -8,7 +8,7 @@
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
 import { ensureXlsx } from "../../services/vendor-loader.js";
-import { parseSchoolWorkbook, previewStaleAcademicRecords, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-current-roster-1";
+import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-promoted-dedupe-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
@@ -34,7 +34,10 @@ async function mountSchoolTab(root) {
     preview.innerHTML = '<p class="hint">جارٍ تحليل الملف…</p>';
     try {
       const data = await parseSchoolWorkbook(file);
-      const staleAcademic = await previewStaleAcademicRecords(data.students);
+      const [staleAcademic, historicalDuplicates] = await Promise.all([
+        previewStaleAcademicRecords(data.students),
+        previewHistoricalPromotedDuplicates(data.promotedRows),
+      ]);
       const matched = data.promotedRows.filter((row) => row.matchStatus === "matched").length;
       const unmatched = data.promotedRows.length - matched;
       const uniquePromoted = new Set(data.promotedRows.filter((row) => row.matchStatus === "matched").map((row) => `${row.studentId}::${String(row.subjectCode || "").trim()}`)).size;
@@ -47,17 +50,18 @@ async function mountSchoolTab(root) {
         </div>
         <p class="hint">المرفعين: ${matched} مطابق، ${unmatched} غير مطابق لن يُحفظ، ${duplicateRows} صف مكرر سيُدمج. لن تُحذف مقررات صحيحة غير موجودة في الملف.</p>
         <p class="hint">السجلات الأكاديمية القديمة خارج كشف الطلاب الحالي: ${staleAcademic.staleFlags.length} سجل تحليل و${staleAcademic.staleAverages.length} معدل فصلي. ستُحذف بعد تنزيل النسخة الاحتياطية.</p>
+        <p class="hint">تكرارات المرفعين القديمة: ${historicalDuplicates.removableCount} سجل زائد آمن للحذف${historicalDuplicates.conflictGroupCount ? `، و${historicalDuplicates.conflictGroupCount} تعارض لن يُحذف تلقائيًا` : "، ولا توجد تعارضات"}.</p>
         <button class="btn btn-primary" id="school-import-commit">تنزيل نسخة احتياطية ثم تنفيذ التحديث</button>
         <div id="school-import-status"></div>`;
       preview.querySelector("#school-import-commit").addEventListener("click", async () => {
-        if (!confirm(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا خارج الكشف الحالي. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
+        if (!confirm(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;
         status.innerHTML = '<p class="hint">جارٍ إنشاء النسخة الاحتياطية وتنفيذ التحديث…</p>';
         try {
           const result = await commitSchoolWorkbook(data, { fileName: file.name });
-          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا.</p>`;
+          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين.</p>`;
         } catch (error) {
           button.disabled = false;
           status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;

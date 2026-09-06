@@ -1,7 +1,7 @@
 import { readWorkbook } from "./xlsx-parser.js";
 import { parseStudentsRows, commitStudentsImport } from "./students-import-service.js";
 import { importTeachers } from "../modules/forms/forms-service.js?v=2026-09-06-school-import-1";
-import { parsePromotedRows, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-06-school-import-1";
+import { parsePromotedRows, previewHistoricalPromotedDuplicates, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-06-promoted-dedupe-1";
 import { buildBackup, downloadBackup } from "./backup-service.js?v=2026-09-06-school-import-1";
 import { list, remove } from "./cloud-runtime.js";
 
@@ -73,6 +73,8 @@ export async function pruneStaleAcademicRecords(students) {
   for (const record of preview.staleAverages) await remove("termAverages", record.id);
   return { flagsRemoved: preview.staleFlags.length, averagesRemoved: preview.staleAverages.length, totalRemoved: preview.total };
 }
+
+export { previewHistoricalPromotedDuplicates };
 
 export async function commitSchoolWorkbook(data, { fileName }) {
   const backup = await buildBackup({ force: true });

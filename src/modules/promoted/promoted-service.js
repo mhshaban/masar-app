@@ -77,14 +77,56 @@ export async function parsePromotedFile(file) {
   return { sheetName, rows: parsePromotedRows(sheets[sheetName] || [], students) };
 }
 
+const promotedKey = (record) => {
+  const studentId = String(record.studentId || "").trim();
+  const subjectCode = String(record.subjectCode || "").trim();
+  return studentId && subjectCode ? `${studentId}::${subjectCode}` : "";
+};
+
+export function analyzeHistoricalPromotedDuplicates(existing, incomingRows = []) {
+  const incomingKeys = new Set(incomingRows.filter((row) => row.matchStatus === "matched").map(promotedKey));
+  const groups = new Map();
+  for (const record of existing) {
+    const key = promotedKey(record);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(record);
+  }
+  const duplicateGroups = [];
+  const removableRecords = [];
+  const conflictGroups = [];
+  for (const [key, records] of groups) {
+    if (records.length < 2) continue;
+    const keeper = records[records.length - 1];
+    const statusValues = new Set(records.map((record) => Boolean(record.cleared)));
+    const safeToMerge = incomingKeys.has(key) || statusValues.size === 1;
+    const group = { key, records, keeper, duplicateCount: records.length - 1, safeToMerge };
+    duplicateGroups.push(group);
+    if (safeToMerge) removableRecords.push(...records.slice(0, -1));
+    else conflictGroups.push(group);
+  }
+  return {
+    duplicateGroups,
+    removableRecords,
+    conflictGroups,
+    duplicateGroupCount: duplicateGroups.length,
+    removableCount: removableRecords.length,
+    conflictGroupCount: conflictGroups.length,
+  };
+}
+
+export async function previewHistoricalPromotedDuplicates(incomingRows = []) {
+  return analyzeHistoricalPromotedDuplicates(await listAll("promotedSubjects"), incomingRows);
+}
+
 export async function commitPromotedBatch(rows, meta) {
   const matched = rows.filter((r) => r.matchStatus === "matched");
   const batchId = `promotedbatch-${Date.now().toString(36)}`;
   const existing = await listAll("promotedSubjects");
-  const keyFor = (r) => `${String(r.studentId).trim()}::${String(r.subjectCode || "").trim()}`;
-  const existingByKey = new Map(existing.map((record) => [keyFor(record), record]));
+  const duplicateAnalysis = analyzeHistoricalPromotedDuplicates(existing, rows);
+  const existingByKey = new Map(existing.map((record) => [promotedKey(record), record]));
   const uniqueIncoming = new Map();
-  for (const row of matched) uniqueIncoming.set(keyFor(row), row);
+  for (const row of matched) uniqueIncoming.set(promotedKey(row), row);
   const previousRecords = [];
   const newRecordIds = [];
   const records = [...uniqueIncoming].map(([key, r], i) => {
@@ -102,6 +144,7 @@ export async function commitPromotedBatch(rows, meta) {
     sourceBatchId: batchId,
   }; });
   await bulkPut("promotedSubjects", records);
+  for (const duplicate of duplicateAnalysis.removableRecords) await remove("promotedSubjects", duplicate.id);
 
   const batch = {
     id: batchId,
@@ -113,10 +156,13 @@ export async function commitPromotedBatch(rows, meta) {
     duplicateRowsRemoved: matched.length - uniqueIncoming.size,
     previousRecords,
     newRecordIds,
+    historicalDuplicateRecords: duplicateAnalysis.removableRecords,
+    historicalDuplicatesRemoved: duplicateAnalysis.removableCount,
+    historicalConflictGroups: duplicateAnalysis.conflictGroupCount,
     status: "Committed",
   };
   await save("promotedImportBatches", batch);
-  await logAuditEvent("import_promoted", { tableName: "promotedImportBatches", recordId: batch.id, count: records.length });
+  await logAuditEvent("import_promoted", { tableName: "promotedImportBatches", recordId: batch.id, count: records.length, historicalDuplicatesRemoved: duplicateAnalysis.removableCount });
   return batch;
 }
 
@@ -130,6 +176,7 @@ export async function rollbackPromotedBatch(batchId) {
   if (batch?.newRecordIds || batch?.previousRecords) {
     for (const id of batch.newRecordIds || []) await remove("promotedSubjects", id);
     if (batch.previousRecords?.length) await bulkPut("promotedSubjects", batch.previousRecords);
+    if (batch.historicalDuplicateRecords?.length) await bulkPut("promotedSubjects", batch.historicalDuplicateRecords);
   } else {
     const records = await listAll("promotedSubjects");
     for (const r of records.filter((r) => r.sourceBatchId === batchId)) await remove("promotedSubjects", r.id);
