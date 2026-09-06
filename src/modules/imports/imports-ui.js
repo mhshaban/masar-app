@@ -1,28 +1,17 @@
-// شاشة استيراد موحَّدة (إدمن فقط) — تجمع كل استيرادات الملفات المبعثرة
-// سابقًا بشاشاتها (سجل الطلبة، الطلاب المرفعين، النسخ الاحتياطي) في مكان
-// واحد. لا تكرار منطق: كل تبويب هنا يستدعي نفس دوال العرض المستوردة من
-// ملف الشاشة الأصلي (export مضاف لها هناك)، فقط إعادة تجميع بصري — منطق
-// القراءة/التحقق/الحفظ نفسه بلا أي تغيير.
+// شاشة الاستيراد الموحَّدة (إدمن فقط): تحديث شامل من ملف المدرسة الواحد،
+// مع إبقاء النسخ الاحتياطي والاستعادة الآمنة في التبويب الثاني فقط.
 //
 // الدرجات والشهادات: استيرادها انتقل بالكامل لـCowork (تحليل خارج التطبيق
 // من ملفات OneDrive)، فلا تبويب استيراد لها هنا بعد الآن — راجع README.
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
-import { getRosterStatus } from "../students/students-service.js";
-import { renderImportSection as renderStudentsRosterImport } from "../students/students-ui.js";
-import {
-  renderImportSection as renderPromotedRosterImport,
-  renderBatchHistory as renderPromotedBatchHistory,
-} from "../promoted/promoted-ui.js";
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
 import { ensureXlsx } from "../../services/vendor-loader.js";
 import { parseSchoolWorkbook, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-school-import-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
-  { key: "students", label: "سجل الطلبة" },
-  { key: "promoted", label: "الطلاب المرفعين" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
 
@@ -78,31 +67,6 @@ async function mountSchoolTab(root) {
   });
 }
 
-async function mountStudentsTab(root) {
-  await ensureXlsx();
-  const status = await getRosterStatus();
-  root.innerHTML = `
-    <div id="imports-students-roster"></div>
-  `;
-  renderStudentsRosterImport(root.querySelector("#imports-students-roster"), {
-    isUpdate: status.available,
-    onImported: () => mountStudentsTab(root),
-  });
-}
-
-async function mountPromotedTab(root) {
-  await ensureXlsx();
-  root.innerHTML = `
-    <div id="imports-promoted-roster" style="margin-bottom:16px;"></div>
-    <div id="imports-promoted-history"></div>
-  `;
-  const historyRoot = root.querySelector("#imports-promoted-history");
-  await renderPromotedBatchHistory(historyRoot);
-  await renderPromotedRosterImport(root.querySelector("#imports-promoted-roster"), async () => {
-    await renderPromotedBatchHistory(historyRoot);
-  });
-}
-
 async function mountBackupTab(root) {
   renderBackupRestoreImport(root, async () => {
     window.location.reload();
@@ -112,7 +76,7 @@ async function mountBackupTab(root) {
 export async function mountImportsView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الاستيراد</h1><div class="sub">كل ملفات الاستيراد بمكان واحد — سجل الطلبة، الطلاب المرفعين، والنسخ الاحتياطي</div></div>
+      <div><h1>الاستيراد</h1><div class="sub">تحديث بيانات المدرسة من ملف واحد، مع النسخ الاحتياطي والاستعادة الآمنة</div></div>
     </div>
     <div class="tabs">
       ${TABS.map((t, i) => `<div class="tab${i === 0 ? " active" : ""}" data-tab="${t.key}">${t.label}</div>`).join("")}
@@ -121,7 +85,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { school: mountSchoolTab, students: mountStudentsTab, promoted: mountPromotedTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
