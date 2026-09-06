@@ -10,6 +10,7 @@ beforeEach(async () => {
 });
 
 test("computeStudentGradeSummaries flags a student below the failing threshold with a human-readable reason", async () => {
+  await bulkPut("students", [{ id: "s1", name: "طالب أول" }]);
   await bulkPut("academicFlags", [
     { id: "s1", studentId: "s1", overallPct: 40, subjects: [], absentCount: 0, barredCount: 0 },
   ]);
@@ -20,6 +21,7 @@ test("computeStudentGradeSummaries flags a student below the failing threshold w
 });
 
 test("computeStudentGradeSummaries flags a student failing in one subject even with a passing overall average", async () => {
+  await bulkPut("students", [{ id: "s2", name: "طالب ثان" }]);
   await bulkPut("academicFlags", [
     {
       id: "s2",
@@ -37,6 +39,7 @@ test("computeStudentGradeSummaries flags a student failing in one subject even w
 });
 
 test("computeStudentGradeSummaries surfaces a barred count as its own reason", async () => {
+  await bulkPut("students", [{ id: "s3", name: "طالب ثالث" }]);
   await bulkPut("academicFlags", [
     { id: "s3", studentId: "s3", overallPct: 65, subjects: [], absentCount: 0, barredCount: 2 },
   ]);
@@ -46,9 +49,15 @@ test("computeStudentGradeSummaries surfaces a barred count as its own reason", a
 });
 
 test("computeStudentGradeSummaries omits a student with nothing below threshold", async () => {
+  await bulkPut("students", [{ id: "s4", name: "طالب رابع" }]);
   await bulkPut("academicFlags", [
     { id: "s4", studentId: "s4", overallPct: 91, subjects: [{ subject: "العلوم", pct: 95 }], absentCount: 0, barredCount: 0 },
   ]);
   const summaries = await computeStudentGradeSummaries();
   assert.equal(summaries.length, 0);
+});
+
+test("computeStudentGradeSummaries ignores a stale academic record outside the current roster", async () => {
+  await bulkPut("academicFlags", [{ id: "old", studentId: "old", overallPct: 30, subjects: [] }]);
+  assert.deepEqual(await computeStudentGradeSummaries(), []);
 });

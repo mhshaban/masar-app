@@ -3,6 +3,7 @@ import { parseStudentsRows, commitStudentsImport } from "./students-import-servi
 import { importTeachers } from "../modules/forms/forms-service.js?v=2026-09-06-school-import-1";
 import { parsePromotedRows, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-06-school-import-1";
 import { buildBackup, downloadBackup } from "./backup-service.js?v=2026-09-06-school-import-1";
+import { list, remove } from "./cloud-runtime.js";
 
 const clean = (value) => String(value ?? "").replace(/[‎‏‪-‮]/g, "").trim();
 
@@ -58,11 +59,27 @@ export async function parseSchoolWorkbook(file) {
   return { students, teachers, promotedRows, sheets: { students: studentsSheet, teachers: teachersSheet, promoted: promotedSheet } };
 }
 
+export async function previewStaleAcademicRecords(students) {
+  const currentIds = new Set(students.map((student) => String(student.id)));
+  const [flags, averages] = await Promise.all([list("academicFlags"), list("termAverages")]);
+  const staleFlags = flags.filter((record) => record.studentId && !currentIds.has(String(record.studentId)));
+  const staleAverages = averages.filter((record) => record.studentId && !currentIds.has(String(record.studentId)));
+  return { staleFlags, staleAverages, total: staleFlags.length + staleAverages.length };
+}
+
+export async function pruneStaleAcademicRecords(students) {
+  const preview = await previewStaleAcademicRecords(students);
+  for (const record of preview.staleFlags) await remove("academicFlags", record.id);
+  for (const record of preview.staleAverages) await remove("termAverages", record.id);
+  return { flagsRemoved: preview.staleFlags.length, averagesRemoved: preview.staleAverages.length, totalRemoved: preview.total };
+}
+
 export async function commitSchoolWorkbook(data, { fileName }) {
   const backup = await buildBackup({ force: true });
   downloadBackup(backup);
   const studentsResult = await commitStudentsImport(data.students);
+  const academicPrune = await pruneStaleAcademicRecords(data.students);
   const teachersCount = await importTeachers(data.teachers);
   const promotedBatch = await commitPromotedBatch(data.promotedRows, { fileName });
-  return { studentsCount: studentsResult.count, teachersCount, promotedBatch };
+  return { studentsCount: studentsResult.count, teachersCount, promotedBatch, academicPrune };
 }

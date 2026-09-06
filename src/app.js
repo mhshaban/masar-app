@@ -12,11 +12,11 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-02-form-layout-1")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-06-current-roster-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-02-form-layout-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-06-onedrive-links-1")).mountAgendaView,
   students: async () => (await import("./modules/students/students-ui.js?v=2026-09-06-student-schedule-1")).mountStudentsView,
-  grades: async () => (await import("./modules/grades/grades-ui.js")).mountGradesView,
+  grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-06-current-roster-1")).mountGradesView,
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-02-form-layout-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-02-form-layout-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js")).mountCareerView,
@@ -25,7 +25,7 @@ const VIEW_LOADERS = {
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-03-safe-restore-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-04-users-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-04-users-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-06-school-import-2")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-06-current-roster-1")).mountImportsView,
 };
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),

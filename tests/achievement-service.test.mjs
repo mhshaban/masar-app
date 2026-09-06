@@ -49,6 +49,12 @@ test("computeStudentAchievement skips a student with no academicFlags row (no ov
   assert.equal(rows.length, 0);
 });
 
+test("achievement views ignore an academic record for a student no longer in the current roster", async () => {
+  await bulkPut("academicFlags", [{ id: "old", studentId: "old", overallPct: 45, subjects: [{ subject: "الرياضيات", pct: 40 }] }]);
+  assert.deepEqual(await computeStudentAchievement(), []);
+  assert.deepEqual(await computeSubjectAchievement(), []);
+});
+
 test("computeSubjectAchievement classifies students per subject independently of their overall average", async () => {
   await bulkPut("students", [
     { id: "s1", name: "طالب أول", level: "الثالث", section: "١" },

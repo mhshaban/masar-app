@@ -1,4 +1,5 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
+import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 
 // A student below this general average, or failing/barred in any subject,
 // is surfaced as a candidate for a guidance case or a support plan — this
@@ -17,11 +18,13 @@ const FAIL_THRESHOLD_PCT = 50;
 // are simply absent from the result — this is a suggestion list, not a
 // roster.
 export async function computeStudentGradeSummaries() {
-  const flags = await listAll("academicFlags");
+  const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
+  const currentStudentIds = new Set(students.map((student) => String(student.id)));
 
   const summaries = [];
   for (const f of flags) {
     if (!f.studentId) continue;
+    if (!currentStudentIds.has(String(f.studentId))) continue;
     const overallPct = f.overallPct == null ? null : Number(f.overallPct);
     const failingSubjects = (f.subjects || []).filter((s) => s.pct != null && Math.round(Number(s.pct)) < FAIL_THRESHOLD_PCT);
     const barredCount = Number(f.barredCount) || 0;

@@ -61,6 +61,7 @@ export async function getMasarFolderHandle({ prompt = false } = {}) {
 
 function needsForBackup(c) {
   const students = c.students || [];
+  const currentStudentIds = new Set(students.map((student) => String(student.id)));
   const flags = c.academicFlags || [];
   const openCases = new Set((c.guidanceCases || []).filter((x) => (x.status || "open") !== "closed").map((x) => String(x.studentId)));
   const activePlans = new Set((c.supportPlans || []).filter((x) => x.status === "active").map((x) => String(x.studentId)));
@@ -72,6 +73,7 @@ function needsForBackup(c) {
     if (!byStudent.get(id).some((n) => n.type === type)) byStudent.get(id).push({ type, reasons });
   };
   for (const f of flags) {
+    if (!currentStudentIds.has(String(f.studentId))) continue;
     const reasons = [];
     const pct = Number(f.overallPct);
     const failing = (f.subjects || []).filter((s) => Number(s.pct) < 50).length;
@@ -87,6 +89,7 @@ function needsForBackup(c) {
   for (const row of c.promotedSubjects || []) {
     if (row.cleared) continue;
     const id = String(row.studentId || "");
+    if (!currentStudentIds.has(id)) continue;
     if (!promoted.has(id)) promoted.set(id, new Set());
     promoted.get(id).add(String(row.subjectCode || "غير محدد"));
   }
@@ -128,11 +131,12 @@ export function buildLocalDashboardSnapshot(backup, now = new Date()) {
     if (failing) reasons.push(`رسوب في ${failing} ${failing === 1 ? "مادة" : "مواد"}`);
     if (Number(flag.barredCount) > 0) reasons.push(`محروم في ${flag.barredCount} مادة`);
     return { studentId: String(flag.studentId), student: studentMap.get(String(flag.studentId)) || null, overallPct: Number.isFinite(pct) ? pct : null, barredCount: Number(flag.barredCount || 0), reasons };
-  }).filter((row) => row.reasons.length).sort((a, b) => (a.overallPct ?? 101) - (b.overallPct ?? 101) || b.barredCount - a.barredCount).slice(0, 10);
+  }).filter((row) => row.student && row.reasons.length).sort((a, b) => (a.overallPct ?? 101) - (b.overallPct ?? 101) || b.barredCount - a.barredCount).slice(0, 10);
   const promotedByStudent = new Map();
   for (const row of c.promotedSubjects || []) {
     if (row.cleared) continue;
     const id = String(row.studentId || "");
+    if (!studentMap.has(id)) continue;
     if (!promotedByStudent.has(id)) promotedByStudent.set(id, new Set());
     promotedByStudent.get(id).add(String(row.subjectCode || "غير محدد"));
   }

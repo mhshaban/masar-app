@@ -39,5 +39,5 @@ export async function listStudentsNeedingAttention() {
     [...byStudent.values()].map(async (row) => ({ ...row, student: await getStudent(row.studentId) })),
   );
 
-  return rows.sort((a, b) => b.needs.length - a.needs.length);
+  return rows.filter((row) => row.student).sort((a, b) => b.needs.length - a.needs.length);
 }

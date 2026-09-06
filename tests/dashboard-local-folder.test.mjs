@@ -23,3 +23,16 @@ test("local OneDrive backup becomes a small dashboard snapshot and removes promo
   assert.equal(priorityScore(snapshot.attentionRows[0].needs), 115);
   assert.equal(priorityLevel(115), "high");
 });
+
+test("local dashboard ignores academic and promoted records for students outside the current roster", () => {
+  const backup = { app: "masar", collections: {
+    students: [{ id: "current", name: "طالب حالي", level: "الأول" }],
+    academicFlags: [{ studentId: "old", overallPct: 20, subjects: [{ pct: 10 }] }],
+    promotedSubjects: [{ studentId: "old", subjectCode: "ريض", cleared: false }],
+    guidanceCases: [], supportPlans: [], careerSessions: [], caseSessions: [], supportPlanActions: [], departmentPlanProjects: [], actionProgress: [],
+  } };
+  const snapshot = buildLocalDashboardSnapshot(backup, new Date("2026-09-01T10:00:00+03:00"));
+  assert.equal(snapshot.attentionCount, 0);
+  assert.deepEqual(snapshot.academicWeak, []);
+  assert.deepEqual(snapshot.promotedTop, []);
+});

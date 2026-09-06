@@ -34,6 +34,8 @@ export async function computeStudentAchievement() {
   const rows = [];
   for (const f of flags) {
     if (!f.studentId || f.overallPct == null) continue;
+    const student = studentById.get(String(f.studentId));
+    if (!student) continue;
     const avgPct = Math.round(Number(f.overallPct));
     const subjects = f.subjects || [];
     const weakSubjects = subjects
@@ -42,7 +44,6 @@ export async function computeStudentAchievement() {
       .sort((a, b) => a.pct - b.pct);
 
     const rating = ratingForPct(avgPct);
-    const student = studentById.get(String(f.studentId));
     rows.push({
       studentId: f.studentId,
       studentName: student ? student.name : null,
@@ -71,6 +72,7 @@ export async function computeSubjectAchievement() {
   const bySubject = new Map();
   for (const f of flags) {
     if (!f.studentId) continue;
+    if (!studentById.has(String(f.studentId))) continue;
     for (const s of f.subjects || []) {
       if (s.pct == null) continue;
       if (!bySubject.has(s.subject)) bySubject.set(s.subject, []);

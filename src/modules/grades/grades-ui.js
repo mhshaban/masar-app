@@ -1,6 +1,7 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
 import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js";
+import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -12,7 +13,9 @@ function esc(str) {
 // من تحليل Cowork) — بدل حساب معدل حسب المقرر من آلاف صفوف الدرجات الخام
 // كما كان سابقًا. الآن مجرد متوسط على أرقام قليلة أصلًا.
 async function getAcademicStats() {
-  const flags = await listAll("academicFlags");
+  const [allFlags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
+  const currentStudentIds = new Set(students.map((student) => String(student.id)));
+  const flags = allFlags.filter((flag) => currentStudentIds.has(String(flag.studentId)));
   const withOverall = flags.filter((f) => f.overallPct != null);
   const overallAvg = withOverall.length
     ? Math.round(withOverall.reduce((sum, f) => sum + Number(f.overallPct), 0) / withOverall.length)

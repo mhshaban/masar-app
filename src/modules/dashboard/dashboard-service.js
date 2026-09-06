@@ -63,9 +63,10 @@ export async function loadDashboardSnapshot() {
         rpc("masar_dashboard_snapshot_v2", { p_stale_days: 14, p_attention_limit: 20 }),
         loadPlanPrioritiesLight(),
       ]);
+      const attentionRows = (snapshot.attentionRows || []).filter((row) => row.student);
       return {
         agenda: snapshot.agenda || { total: 0, done: 0, ongoing: 0, notStarted: 0 },
-        attentionRows: snapshot.attentionRows || [],
+        attentionRows,
         attentionCount: Number(snapshot.attentionCount || 0),
         staleCases: snapshot.staleCases || [],
         overdueSupportActions: snapshot.overdueSupportActions || [],
