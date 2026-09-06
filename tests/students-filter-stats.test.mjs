@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear } from "../src/services/cloud-runtime.js";
-import { buildLevelTrackBreakdown, studentTrackGroup, normalizeSectionFilter, searchStudentsPage, listStudentsForSection } from "../src/modules/students/students-service.js";
+import { buildLevelTrackBreakdown, studentTrackGroup, normalizeSectionFilter, searchStudentsPage, listStudentsForSection, getFilterOptions } from "../src/modules/students/students-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -39,4 +39,14 @@ test("section filter accepts Western digits and returns only that exact section"
   assert.equal(page.rows[0].id, "1");
   const printable = await listStudentsForSection("1تجر1");
   assert.deepEqual(printable.map((student) => student.id), ["1"]);
+});
+
+test("section choices come from the current roster without duplicates", async () => {
+  await bulkPut("students", [
+    { id: "1", section: "١تجر١" },
+    { id: "2", section: "١تجر١" },
+    { id: "3", section: "٣محك١" },
+  ]);
+  const options = await getFilterOptions();
+  assert.deepEqual(options.sections, ["١تجر١", "٣محك١"]);
 });

@@ -152,6 +152,26 @@ export async function listWhere(collection, field, value) {
   return allRows.map(rowToRecord);
 }
 
+// يجلب قيمة حقل JSON واحد فقط لكل الصفوف بدل تنزيل السجل الكامل. مناسب
+// لقوائم الاختيار الصغيرة (مثل الشعب) ويحافظ على خفة النقل من Supabase.
+export async function listFieldValues(collection, field) {
+  const backend = testBackend();
+  if (backend) return (await backend.list(collection)).map((record) => record[field]);
+  if (!/^[A-Za-z0-9_]+$/.test(field)) throw new Error("اسم الحقل غير صالح");
+  const values = [];
+  let offset = 0;
+  while (true) {
+    const res = await request(`${collection}?select=value:data->>${field}&order=id.asc`, {
+      headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+    });
+    const page = await res.json();
+    values.push(...page.map((row) => row.value));
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return values;
+}
+
 // قراءة حالة تنفيذ إجراءات الخطة فقط، دون الحقول النصية أو المرفقات
 // الموجودة داخل data. يُستخدم كمسار احتياطي خفيف لشاشة أولويات اليوم.
 export async function listActionProgressStatuses() {

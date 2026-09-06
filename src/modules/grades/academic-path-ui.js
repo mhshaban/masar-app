@@ -73,7 +73,7 @@ export async function renderAcademicPath(container, studentId) {
   container.innerHTML = `
     <div class="card">
       <h2>المعدل الفصلي عبر الزمن</h2>
-      <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط — من تحليل Cowork، لا يشمل درجات الوقفة التقويمية.</p>
+      <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط.</p>
       <div id="term-chart-root"></div>
     </div>
   `;

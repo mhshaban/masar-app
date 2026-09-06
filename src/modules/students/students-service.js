@@ -1,4 +1,4 @@
-import { list as listAll, listWhere, get, save, rpc } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, listFieldValues, get, save, rpc } from "../../services/cloud-runtime.js?v=2026-09-06-field-values-1";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -111,6 +111,7 @@ export async function getFilterOptions() {
     levels: uniqueSorted(students.map((s) => s.level)),
     departments: uniqueSorted(students.map((s) => s.department)),
     tracks: STUDENT_TRACK_ORDER,
+    sections: uniqueSorted(students.map((s) => s.section)),
   };
 }
 
@@ -177,9 +178,12 @@ export async function getRosterMeta() {
   if (!isTestRuntime()) {
     try {
       const meta = await rpc("masar_student_roster_meta");
+      const sections = Array.isArray(meta.sections) && meta.sections.length
+        ? uniqueSorted(meta.sections)
+        : uniqueSorted(await listFieldValues("students", "section"));
       return {
         stats: { total: Number(meta.total || 0), byLevel: meta.byLevel || {}, flagged: Number(meta.flagged || 0), unmatched: Number(meta.unmatched || 0) },
-        options: { levels: meta.levels || [], departments: meta.departments || [], tracks: STUDENT_TRACK_ORDER },
+        options: { levels: meta.levels || [], departments: meta.departments || [], tracks: STUDENT_TRACK_ORDER, sections },
       };
     } catch {
       // توافق مع قواعد البيانات قبل migration.

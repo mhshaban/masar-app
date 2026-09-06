@@ -58,3 +58,8 @@ export async function openScheduleFile(fileHandle) {
     throw error;
   }
 }
+
+export async function scheduleFileObjectUrl(fileHandle) {
+  const file = await fileHandle.getFile();
+  return URL.createObjectURL(file);
+}
