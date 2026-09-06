@@ -1,4 +1,4 @@
-import { getRosterStatus, getRosterMeta, searchStudentsPage, getStudent, updateStudent } from "./students-service.js?v=2026-08-31-record-edit-1";
+import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-roster-dashboard-1";
 import { renderAcademicPath } from "../grades/academic-path-ui.js";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
@@ -121,7 +121,8 @@ function renderEmptyState(container, { isAdmin, onGoto } = {}) {
 // destroy and recreate the <input> itself, dropping keyboard focus after
 // every single character — confirmed as the reported "search box only
 // accepts one letter" bug.
-function renderFilters(root, options, current, onChange, onQueryChange) {
+function renderFilters(root, options, current, onChange, onQueryChange, onSectionChange, onPrintSection) {
+  const orderedLevels = [...STUDENT_LEVEL_ORDER.filter((level) => options.levels.includes(level)), ...options.levels.filter((level) => !STUDENT_LEVEL_ORDER.includes(level))];
   root.innerHTML = `
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -129,7 +130,7 @@ function renderFilters(root, options, current, onChange, onQueryChange) {
     </div>
     <div class="chip-row" id="students-level-chips">
       <div class="chip${!current.level ? " on" : ""}" data-level="">الكل</div>
-      ${options.levels.map((l) => `<div class="chip${current.level === l ? " on" : ""}" data-level="${esc(l)}">${esc(l)}</div>`).join("")}
+      ${orderedLevels.map((l) => `<div class="chip${current.level === l ? " on" : ""}" data-level="${esc(l)}">${esc(l)}</div>`).join("")}
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
       <select id="students-department" style="padding:8px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -140,6 +141,8 @@ function renderFilters(root, options, current, onChange, onQueryChange) {
         <option value="">كل المسارات</option>
         ${options.tracks.map((t) => `<option value="${esc(t)}" ${current.track === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
       </select>
+      <input id="students-section" type="text" value="${esc(current.section)}" placeholder="الشعبة، مثال: ١تجر١" style="width:170px; padding:8px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+      <button class="btn btn-ghost" id="students-print-section" ${current.section ? "" : "disabled"}>طباعة الشعبة</button>
     </div>
   `;
 
@@ -149,6 +152,16 @@ function renderFilters(root, options, current, onChange, onQueryChange) {
   });
   root.querySelector("#students-department").addEventListener("change", (e) => onChange({ ...current, department: e.target.value }));
   root.querySelector("#students-track").addEventListener("change", (e) => onChange({ ...current, track: e.target.value }));
+  root.querySelector("#students-section").addEventListener("input", (e) => onSectionChange(e.target.value));
+  root.querySelector("#students-print-section").addEventListener("click", onPrintSection);
+}
+
+function printSectionRoster(students, section, popup) {
+  const generatedAt = new Intl.DateTimeFormat("ar-BH", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
+  popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف الشعبة ${esc(section)}</title><style>@page{size:A4 portrait;margin:12mm}body{font-family:Cairo,"Segoe UI",Tahoma,Arial,sans-serif;color:#111}h1{font-size:18pt;margin:0 0 3mm}.meta{font-size:9pt;color:#555;margin-bottom:5mm}table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #999;padding:2mm;text-align:right}th{background:#eee}tr{break-inside:avoid}.num{text-align:center;direction:ltr}</style></head><body><h1>كشف طلبة الشعبة ${esc(section)}</h1><div class="meta">قسم الإرشاد الأكاديمي والتوجيه المهني · العدد: ${students.length} طالبًا · تاريخ الطباعة: ${esc(generatedAt)}</div><table><thead><tr><th>#</th><th>اسم الطالب</th><th>الرقم الأكاديمي</th><th>المستوى</th><th>القسم</th><th>المسار</th></tr></thead><tbody>${students.map((student, index) => `<tr><td class="num">${index + 1}</td><td>${esc(student.name)}</td><td class="num">${esc(student.academicId || student.id)}</td><td>${esc(student.level) || "—"}</td><td>${esc(student.department) || "—"}</td><td>${esc(student.track) || "—"}</td></tr>`).join("")}</tbody></table></body></html>`);
+  popup.document.close();
+  popup.focus();
+  setTimeout(() => popup.print(), 250);
 }
 
 const PAGE_SIZE = 50;
@@ -334,7 +347,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     return;
   }
 
-  let state = { query: "", level: "", department: "", track: "" };
+  let state = { query: "", level: "", department: "", track: "", section: "" };
 
   container.innerHTML = `
     <div class="topbar">
@@ -347,13 +360,12 @@ export async function mountStudentsView(container, { onGoto } = {}) {
   `;
 
   const { stats, options } = await getRosterMeta();
-  const topLevels = Object.entries(stats.byLevel);
+  const byLevelTrack = await getLevelTrackBreakdown();
   container.querySelector("#students-stats").innerHTML = `
     <div class="card stat"><div class="label">إجمالي الطلبة</div><div class="value">${stats.total}</div></div>
-    ${topLevels.slice(0, 2).map(([level, n]) => `
-      <div class="card stat"><div class="label">مستوى ${esc(level)}</div><div class="value">${n}</div></div>
+    ${STUDENT_LEVEL_ORDER.map((level) => `
+      <div class="card stat"><div class="label">المستوى ${esc(level)}</div><div class="value">${Number(stats.byLevel[level] || 0)}</div><div class="hint">صناعي: ${Number(byLevelTrack[level]?.الصناعي || 0)} · تجاري: ${Number(byLevelTrack[level]?.التجاري || 0)}</div></div>
     `).join("")}
-    <div class="card stat"><div class="label">لديهم ملاحظات دعم/إرشاد</div><div class="value">${stats.flagged}</div></div>
   `;
 
   const resultsRoot = container.querySelector("#students-results");
@@ -365,7 +377,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
   let searchTimer = null;
 
   const draw = () => {
-    countRoot.textContent = `${matchingTotal} من ${stats.total} طالبًا`;
+    countRoot.textContent = `النتيجة: ${matchingTotal} طالبًا من أصل ${stats.total}`;
     renderTable(
       resultsRoot,
       loadedResults,
@@ -392,7 +404,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
 
   const onChange = async (next) => {
     state = next;
-    renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange);
+    renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange, onSectionChange, onPrintSection);
     await refresh();
   };
 
@@ -402,6 +414,36 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     searchTimer = setTimeout(refresh, 250);
   };
 
-  renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange);
+  const onSectionChange = (section) => {
+    state = { ...state, section };
+    const printButton = container.querySelector("#students-print-section");
+    if (printButton) printButton.disabled = !section.trim();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(refresh, 250);
+  };
+
+  const onPrintSection = async () => {
+    const section = state.section.trim();
+    if (!section) return;
+    const popup = window.open("", "_blank");
+    if (!popup) {
+      alert("اسمح بفتح النافذة المنبثقة لطباعة كشف الشعبة.");
+      return;
+    }
+    try {
+      const students = await listStudentsForSection(section);
+      if (!students.length) {
+        popup.close();
+        alert("لم يتم العثور على طلبة في هذه الشعبة.");
+        return;
+      }
+      printSectionRoster(students, section, popup);
+    } catch (error) {
+      popup.close();
+      alert(error.message || "تعذّرت طباعة كشف الشعبة.");
+    }
+  };
+
+  renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange, onSectionChange, onPrintSection);
   await refresh();
 }
