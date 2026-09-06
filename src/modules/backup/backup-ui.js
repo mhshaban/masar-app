@@ -1,5 +1,5 @@
 import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js?v=2026-08-31-egress-1";
-import { count } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
+import { count, clear } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS } from "../../core/config.js";
 import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -57,17 +57,55 @@ async function renderExportSection(root) {
       <div id="export-summary">${loadingHtml("جارٍ حساب أعداد السجلات…")}</div>
       <button class="btn btn-primary" id="export-btn" style="margin-top:12px;" disabled>تنزيل نسخة احتياطية الآن</button>
       <div id="export-status" style="margin-top:8px;"></div>
+      <div id="historical-cleanup" style="margin-top:16px;"></div>
     </div>
   `;
 
   const summaryRoot = root.querySelector("#export-summary");
   const exportBtn = root.querySelector("#export-btn");
   const statusRoot = root.querySelector("#export-status");
+  const cleanupRoot = root.querySelector("#historical-cleanup");
 
   try {
     const counts = {};
     for (const name of COLLECTIONS) counts[name] = await count(name);
     summaryRoot.innerHTML = renderSummary(counts);
+    const historicalCount = Number(counts.agendaStatus || 0);
+    if (historicalCount > 0) {
+      cleanupRoot.innerHTML = `
+        <div class="sens">
+          <div>
+            <strong>تنظيف البيانات التاريخية:</strong>
+            توجد ${historicalCount} بنود متابعة قديمة لا يعتمد عليها التطبيق في الإحصائيات أو التشغيل.
+            <button class="btn" id="cleanup-agenda-status-btn" style="margin-top:10px; background:var(--critical); color:#fff;">تنظيف ${historicalCount} سجلًا تاريخيًا</button>
+            <div id="cleanup-status" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      `;
+      const cleanupBtn = cleanupRoot.querySelector("#cleanup-agenda-status-btn");
+      const cleanupStatus = cleanupRoot.querySelector("#cleanup-status");
+      cleanupBtn.addEventListener("click", async () => {
+        if (!confirmDialog(`سيتم حذف ${historicalCount} سجلًا تاريخيًا من agendaStatus فقط. لن تتأثر حالة تنفيذ الإجراءات الحالية. تأكد من تنزيل نسخة احتياطية أولًا. هل تريد المتابعة؟`)) return;
+        cleanupBtn.disabled = true;
+        cleanupBtn.textContent = "جارٍ التنظيف…";
+        try {
+          const before = await count("agendaStatus");
+          await clear("agendaStatus");
+          const after = await count("agendaStatus");
+          if (after !== 0) throw new Error(`بقي ${after} سجلًا ولم يكتمل التنظيف`);
+          await logAuditEvent("cleanup_historical_agenda_status", { tableName: "agendaStatus", count: before });
+          cleanupRoot.innerHTML = '<p class="hint" role="status">تم تنظيف بيانات agendaStatus التاريخية بنجاح.</p>';
+          showToast(`تم تنظيف ${before} سجلًا تاريخيًا بنجاح`);
+        } catch (err) {
+          cleanupBtn.disabled = false;
+          cleanupBtn.textContent = `إعادة محاولة تنظيف ${historicalCount} سجلًا تاريخيًا`;
+          cleanupStatus.innerHTML = errorHtml(`تعذّر التنظيف: ${err.message}`);
+          showToast(`تعذّر التنظيف: ${err.message}`, { type: "error" });
+        }
+      });
+    } else {
+      cleanupRoot.innerHTML = '<p class="hint">لا توجد بيانات agendaStatus تاريخية تحتاج إلى تنظيف.</p>';
+    }
   } catch (err) {
     summaryRoot.innerHTML = errorHtml(`تعذّر حساب أعداد السجلات: ${err.message}`);
   }

@@ -17,6 +17,7 @@ export const ACTION_LABELS = {
   import_students: "استيراد سجل الطلبة",
   import_teachers: "استيراد سجل المعلمين",
   import_promoted: "استيراد مقررات المرفعين",
+  cleanup_historical_agenda_status: "تنظيف بيانات المتابعة التاريخية",
   update_student: "تعديل بيانات طالب",
   update_teacher: "تعديل بيانات معلم",
 };
@@ -34,6 +35,7 @@ export const TABLE_LABELS = {
   departmentForms: "الاستمارات",
   students: "سجل الطلبة",
   schoolTeachers: "سجل المعلمين",
+  agendaStatus: "المتابعة التاريخية",
   reports: "التقارير",
   backup: "النسخ الاحتياطي",
   users: "المستخدمون",
