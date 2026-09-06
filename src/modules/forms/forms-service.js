@@ -146,14 +146,19 @@ export async function saveTeacher(fields) {
 
 export async function importTeachers(records) {
   if (!Array.isArray(records) || !records.length) throw new Error("لا توجد بيانات معلمين للاستيراد");
+  const existing = new Map((await listAll("schoolTeachers")).map((teacher) => [String(teacher.id), teacher]));
   const cleaned = records.map((item) => {
     if (!item.name?.trim()) throw new Error("يوجد سجل دون اسم معلم");
     const personalNo = String(item.personalNo || "").trim();
+    const id = item.id || (personalNo ? `teacher-${personalNo}` : undefined);
+    const previous = existing.get(String(id));
     return {
+      ...(previous || {}),
       ...item,
-      id: item.id || (personalNo ? `teacher-${personalNo}` : undefined),
+      id,
       name: item.name.trim(), personalNo, updatedAt: new Date().toISOString(),
-      createdAt: item.createdAt || new Date().toISOString(),
+      createdAt: previous?.createdAt || item.createdAt || new Date().toISOString(),
+      ...(previous?.photoDataUrl && !item.photoDataUrl ? { photoDataUrl: previous.photoDataUrl } : {}),
     };
   });
   await bulkPut("schoolTeachers", cleaned);

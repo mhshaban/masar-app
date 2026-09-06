@@ -34,13 +34,7 @@ function detectColumns(headerRow) {
   return map;
 }
 
-export async function parsePromotedFile(file) {
-  const { sheetNames, sheets } = await readWorkbook(file);
-  const sheetName = sheetNames.find((n) => n.includes(SHEET_NAME_HINT));
-  if (!sheetName) {
-    throw new Error(`تعذّر إيجاد شيت "المرفعين" داخل الملف — تأكد من رفع ملف كشف الطلاب الكامل.`);
-  }
-  const rows = sheets[sheetName] || [];
+export function parsePromotedRows(rows, students) {
   const [headerRow, ...dataRows] = rows;
   if (!headerRow) throw new Error("شيت المرفعين فارغ.");
 
@@ -49,8 +43,6 @@ export async function parsePromotedFile(file) {
     throw new Error("تعذّر التعرّف على أعمدة شيت المرفعين — تأكد من وجود عمودي 'الرقم الاكاديمي' و'المقرر'.");
   }
 
-  await ensureStudentsSeeded();
-  const students = await listAll("students");
   const byAcademicId = new Map(students.map((s) => [String(s.academicId), s]));
 
   const parsed = dataRows
@@ -73,7 +65,16 @@ export async function parsePromotedFile(file) {
       };
     });
 
-  return { sheetName, rows: parsed };
+  return parsed;
+}
+
+export async function parsePromotedFile(file) {
+  const { sheetNames, sheets } = await readWorkbook(file);
+  const sheetName = sheetNames.find((n) => n.includes(SHEET_NAME_HINT));
+  if (!sheetName) throw new Error(`تعذّر إيجاد شيت "المرفعين" داخل الملف — تأكد من رفع ملف كشف الطلاب الكامل.`);
+  await ensureStudentsSeeded();
+  const students = await listAll("students");
+  return { sheetName, rows: parsePromotedRows(sheets[sheetName] || [], students) };
 }
 
 export async function commitPromotedBatch(rows, meta) {
@@ -81,7 +82,7 @@ export async function commitPromotedBatch(rows, meta) {
   const batchId = `promotedbatch-${Date.now().toString(36)}`;
   const existing = await listAll("promotedSubjects");
   const keyFor = (r) => `${String(r.studentId).trim()}::${String(r.subjectCode || "").trim()}`;
-  const existingByKey = new Map(existing.map((r) => [keyFor(r), r]));
+  const existingByKey = new Map(existing.map((record) => [keyFor(record), record]));
   const uniqueIncoming = new Map();
   for (const row of matched) uniqueIncoming.set(keyFor(row), row);
   const previousRecords = [];

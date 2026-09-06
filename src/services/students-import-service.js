@@ -5,7 +5,7 @@
 // حقيقية داخل نفس المستودع كان يعني أي زائر يقدر يجلبه مباشرة بدون تسجيل
 // دخول — استيراد داخل التطبيق (يكتب عبر cloud-runtime.js، خلف تسجيل
 // الدخول + RLS) هو البديل الآمن.
-import { list, clear, bulkPut } from "./cloud-runtime.js";
+import { list, bulkPut, remove } from "./cloud-runtime.js";
 import { invalidateStudentsCache } from "../modules/students/students-service.js";
 import { readWorkbook } from "./xlsx-parser.js";
 import { resetStudentsSeedCache } from "./students-source.js";
@@ -17,7 +17,7 @@ const SHEET_HINT = "كشف الطلاب";
 // بصف مقابل الحقول اللي كان يُنتجها seed القديم (data/students.local.json)
 // للتأكد من تطابق الشكل تمامًا (نفس أسماء الحقول، نفس بنية counselor/
 // weekSchedule/phones) فلا يتغيّر أي شيء بباقي الشاشات اللي تقرأ سجل الطالب.
-const COL = {
+const LEGACY_COL = {
   civilId: 3,
   academicId: 4,
   name: 5,
@@ -52,16 +52,48 @@ const COL = {
   committee: 35,
 };
 
+const HEADER_ALIASES = {
+  civilId: ["الرقم الشخصي", "الرقم السكانى", "الرقم السكاني"],
+  academicId: ["الرقم الاكاديمي", "الرقم الأكاديمي"],
+  name: ["اسم الطالب", "الاسم"], nameEn: ["الاسم باللغة الإنجليزية", "الاسم باللغة الانجليزية"],
+  email: ["البريد الالكتروني", "البريد الإلكتروني", "الايميل"], level: ["المستوى"], section: ["الشعبة"],
+  department: ["القسم"], track: ["المسار"], transport: ["المواصلات"], complexNumber: ["رقم المجمع", "المجمع"],
+  counselorName: ["اسم المرشد"], counselorPhone: ["رقم المرشد"], counselorEmail: ["ايميل المرشد", "إيميل المرشد"],
+  counselorDepartment: ["قسم المرشد"], socialGuidance: ["الارشاد الاجتماعي", "الإرشاد الاجتماعي"],
+  supportNeeded: ["الدعم المطلوب"], nonArabNationality: ["جنسيات غير عربية"], specializationPreference: ["رغبة التخصص"],
+  minSpecializationThreshold: ["الحد الأدنى للتخصص"], seatNumber: ["رقم المقعد"], committee: ["اللجنة"],
+};
+
+function cleanHeader(value) {
+  return String(value ?? "").replace(/[‎‏‪-‮]/g, "").trim();
+}
+
+function detectColumns(headerRow) {
+  const columns = {};
+  headerRow.forEach((cell, index) => {
+    const header = cleanHeader(cell);
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (columns[field] === undefined && aliases.includes(header)) columns[field] = index;
+    }
+    if (/^رقم الاتصال[١-٦1-6]$/.test(header)) {
+      if (!columns.phones) columns.phones = [];
+      columns.phones.push(index);
+    }
+  });
+  return columns;
+}
+
 function toText(v) {
   if (v == null) return null;
   const s = String(v).trim();
   return s || null;
 }
 
-export function rowToStudent(r, i) {
-  const civilId = toText(r[COL.civilId]);
-  const academicId = toText(r[COL.academicId]);
-  const phones = [r[COL.phone1], r[COL.phone2], r[COL.phone3], r[COL.phone4], r[COL.phone5]]
+export function rowToStudent(r, i, columns = LEGACY_COL) {
+  const civilId = toText(r[columns.civilId]);
+  const academicId = toText(r[columns.academicId]);
+  const phoneColumns = columns.phones || [columns.phone1, columns.phone2, columns.phone3, columns.phone4, columns.phone5];
+  const phones = phoneColumns.map((index) => r[index])
     .map(toText)
     .filter(Boolean);
 
@@ -69,37 +101,45 @@ export function rowToStudent(r, i) {
     id: academicId || civilId || `student-${i + 1}`,
     civilId,
     academicId,
-    name: toText(r[COL.name]),
-    nameEn: toText(r[COL.nameEn]),
-    email: toText(r[COL.email]),
-    level: toText(r[COL.level]),
-    section: toText(r[COL.section]),
-    department: toText(r[COL.department]),
-    track: toText(r[COL.track]),
+    name: toText(r[columns.name]),
+    nameEn: toText(r[columns.nameEn]),
+    email: toText(r[columns.email]),
+    level: toText(r[columns.level]),
+    section: toText(r[columns.section]),
+    department: toText(r[columns.department]),
+    track: toText(r[columns.track]),
     phones,
-    transport: toText(r[COL.transport]),
-    complexNumber: toText(r[COL.complexNumber]),
+    transport: toText(r[columns.transport]),
+    complexNumber: toText(r[columns.complexNumber]),
     weekSchedule: {
-      sunday: toText(r[COL.sunday]),
-      monday: toText(r[COL.monday]),
-      tuesday: toText(r[COL.tuesday]),
-      wednesday: toText(r[COL.wednesday]),
-      thursday: toText(r[COL.thursday]),
+      sunday: toText(r[columns.sunday]), monday: toText(r[columns.monday]), tuesday: toText(r[columns.tuesday]),
+      wednesday: toText(r[columns.wednesday]), thursday: toText(r[columns.thursday]),
     },
     counselor: {
-      name: toText(r[COL.counselorName]),
-      phone: toText(r[COL.counselorPhone]),
-      email: toText(r[COL.counselorEmail]),
-      department: toText(r[COL.counselorDepartment]),
+      name: toText(r[columns.counselorName]), phone: toText(r[columns.counselorPhone]),
+      email: toText(r[columns.counselorEmail]), department: toText(r[columns.counselorDepartment]),
     },
-    socialGuidance: toText(r[COL.socialGuidance]),
-    supportNeeded: toText(r[COL.supportNeeded]),
-    nonArabNationality: toText(r[COL.nonArabNationality]),
-    specializationPreference: toText(r[COL.specializationPreference]),
-    minSpecializationThreshold: toText(r[COL.minSpecializationThreshold]),
-    seatNumber: toText(r[COL.seatNumber]),
-    committee: toText(r[COL.committee]),
+    socialGuidance: toText(r[columns.socialGuidance]), supportNeeded: toText(r[columns.supportNeeded]),
+    nonArabNationality: toText(r[columns.nonArabNationality]), specializationPreference: toText(r[columns.specializationPreference]),
+    minSpecializationThreshold: toText(r[columns.minSpecializationThreshold]), seatNumber: toText(r[columns.seatNumber]),
+    committee: toText(r[columns.committee]),
   };
+}
+
+export function parseStudentsRows(rows) {
+  const [headerRow, ...dataRows] = rows;
+  if (!headerRow) throw new Error("شيت كشف الطلاب فارغ.");
+  const columns = detectColumns(headerRow);
+  if (columns.academicId === undefined || columns.name === undefined) throw new Error("تعذّر التعرّف على عمودي الرقم الأكاديمي واسم الطالب.");
+  const byId = new Map();
+  for (const [index, row] of dataRows.entries()) {
+    if (!row || row[columns.academicId] == null) continue;
+    const student = rowToStudent(row, index, columns);
+    if (!student.name) throw new Error(`يوجد طالب بلا اسم عند الصف ${index + 2}.`);
+    if (byId.has(student.id)) throw new Error(`الرقم الأكاديمي مكرر في كشف الطلاب: ${student.id}`);
+    byId.set(student.id, student);
+  }
+  return [...byId.values()];
 }
 
 export async function parseStudentsWorkbook(file) {
@@ -109,10 +149,7 @@ export async function parseStudentsWorkbook(file) {
     throw new Error(`تعذّر إيجاد شيت "${SHEET_HINT}" داخل الملف — تأكد من رفع ملف كشف الطلاب الكامل.`);
   }
 
-  const rows = (sheets[sheetName] || []).slice(1);
-  const students = rows
-    .filter((r) => r && r[COL.academicId] != null)
-    .map(rowToStudent);
+  const students = parseStudentsRows(sheets[sheetName] || []);
 
   return { sheetName, students };
 }
@@ -122,15 +159,20 @@ export async function parseStudentsWorkbook(file) {
 export async function commitStudentsImport(students) {
   // الملاحظات يضيفها المرشد يدويًا، لذلك لا يجوز أن يمحوها كشف جديد صادر
   // من المدرسة. بقية البيانات الأساسية تتبع الملف الأحدث كما هو متوقع.
-  const existingNotes = new Map((await list("students"))
+  const existing = await list("students");
+  const existingNotes = new Map(existing
     .filter((student) => student.notes)
     .map((student) => [String(student.id), student.notes]));
   const merged = students.map((student) => ({
     ...student,
     ...(existingNotes.has(String(student.id)) ? { notes: existingNotes.get(String(student.id)) } : {}),
   }));
-  await clear("students");
+  // اكتب السجل الجديد أولًا؛ لو انقطع الاتصال لا يصبح سجل الطلبة فارغًا.
   if (merged.length) await bulkPut("students", merged);
+  const incomingIds = new Set(merged.map((student) => String(student.id)));
+  for (const student of existing) {
+    if (!incomingIds.has(String(student.id))) await remove("students", student.id);
+  }
   invalidateStudentsCache();
   resetStudentsSeedCache();
   await logAuditEvent("import_students", { tableName: "students", count: merged.length });

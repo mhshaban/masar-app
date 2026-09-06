@@ -17,12 +17,66 @@ import {
 } from "../promoted/promoted-ui.js";
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
 import { ensureXlsx } from "../../services/vendor-loader.js";
+import { parseSchoolWorkbook, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-school-import-1";
 
 const TABS = [
+  { key: "school", label: "تحديث شامل" },
   { key: "students", label: "سجل الطلبة" },
   { key: "promoted", label: "الطلاب المرفعين" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
+
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+
+async function mountSchoolTab(root) {
+  await ensureXlsx();
+  root.innerHTML = `
+    <div class="card">
+      <h2>تحديث بيانات المدرسة من ملف واحد</h2>
+      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين، وينزّل نسخة احتياطية كاملة تلقائيًا قبل الحفظ.</p>
+      <input type="file" id="school-import-file" aria-label="ملف كشف الطلاب الشامل" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
+      <div id="school-import-preview"></div>
+    </div>`;
+  const input = root.querySelector("#school-import-file");
+  const preview = root.querySelector("#school-import-preview");
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    preview.innerHTML = '<p class="hint">جارٍ تحليل الملف…</p>';
+    try {
+      const data = await parseSchoolWorkbook(file);
+      const matched = data.promotedRows.filter((row) => row.matchStatus === "matched").length;
+      const unmatched = data.promotedRows.length - matched;
+      const uniquePromoted = new Set(data.promotedRows.filter((row) => row.matchStatus === "matched").map((row) => `${row.studentId}::${String(row.subjectCode || "").trim()}`)).size;
+      const duplicateRows = matched - uniquePromoted;
+      preview.innerHTML = `
+        <div class="grid g3" style="margin-bottom:16px;">
+          <div class="card stat"><div class="label">الطلاب</div><div class="value">${data.students.length}</div></div>
+          <div class="card stat"><div class="label">المعلمون</div><div class="value">${data.teachers.length}</div></div>
+          <div class="card stat"><div class="label">صفوف المرفعين</div><div class="value">${data.promotedRows.length}</div></div>
+        </div>
+        <p class="hint">المرفعين: ${matched} مطابق، ${unmatched} غير مطابق لن يُحفظ، ${duplicateRows} صف مكرر سيُدمج. لن تُحذف مقررات صحيحة غير موجودة في الملف.</p>
+        <button class="btn btn-primary" id="school-import-commit">تنزيل نسخة احتياطية ثم تنفيذ التحديث</button>
+        <div id="school-import-status"></div>`;
+      preview.querySelector("#school-import-commit").addEventListener("click", async () => {
+        if (!confirm(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
+        const button = preview.querySelector("#school-import-commit");
+        const status = preview.querySelector("#school-import-status");
+        button.disabled = true;
+        status.innerHTML = '<p class="hint">جارٍ إنشاء النسخة الاحتياطية وتنفيذ التحديث…</p>';
+        try {
+          const result = await commitSchoolWorkbook(data, { fileName: file.name });
+          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين.</p>`;
+        } catch (error) {
+          button.disabled = false;
+          status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+        }
+      });
+    } catch (error) {
+      preview.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+    }
+  });
+}
 
 async function mountStudentsTab(root) {
   await ensureXlsx();
@@ -67,7 +121,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { students: mountStudentsTab, promoted: mountPromotedTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, students: mountStudentsTab, promoted: mountPromotedTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
