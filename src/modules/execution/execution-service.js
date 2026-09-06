@@ -47,6 +47,31 @@ function genAttachmentId() {
   return `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeCloudUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value || "").trim());
+  } catch {
+    throw new Error("رابط المرفق غير صالح.");
+  }
+  if (url.protocol !== "https:") throw new Error("رابط المرفق يجب أن يبدأ بـ https://");
+  return url.href;
+}
+
+export async function addAttachmentLink(actionId, { name, url }) {
+  const safeUrl = normalizeCloudUrl(url);
+  const current = await getProgress(actionId);
+  const attachment = {
+    id: genAttachmentId(),
+    name: String(name || "ثبوتية OneDrive").trim() || "ثبوتية OneDrive",
+    url: safeUrl,
+    storage: "cloud-link",
+  };
+  const next = { ...current, id: actionId, attachments: [...(current.attachments || []), attachment] };
+  await save("actionProgress", next);
+  return next;
+}
+
 export async function addAttachment(actionId, file) {
   if (file.size > MAX_ATTACHMENT_BYTES) {
     throw new Error(`حجم الملف أكبر من الحد المسموح (${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} ميغابايت).`);

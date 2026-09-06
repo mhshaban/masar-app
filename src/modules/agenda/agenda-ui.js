@@ -1,5 +1,5 @@
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
-import { saveProgress, addAttachment, removeAttachment } from "../execution/execution-service.js";
+import { saveProgress, addAttachmentLink, removeAttachment } from "../execution/execution-service.js?v=2026-09-06-onedrive-links-1";
 import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 
@@ -40,8 +40,8 @@ function attachmentsListHtml(attachments) {
       ${attachments.map((a) => `
         <li class="row-item" data-attachment-id="${esc(a.id)}">
           <div class="body">
-            <a href="${esc(a.dataUrl)}" download="${esc(a.name)}" class="title" style="color:var(--teal-600);">${esc(a.name)}</a>
-            <div class="meta">${formatFileSize(a.size)}</div>
+            <a href="${esc(a.url || a.dataUrl)}" ${a.url ? 'target="_blank" rel="noopener noreferrer"' : `download="${esc(a.name)}"`} class="title" style="color:var(--teal-600);">${esc(a.name)}</a>
+            <div class="meta">${a.url ? "رابط OneDrive أو تخزين سحابي" : formatFileSize(a.size)}</div>
           </div>
           <button class="link-btn" data-remove-attachment="${esc(a.id)}" style="color:var(--critical);">حذف</button>
         </li>
@@ -89,9 +89,14 @@ function editForm(entry, followUpOptions) {
         <textarea id="agenda-edit-effectiveness" data-field="effectivenessReport" rows="3" placeholder="ما مدى فعالية هذا الإجراء؟ ماذا تحقق فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; resize:vertical;">${esc(p.effectivenessReport ?? "")}</textarea>
       </div>
       <div style="margin-top:12px;">
-        <label class="hint" for="agenda-edit-attachment" style="display:block;margin-bottom:4px;">الثبوتيات المرفَقة (صور، مستندات...)</label>
+        <label class="hint" for="agenda-edit-attachment-url" style="display:block;margin-bottom:4px;">الثبوتيات المرفَقة</label>
         <div class="attachments-list">${attachmentsListHtml(p.attachments)}</div>
-        <input id="agenda-edit-attachment" type="file" data-role="attachment-input" style="margin-top:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center;">
+          <input id="agenda-edit-attachment-name" type="text" data-role="attachment-name" placeholder="اسم المرفق" style="min-width:160px; flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
+          <input id="agenda-edit-attachment-url" type="url" data-role="attachment-url" placeholder="الصق رابط مشاركة OneDrive هنا" style="min-width:260px; flex:2; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; direction:ltr;">
+          <button class="btn btn-ghost" type="button" data-action="add-attachment-link" style="padding:8px 14px;">إضافة الرابط</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0;">ارفع الملف في OneDrive والصق رابط المشاركة؛ مسار يحفظ الرابط فقط لتخفيف البيانات. المرفقات القديمة محفوظة كما هي.</p>
       </div>
     </div>
   `;
@@ -156,13 +161,12 @@ async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
         await refresh();
       });
 
-      const attachmentInput = slot.querySelector("[data-role='attachment-input']");
-      attachmentInput.addEventListener("click", (ev) => ev.stopPropagation());
-      attachmentInput.addEventListener("change", async () => {
-        const file = attachmentInput.files[0];
-        if (!file) return;
+      slot.querySelector("[data-action='add-attachment-link']").addEventListener("click", async (ev) => {
+        ev.stopPropagation();
         try {
-          entry.progress = await addAttachment(id, file);
+          const url = slot.querySelector("[data-role='attachment-url']").value;
+          const name = slot.querySelector("[data-role='attachment-name']").value;
+          entry.progress = await addAttachmentLink(id, { name, url });
           openEditor();
         } catch (err) {
           alert(err.message);

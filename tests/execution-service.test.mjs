@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { clear } from "../src/services/cloud-runtime.js";
-import { getProgress, saveProgress, addAttachment, removeAttachment, MAX_ATTACHMENT_BYTES } from "../src/modules/execution/execution-service.js";
+import { getProgress, saveProgress, addAttachment, addAttachmentLink, removeAttachment, MAX_ATTACHMENT_BYTES } from "../src/modules/execution/execution-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -37,6 +37,18 @@ test("addAttachment stores the file as a data URL without touching other progres
 test("addAttachment rejects a file larger than the size cap", async () => {
   const bigFile = new File([new Uint8Array(MAX_ATTACHMENT_BYTES + 1)], "too-big.jpg", { type: "image/jpeg" });
   await assert.rejects(() => addAttachment("proj1-a1", bigFile));
+});
+
+test("addAttachmentLink stores only a secure cloud link", async () => {
+  const updated = await addAttachmentLink("proj1-a1", { name: "تقرير التنفيذ", url: "https://example.sharepoint.com/report.pdf" });
+  assert.equal(updated.attachments[0].name, "تقرير التنفيذ");
+  assert.equal(updated.attachments[0].url, "https://example.sharepoint.com/report.pdf");
+  assert.equal(updated.attachments[0].storage, "cloud-link");
+  assert.equal("dataUrl" in updated.attachments[0], false);
+});
+
+test("addAttachmentLink rejects non-HTTPS links", async () => {
+  await assert.rejects(() => addAttachmentLink("proj1-a1", { name: "غير آمن", url: "javascript:alert(1)" }));
 });
 
 test("removeAttachment removes only the targeted attachment", async () => {
