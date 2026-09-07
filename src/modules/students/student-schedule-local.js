@@ -15,8 +15,9 @@ export function scheduleMatchScore(fileName, student) {
   const fileKey = normalizeScheduleFileKey(fileName);
   const academicId = normalizeScheduleFileKey(student?.academicId || student?.id);
   const section = normalizeScheduleFileKey(student?.section);
-  if (academicId && fileKey === academicId) return 120;
+  // Prefer the section timetable when a student's certificate also uses their ID.
   if (section && fileKey === section) return 100;
+  if (academicId && fileKey === academicId) return 90;
   if (academicId && fileKey.includes(academicId)) return 90;
   if (section && section.length >= 3 && fileKey.includes(section)) return 80;
   return 0;

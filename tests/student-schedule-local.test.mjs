@@ -15,3 +15,8 @@ test("matches a timetable whose filename is exactly the student's section", () =
 test("does not match another section with a similar year digit", () => {
   assert.equal(scheduleMatchScore("١تجر٢.pdf", { section: "١تجر١", academicId: "20260001" }), 0);
 });
+
+test("section timetable wins over a certificate named with the student's academic number", () => {
+  const student = { section: "١تجر١", academicId: "20260001" };
+  assert.ok(scheduleMatchScore("١تجر١.pdf", student) > scheduleMatchScore("20260001.pdf", student));
+});

@@ -1,4 +1,4 @@
-name: Masar tests
+name: Masar tests and deployment
 on:
   push:
     branches: [main]
@@ -24,3 +24,32 @@ jobs:
       - name: Check JavaScript syntax
         run: find src -name '*.js' -not -path 'src/vendor/*' -print0 | xargs -0 -n1 node --check
       - run: npm test
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Prepare static application
+        run: |
+          mkdir -p _site/scripts/lib
+          cp index.html manifest.webmanifest offline.html sw.js _site/
+          cp -R icons _site/icons
+          cp -R src _site/src
+          cp scripts/lib/certificate-parser.mjs scripts/lib/score-conventions.mjs scripts/lib/document-classifier.mjs _site/scripts/lib/
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Publish after successful tests
+        id: deployment
+        uses: actions/deploy-pages@v4

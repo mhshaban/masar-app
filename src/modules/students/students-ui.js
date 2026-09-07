@@ -1,10 +1,11 @@
+import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-finish-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
 import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-07-academic-fix-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
-import { findStudentScheduleFiles, scheduleFileObjectUrl } from "./student-schedule-local.js?v=2026-09-06-student-schedule-2";
+import { findStudentScheduleFiles } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 
 function esc(str) {
@@ -338,7 +339,7 @@ async function renderDetail(container, id, onBack) {
     <div class="card" id="student-schedule-card" style="margin-top:16px;">
       <div class="card-head">
         <div><h2>جدول الطالب</h2><div class="hint">جدول الشعبة ${esc(s.section) || "—"} — يُعرض داخل ملف الطالب من مجلد مسار على OneDrive.</div></div>
-        <button class="btn btn-primary" id="student-schedule-open" ${s.section ? "" : "disabled"}>عرض الجدول داخل الملف</button>
+        <button class="btn btn-primary" id="student-schedule-open" ${s.section ? "" : "disabled"}>عرض الجدول</button>
       </div>
       <div id="student-schedule-result"></div>
     </div>
@@ -368,28 +369,18 @@ async function renderDetail(container, id, onBack) {
 
   const scheduleButton = container.querySelector("#student-schedule-open");
   const scheduleResult = container.querySelector("#student-schedule-result");
-  let schedulePreviewUrl = null;
+  let disposeSchedule = null;
   const showSchedulePreview = async (match) => {
-    if (schedulePreviewUrl) URL.revokeObjectURL(schedulePreviewUrl);
-    schedulePreviewUrl = await scheduleFileObjectUrl(match.handle);
-    scheduleResult.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0;">
-        <div><strong>${esc(match.name)}</strong><div class="hint">${esc(match.relativePath)}</div></div>
-        <div class="forms-actions"><button class="btn btn-ghost" id="student-schedule-full">فتح بحجم كامل</button><button class="btn btn-ghost" id="student-schedule-hide">إخفاء</button></div>
-      </div>
-      <iframe title="جدول الطالب ${esc(s.name)}" src="${esc(schedulePreviewUrl)}" style="width:100%;height:min(76vh,820px);border:1px solid var(--border);border-radius:12px;background:#fff;"></iframe>
-    `;
-    scheduleResult.querySelector("#student-schedule-full").addEventListener("click", () => window.open(schedulePreviewUrl, "_blank", "noopener"));
-    scheduleResult.querySelector("#student-schedule-hide").addEventListener("click", () => {
-      URL.revokeObjectURL(schedulePreviewUrl);
-      schedulePreviewUrl = null;
-      scheduleResult.innerHTML = "";
-      scheduleButton.textContent = "عرض الجدول داخل الملف";
+    disposeSchedule?.();
+    disposeSchedule = mountScheduleViewer(scheduleResult, match.handle, {
+      studentName: s.name,
+      onClose: () => { scheduleButton.textContent = "عرض الجدول"; },
     });
     scheduleButton.textContent = "تحديث الجدول";
   };
   scheduleButton.addEventListener("click", async () => {
     scheduleButton.disabled = true;
+    disposeSchedule?.();
     scheduleResult.innerHTML = '<p class="hint">جارٍ البحث في مجلد مسار…</p>';
     try {
       const result = await findStudentScheduleFiles(s, { prompt: true, refresh: true });
