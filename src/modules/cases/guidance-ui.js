@@ -235,9 +235,9 @@ export async function mountCasesView(container) {
       <div><h1>المتابعات والحالات الإرشادية</h1><div class="sub">حالة تُفتح للطالب، مع جلسات متابعة عبر الوقت — مرشَّحة تلقائيًا من الدرجات المستوردة</div></div>
       <button class="btn btn-ghost" id="cases-export-btn">تصدير Word</button>
     </div>
-    <div id="cases-candidates" style="margin-bottom:16px;"></div>
     <div id="cases-new-form" style="margin-bottom:16px;"></div>
-    <div id="cases-table"></div>
+    <div id="cases-table" style="margin-bottom:16px;"></div>
+    <div id="cases-candidates"></div>
   `;
 
   const openDetail = (id) => renderCaseDetail(container, id, () => mountCasesView(container));
@@ -246,11 +246,12 @@ export async function mountCasesView(container) {
     renderNewCaseForm(container.querySelector("#cases-new-form"), student ? { student, reason } : null, async () => {
       await mountCasesView(container);
     });
+    if (student) container.querySelector("#cases-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  await renderCandidates(container.querySelector("#cases-candidates"), showNewForm);
   showNewForm(null, null);
   await renderCasesTable(container.querySelector("#cases-table"), openDetail);
+  await renderCandidates(container.querySelector("#cases-candidates"), showNewForm);
 
   container.querySelector("#cases-export-btn").addEventListener("click", async () => {
     const cases = await listCases();

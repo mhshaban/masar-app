@@ -195,9 +195,9 @@ export async function mountCareerView(container) {
     <div class="topbar">
       <div><h1>التوجيه المهني</h1><div class="sub">جلسات وتوصيات التوجيه الجامعي والمهني — مرشَّحة تلقائيًا لطلاب السنة النهائية</div></div>
     </div>
-    <div id="career-candidates" style="margin-bottom:16px;"></div>
     <div id="career-new-form" style="margin-bottom:16px;"></div>
-    <div id="career-table"></div>
+    <div id="career-table" style="margin-bottom:16px;"></div>
+    <div id="career-candidates"></div>
   `;
 
   const openDetail = (studentId) => renderStudentDetail(container, studentId, () => mountCareerView(container));
@@ -206,9 +206,10 @@ export async function mountCareerView(container) {
     renderNewSessionForm(container.querySelector("#career-new-form"), student || null, async () => {
       await mountCareerView(container);
     });
+    if (student) container.querySelector("#career-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  await renderCandidates(container.querySelector("#career-candidates"), showNewForm);
   showNewForm(null);
   await renderStudentsTable(container.querySelector("#career-table"), openDetail);
+  await renderCandidates(container.querySelector("#career-candidates"), showNewForm);
 }

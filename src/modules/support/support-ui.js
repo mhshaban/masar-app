@@ -225,9 +225,9 @@ export async function mountSupportView(container) {
       <div><h1>خطط الدعم الفردية</h1><div class="sub">خطة تدخل للطالب مع إجراءات متابَعة كقائمة مهام — مرشَّحة تلقائيًا من الدرجات المستوردة</div></div>
       <button class="btn btn-ghost" id="support-export-btn">تصدير Word</button>
     </div>
-    <div id="support-candidates" style="margin-bottom:16px;"></div>
     <div id="support-new-form" style="margin-bottom:16px;"></div>
-    <div id="support-table"></div>
+    <div id="support-table" style="margin-bottom:16px;"></div>
+    <div id="support-candidates"></div>
   `;
 
   const openDetail = (id) => renderPlanDetail(container, id, () => mountSupportView(container));
@@ -236,11 +236,12 @@ export async function mountSupportView(container) {
     renderNewPlanForm(container.querySelector("#support-new-form"), student ? { student, reason } : null, async () => {
       await mountSupportView(container);
     });
+    if (student) container.querySelector("#support-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  await renderCandidates(container.querySelector("#support-candidates"), showNewForm);
   showNewForm(null, null);
   await renderPlansTable(container.querySelector("#support-table"), openDetail);
+  await renderCandidates(container.querySelector("#support-candidates"), showNewForm);
 
   container.querySelector("#support-export-btn").addEventListener("click", async () => {
     const plans = await listPlans();

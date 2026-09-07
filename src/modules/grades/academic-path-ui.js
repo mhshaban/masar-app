@@ -1,3 +1,4 @@
+import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-07-review-1";
 import { getStudentTermTimeline, getStudentSubjectSummary } from "./term-progress-service.js?v=2026-09-07-academic-fix-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 
@@ -9,24 +10,32 @@ export function renderCertificateResults(certificate) {
 }
 
 async function mountCertificateResults(root, student) {
-  root.innerHTML = `<h2>شهادة الطالب — نتائج جميع المواد</h2><div class="forms-actions"><button class="btn btn-primary" data-folder>قراءة الشهادات من مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p class="hint">تُقرأ الشهادة على جهازك ويُتحقق من الرقم الأكاديمي داخلها قبل عرض النتائج.</p><p data-status role="status"></p><div data-results></div>`;
+  root.innerHTML = `<h2>شهادة الطالب — نتائج جميع المواد</h2><div class="forms-actions"><button class="btn btn-primary" data-folder>قراءة الشهادات من مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p class="hint">تُقرأ الشهادة على جهازك ويُتحقق من الرقم الأكاديمي داخلها قبل عرض النتائج.</p><label class="forms-field">المسار<select data-track><option value="">اختر المسار</option><option value="الصناعي">الصناعي</option><option value="التجاري">التجاري</option></select></label><p data-status role="status"></p><div data-results></div>`;
   const status = root.querySelector("[data-status]");
   const results = root.querySelector("[data-results]");
+  const trackSelect = root.querySelector("[data-track]");
+  let loadedCertificates = [];
+  trackSelect.value = curriculumTrack(student);
+  const drawCurriculum = () => { results.innerHTML = renderCurriculumResults(loadedCertificates, trackSelect.value); };
+  trackSelect.addEventListener("change", drawCurriculum);
+  drawCurriculum();
   let version = 0;
   async function readFiles(files, ticket) {
-    const blocks = [], errors = [];
+    const certificates = [], errors = [];
     for (const source of files) {
       if (ticket !== version || !root.isConnected) return;
       status.textContent = `جارٍ قراءة ${source.name}…`;
       try {
         const file = source.handle ? await source.handle.getFile() : source;
         const certificate = await readStudentCertificate(file, student);
-        blocks.push(`<div style="margin-top:16px;"><h3>${esc(source.name)}</h3>${renderCertificateResults(certificate)}</div>`);
+        certificates.push({ ...certificate, sourceName: source.name, lastModified: file.lastModified });
       } catch (error) { errors.push(`${source.name}: ${error.message}`); }
     }
     if (ticket !== version || !root.isConnected) return;
-    results.innerHTML = blocks.join("");
-    status.textContent = [blocks.length ? `تم عرض ${blocks.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
+    loadedCertificates = certificates;
+    if (!trackSelect.value) trackSelect.value = curriculumTrack(student, certificates);
+    drawCurriculum();
+    status.textContent = [certificates.length ? `تم عرض ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
   }
   async function loadFolder(prompt) {
     const ticket = ++version;

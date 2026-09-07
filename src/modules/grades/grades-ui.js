@@ -232,7 +232,7 @@ async function renderClassificationTab(root, onGoto) {
 export async function mountGradesView(container, { onGoto } = {}) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الدرجات والتحليلات</h1><div class="sub">تحليلات ومعدلات الطلبة من تحليل Cowork لشهادات ودرجات الطلبة</div></div>
+      <div><h1>الدرجات والتحليلات</h1></div>
     </div>
     <div class="tabs">
       <div class="tab active" data-tab="analytics">التحليلات</div>

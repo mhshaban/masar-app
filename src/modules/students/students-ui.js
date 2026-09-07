@@ -1,7 +1,7 @@
-import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-finish-1";
+import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-review-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-07-academic-fix-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-07-review-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
@@ -134,6 +134,7 @@ function renderFilters(root, options, current, onChange, onQueryChange, onSectio
     <div class="chip-row" id="students-level-chips">
       <div class="chip${!current.level ? " on" : ""}" data-level="">الكل</div>
       ${orderedLevels.map((l) => `<div class="chip${current.level === l ? " on" : ""}" data-level="${esc(l)}">${esc(l)}</div>`).join("")}
+      <span class="students-filter-count" id="students-count" role="status" aria-live="polite"></span>
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
       <select id="students-department" style="padding:8px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -150,7 +151,6 @@ function renderFilters(root, options, current, onChange, onQueryChange, onSectio
       </select>
       <button class="btn btn-ghost" id="students-print-section" ${current.section ? "" : "disabled"}>طباعة الشعبة</button>
       <button class="btn btn-ghost" id="students-load-photos">عرض صور الطلاب</button>
-      <span class="hint" style="align-self:center;margin:0;">الصور من مجلد مسار باسم الرقم الأكاديمي أو الشخصي — بدون رفع إلى Supabase</span>
     </div>
     <div class="card" style="margin:-2px 0 16px; padding:14px;">
       <div class="grid g2">
@@ -374,6 +374,7 @@ async function renderDetail(container, id, onBack) {
     disposeSchedule?.();
     disposeSchedule = mountScheduleViewer(scheduleResult, match.handle, {
       studentName: s.name,
+      section: s.section,
       onClose: () => { scheduleButton.textContent = "عرض الجدول"; },
     });
     scheduleButton.textContent = "تحديث الجدول";
@@ -416,8 +417,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
 
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي — بيانات مشتركة سحابيًا بين الحسابات النشطة، لا تُدفع إلى git</div></div>
-      <div class="meta" id="students-count"></div>
+      <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي</div></div>
     </div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>
@@ -434,7 +434,6 @@ export async function mountStudentsView(container, { onGoto } = {}) {
   `;
 
   const resultsRoot = container.querySelector("#students-results");
-  const countRoot = container.querySelector("#students-count");
 
   let loadedResults = [];
   let matchingTotal = 0;
@@ -442,7 +441,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
   let searchTimer = null;
 
   const draw = () => {
-    countRoot.textContent = `النتيجة: ${matchingTotal} طالبًا من أصل ${stats.total}`;
+    container.querySelector("#students-count").textContent = `النتيجة: ${matchingTotal} طالبًا من أصل ${stats.total}`;
     renderTable(
       resultsRoot,
       loadedResults,

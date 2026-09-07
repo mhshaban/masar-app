@@ -191,7 +191,7 @@ async function renderPendingList(root, onGoto) {
 export async function mountPromotedView(container, { onGoto } = {}) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الطلاب المرفعين</h1><div class="sub">طلاب انتقلوا من الإعدادية بمقررات لم تُستوفَ بعد — من شيت "المرفعين" في كشف الطلاب</div></div>
+      <div><h1>الطلاب المرفعين</h1><div class="sub">طلاب انتقلوا من الإعدادية بمقررات لم تُستوفَ بعد</div></div>
     </div>
     <div id="promoted-pending" style="margin-bottom:16px;"></div>
   `;
