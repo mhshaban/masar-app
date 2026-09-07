@@ -46,14 +46,14 @@ async function imageFilesForFolder(folder, refresh) {
   }
 }
 
-export async function findStudentPhotoFiles(students, { prompt = false, refresh = false } = {}) {
+export async function findStudentPhotoFiles(students, { prompt = false, refresh = false, matcher = studentPhotoMatchScore } = {}) {
   const folder = await getMasarFolderHandle({ prompt });
   if (!folder) return { connected: false, matches: new Map() };
   const files = await imageFilesForFolder(folder, refresh);
   const matches = new Map();
   for (const student of students) {
     const ranked = files
-      .map((file) => ({ ...file, score: studentPhotoMatchScore(file.name, student) }))
+      .map((file) => ({ ...file, score: matcher(file.name, student) }))
       .filter((file) => file.score > 0)
       .sort((a, b) => b.score - a.score || a.relativePath.localeCompare(b.relativePath, "ar"));
     if (ranked[0]) matches.set(String(student.id), ranked[0]);

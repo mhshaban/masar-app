@@ -6,9 +6,9 @@
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
-import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js";
+import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-06-polish-1";
 import { ensureXlsx } from "../../services/vendor-loader.js";
-import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-promoted-dedupe-1";
+import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-polish-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
@@ -54,7 +54,7 @@ async function mountSchoolTab(root) {
         <button class="btn btn-primary" id="school-import-commit">تنزيل نسخة احتياطية ثم تنفيذ التحديث</button>
         <div id="school-import-status"></div>`;
       preview.querySelector("#school-import-commit").addEventListener("click", async () => {
-        if (!confirm(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
+        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;

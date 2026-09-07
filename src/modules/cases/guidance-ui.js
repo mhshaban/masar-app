@@ -1,3 +1,4 @@
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   CASE_CATEGORIES, listCases, getCase, createCase, closeCase, reopenCase, removeCase,
   listSessions, addSession, removeSession, listCandidates,
@@ -82,7 +83,7 @@ function renderNewCaseForm(root, prefill, onCreated) {
 
   root.querySelector("#new-case-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!selected) { alert("اختر طالبًا من نتائج البحث أولًا"); return; }
+    if (!selected) { notify("اختر طالبًا من نتائج البحث أولًا"); return; }
     const form = e.target;
     try {
       await createCase({
@@ -95,7 +96,7 @@ function renderNewCaseForm(root, prefill, onCreated) {
       });
       await onCreated();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
 }
@@ -172,12 +173,12 @@ async function renderSessions(root, caseId, refreshDetail) {
       await addSession(caseId, { date: form.date.value, note: form.note.value, nextStep: form.nextStep.value });
       await refreshDetail();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
   root.querySelectorAll("[data-remove-session]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (!confirm("حذف هذه الجلسة؟")) return;
+      if (!await confirmDialog("حذف هذه الجلسة؟")) return;
       await removeSession(btn.dataset.removeSession);
       await refreshDetail();
     });
@@ -220,7 +221,7 @@ async function renderCaseDetail(container, id, onBack) {
   const reopenBtn = container.querySelector("#case-reopen");
   if (reopenBtn) reopenBtn.addEventListener("click", async () => { await reopenCase(id); await refresh(); });
   container.querySelector("#case-delete").addEventListener("click", async () => {
-    if (!confirm("حذف هذه الحالة وكل جلساتها نهائيًا؟")) return;
+    if (!await confirmDialog("حذف هذه الحالة وكل جلساتها نهائيًا؟")) return;
     await removeCase(id);
     onBack();
   });

@@ -1,3 +1,4 @@
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   listPlans, getPlan, createPlan, completePlan, cancelPlan, reactivatePlan, removePlan,
   listActions, addAction, cycleActionStatus, removeAction, listCandidates,
@@ -77,13 +78,13 @@ function renderNewPlanForm(root, prefill, onCreated) {
 
   root.querySelector("#new-plan-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!selected) { alert("اختر طالبًا من نتائج البحث أولًا"); return; }
+    if (!selected) { notify("اختر طالبًا من نتائج البحث أولًا"); return; }
     const form = e.target;
     try {
       await createPlan({ studentId: selected.id, studentName: selected.name, domain: form.domain.value, goal: form.goal.value });
       await onCreated();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
 }
@@ -153,7 +154,7 @@ async function renderActions(root, planId, refreshDetail) {
       await addAction(planId, { action: form.action.value, dueDate: form.dueDate.value });
       await refreshDetail();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
   root.querySelectorAll("[data-toggle]").forEach((box) => {
@@ -164,7 +165,7 @@ async function renderActions(root, planId, refreshDetail) {
   });
   root.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (!confirm("حذف هذا الإجراء؟")) return;
+      if (!await confirmDialog("حذف هذا الإجراء؟")) return;
       await removeAction(btn.dataset.remove);
       await refreshDetail();
     });
@@ -210,7 +211,7 @@ async function renderPlanDetail(container, id, onBack) {
   const reactivateBtn = container.querySelector("#plan-reactivate");
   if (reactivateBtn) reactivateBtn.addEventListener("click", async () => { await reactivatePlan(id); await refresh(); });
   container.querySelector("#plan-delete").addEventListener("click", async () => {
-    if (!confirm("حذف هذه الخطة وكل إجراءاتها نهائيًا؟")) return;
+    if (!await confirmDialog("حذف هذه الخطة وكل إجراءاتها نهائيًا؟")) return;
     await removePlan(id);
     onBack();
   });

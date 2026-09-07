@@ -1,3 +1,4 @@
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { SESSION_TOPICS, listStudentsWithSessions, getStudentSessions, addSession, removeSession, listCandidates } from "./career-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js";
 
@@ -72,7 +73,7 @@ function renderNewSessionForm(root, prefill, onCreated) {
 
   root.querySelector("#new-session-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!selected) { alert("اختر طالبًا من نتائج البحث أولًا"); return; }
+    if (!selected) { notify("اختر طالبًا من نتائج البحث أولًا"); return; }
     const form = e.target;
     try {
       await addSession({
@@ -85,7 +86,7 @@ function renderNewSessionForm(root, prefill, onCreated) {
       });
       await onCreated();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
 }
@@ -177,12 +178,12 @@ async function renderStudentDetail(container, studentId, onBack) {
       });
       await refresh();
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
   container.querySelectorAll("[data-remove-session]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (!confirm("حذف هذه الجلسة؟")) return;
+      if (!await confirmDialog("حذف هذه الجلسة؟")) return;
       await removeSession(btn.dataset.removeSession);
       await refresh();
     });

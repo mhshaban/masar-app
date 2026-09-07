@@ -741,6 +741,9 @@
     input, select, textarea { min-height: 44px; }
   }
 
+  .masar-confirm { max-width: 480px; width: calc(100% - 40px); box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--ink-800); font-family: inherit; box-shadow: var(--shadow); }
+  .masar-confirm::backdrop { background: rgba(15,20,35,.65); }
+  .masar-confirm p { line-height: 1.9; white-space: pre-wrap; margin-bottom: 22px; }
   @media (prefers-reduced-motion: reduce) {
     .view { animation: none; }
     .nav { transition: none; }

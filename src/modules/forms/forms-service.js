@@ -133,12 +133,38 @@ export async function getTeacherPhoto(id) {
   return (await get("schoolTeachers", id))?.photoDataUrl || "";
 }
 
+export async function listLegacyTeacherPhotoIds() {
+  const ids = [];
+  for (let offset = 0; ; offset += 50) {
+    const page = await listTeachersDirectory({ offset, limit: 50 });
+    ids.push(...page.rows.filter((teacher) => teacher.hasPhoto).map((teacher) => teacher.id));
+    if (!page.rows.length || offset + page.rows.length >= page.total) return ids;
+  }
+}
+
+export async function removeLegacyTeacherPhotos(ids) {
+  const profile = getCurrentProfile();
+  if (profile?.role !== "admin" && profile?.is_admin !== true) throw new Error("حذف الصور القديمة متاح للإدمن فقط");
+  let removed = 0;
+  for (const id of new Set(ids)) {
+    const current = await get("schoolTeachers", id);
+    if (!current?.photoDataUrl) continue;
+    const { photoDataUrl, ...metadata } = current;
+    await save("schoolTeachers", metadata);
+    removed++;
+  }
+  return removed;
+}
+
 export async function saveTeacher(fields) {
   if (!fields.name?.trim()) throw new Error("اسم المعلم مطلوب");
+  const stableId = fields.id || (fields.personalNo ? `teacher-${fields.personalNo}` : null);
+  const current = stableId ? await get("schoolTeachers", stableId) : null;
   const teacher = await save("schoolTeachers", {
+    ...current,
     ...(fields.personalNo && !fields.id ? { id: `teacher-${fields.personalNo}` } : {}),
     ...fields, name: fields.name.trim(), updatedAt: new Date().toISOString(),
-    createdAt: fields.createdAt || new Date().toISOString(),
+    createdAt: fields.createdAt || current?.createdAt || new Date().toISOString(),
   });
   await logAuditEvent("update_teacher", { tableName: "schoolTeachers", recordId: String(teacher.id) });
   return teacher;

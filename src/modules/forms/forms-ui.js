@@ -1,8 +1,12 @@
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js";
+import { findTeacherPhotos, copyLegacyTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
+import { listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "./forms-service.js?v=2026-09-06-polish-1";
+import { getCurrentProfile } from "../../services/auth-service.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
-} from "./forms-service.js?v=2026-09-04-form-actor-1";
+} from "./forms-service.js?v=2026-09-06-polish-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-2";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-2";
 import { ensureXlsx } from "../../services/vendor-loader.js";
@@ -136,10 +140,10 @@ async function renderCreate(root, rerender) {
   type.addEventListener("change", () => { root.querySelector("#form-dynamic").innerHTML = typeFields(type.value); });
   root.querySelector("#department-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!selectedStudent) return alert("اختر الطالب أولًا");
+    if (!selectedStudent) return notify("اختر الطالب أولًا");
     const values = Object.fromEntries(new FormData(event.target).entries());
-    try { await createDepartmentForm(type.value, selectedStudent, values); alert("تم حفظ الاستمارة في السجل"); await rerender("log"); }
-    catch (error) { alert(error.message); }
+    try { await createDepartmentForm(type.value, selectedStudent, values); notify("تم حفظ الاستمارة في السجل"); await rerender("log"); }
+    catch (error) { notify(error.message); }
   });
 }
 
@@ -159,7 +163,7 @@ async function renderLog(root, openDetail, openEdit) {
   root.querySelector("#forms-export-excel").addEventListener("click", async (event) => {
     const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ إعداد الملف…";
     try { await exportFormsExcel(forms); }
-    catch (error) { alert(error.message || "تعذر تصدير ملف Excel"); }
+    catch (error) { notify(error.message || "تعذر تصدير ملف Excel"); }
     finally { button.disabled = false; button.textContent = original; }
   });
   root.querySelector("#forms-search").addEventListener("input", draw); root.querySelector("#forms-status").addEventListener("change", draw); draw();
@@ -185,9 +189,9 @@ async function renderEdit(root, id, back, openDetail) {
     const createdDate = values.createdDate; delete values.createdDate;
     try {
       await updateDepartmentForm(id, { createdDate, fields: values });
-      alert("تم حفظ تعديلات الاستمارة");
+      notify("تم حفظ تعديلات الاستمارة");
       await openDetail(id);
-    } catch (error) { alert(error.message); }
+    } catch (error) { notify(error.message); }
   });
 }
 
@@ -223,21 +227,14 @@ async function renderDetail(root, id, back) {
     </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
-  root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); alert("تم حفظ المتابعة"); await renderDetail(root, id, back); });
+  root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); notify("تم حفظ المتابعة"); await renderDetail(root, id, back); });
   root.querySelector("#forms-print").addEventListener("click", () => window.print());
   root.querySelector("#forms-word").addEventListener("click", () => {
     const report = buildDepartmentFormReportHtml(item, new Date().toLocaleString("ar-BH"));
     const safeName = `${item.title || "استمارة"}-${item.student?.name || item.studentId || item.id}`.replace(/[\\/:*?"<>|]/g, "-");
     downloadAsWordDoc(item.title || "استمارة القسم", report, safeName);
   });
-  root.querySelector("#forms-delete").addEventListener("click", async () => { if (!confirm("حذف هذه الاستمارة من السجل؟")) return; await removeDepartmentForm(id); back(); });
-}
-
-async function imageToDataUrl(file) {
-  if (!file) return ""; if (!file.type.startsWith("image/")) throw new Error("اختر ملف صورة");
-  const image = new Image(); image.src = URL.createObjectURL(file); await image.decode();
-  const scale = Math.min(1, 400 / Math.max(image.width, image.height)); const canvas = document.createElement("canvas"); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
-  canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(image.src); return canvas.toDataURL("image/jpeg", .78);
+  root.querySelector("#forms-delete").addEventListener("click", async () => { if (!await confirmDialog("حذف هذه الاستمارة من السجل؟")) return; await removeDepartmentForm(id); back(); });
 }
 
 const TEACHERS_PAGE_SIZE = 25;
@@ -247,39 +244,96 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null }
   const { rows: teachers, total } = await listTeachersDirectory({ query, offset, limit: TEACHERS_PAGE_SIZE });
   const pageCount = Math.max(1, Math.ceil(total / TEACHERS_PAGE_SIZE));
   const current = editTeacher || {};
-  root.innerHTML = `<div class="card forms-card"><h2>${editTeacher ? "تعديل بيانات المعلم" : "إضافة معلم"}</h2><form id="teacher-form" class="forms-grid"><input type="hidden" name="id" value="${esc(current.id || "")}"><input type="hidden" name="createdAt" value="${esc(current.createdAt || "")}">${field("اسم المعلم", "name", "text", true, current.name || "")}${field("الاسم باللغة الإنجليزية", "nameEn", "text", false, current.nameEn || "")}${field("الرقم الشخصي", "personalNo", "text", false, current.personalNo || "")}${field("الرقم الوظيفي", "employeeNo", "text", false, current.employeeNo || "")}${field("المسمى الوظيفي", "jobTitle", "text", false, current.jobTitle || "")}${field("القسم / المادة", "department", "text", false, current.department || "")}${field("رقم التواصل", "phone", "tel", false, current.phone || "")}${field("البريد الإلكتروني", "email", "email", false, current.email || "")}${area("ملاحظات", "notes", false, current.notes || "")}<label class="forms-field"><span>${editTeacher?.hasPhoto ? "استبدال الصورة (اختياري)" : "الصورة"}</span><input name="photo" type="file" accept="image/*">${editTeacher?.hasPhoto ? '<small class="hint">اتركه فارغًا للاحتفاظ بالصورة الحالية.</small>' : ""}</label><div class="forms-actions forms-wide"><button class="btn btn-primary">${editTeacher ? "حفظ التعديلات" : "حفظ المعلم"}</button>${editTeacher ? '<button class="btn btn-ghost" type="button" id="teacher-edit-cancel">إلغاء التعديل</button>' : ""}</div></form></div>
-    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${total})</h2><div class="hint">تُحمّل صور الصفحة الحالية فقط لتقليل استهلاك البيانات.</div></div><div class="search"><input id="teacher-search" type="search" value="${esc(query)}" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div id="teachers-table"></div></div>`;
+  root.innerHTML = `<div class="card forms-card"><h2>${editTeacher ? "تعديل بيانات المعلم" : "إضافة معلم"}</h2><form id="teacher-form" class="forms-grid"><input type="hidden" name="id" value="${esc(current.id || "")}"><input type="hidden" name="createdAt" value="${esc(current.createdAt || "")}">${field("اسم المعلم", "name", "text", true, current.name || "")}${field("الاسم باللغة الإنجليزية", "nameEn", "text", false, current.nameEn || "")}${field("الرقم الشخصي", "personalNo", "text", false, current.personalNo || "")}${field("الرقم الوظيفي", "employeeNo", "text", false, current.employeeNo || "")}${field("المسمى الوظيفي", "jobTitle", "text", false, current.jobTitle || "")}${field("القسم / المادة", "department", "text", false, current.department || "")}${field("رقم التواصل", "phone", "tel", false, current.phone || "")}${field("البريد الإلكتروني", "email", "email", false, current.email || "")}${area("ملاحظات", "notes", false, current.notes || "")}<p class="hint forms-wide">الصور الجديدة تُقرأ من مجلد مسار باسم الرقم الشخصي أو الوظيفي. الصور القديمة محفوظة ولا تتأثر بتعديل البيانات.</p><div class="forms-actions forms-wide"><button class="btn btn-primary">${editTeacher ? "حفظ التعديلات" : "حفظ المعلم"}</button>${editTeacher ? '<button class="btn btn-ghost" type="button" id="teacher-edit-cancel">إلغاء التعديل</button>' : ""}</div></form></div>
+    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${total})</h2><div class="hint">الصورة المحلية أولًا، والصورة القديمة بديل عند عدم وجودها.</div></div><div class="search"><input id="teacher-search" type="search" value="${esc(query)}" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div class="forms-actions"><button class="btn btn-ghost" id="teacher-local-photos">ربط / تحديث الصور المحلية</button><button class="btn btn-ghost" id="teacher-copy-photos">نسخ الصور القديمة إلى مجلد</button></div><p class="hint" id="teacher-photo-status"></p><div id="teachers-table"></div></div>`;
   root.querySelector("#teacher-edit-cancel")?.addEventListener("click", () => renderTeachers(root, { query, page }));
   root.querySelector("#teacher-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.target).entries());
     try {
-      const newPhoto = event.target.photo.files[0];
-      data.photoDataUrl = newPhoto ? await imageToDataUrl(newPhoto) : (editTeacher?.hasPhoto ? await getTeacherPhoto(editTeacher.id) : "");
-      delete data.photo;
       if (!data.id) delete data.id;
       if (!data.createdAt) delete data.createdAt;
       await saveTeacher(data);
-      alert(editTeacher ? "تم تحديث بيانات المعلم" : "تم حفظ بيانات المعلم");
+      notify(editTeacher ? "تم تحديث بيانات المعلم" : "تم حفظ بيانات المعلم");
       await renderTeachers(root, { query, page });
-    } catch (error) { alert(error.message); }
+    } catch (error) { notify(error.message); }
   });
   const tableRoot = root.querySelector("#teachers-table");
-  tableRoot.innerHTML = teachers.length ? `<div class="tablewrap"><table class="teachers-table"><thead><tr><th>الصورة</th><th>المعلم</th><th>الرقم الشخصي</th><th>القسم</th><th>الوظيفة</th><th>التواصل</th><th></th></tr></thead><tbody>${teachers.map((teacher) => `<tr><td>${teacher.hasPhoto ? `<img data-teacher-photo="${esc(teacher.id)}" alt="صورة ${esc(teacher.name)}">` : '<div class="teacher-avatar">م</div>'}</td><td><strong>${esc(teacher.name)}</strong><div class="hint" dir="ltr">${esc(teacher.nameEn)}</div></td><td class="num">${esc(teacher.personalNo || teacher.employeeNo) || "—"}</td><td>${esc(teacher.department) || "—"}</td><td>${esc(teacher.jobTitle) || "—"}</td><td>${teacher.phone ? `<a href="tel:${esc(teacher.phone)}">${esc(teacher.phone)}</a><br>` : ""}${teacher.email ? `<a href="mailto:${esc(teacher.email)}">${esc(teacher.email)}</a>` : "—"}</td><td><div class="forms-actions"><button class="link-btn" data-edit-teacher="${esc(teacher.id)}">تعديل</button><button class="link-btn forms-danger" data-remove-teacher="${esc(teacher.id)}">حذف</button></div></td></tr>`).join("")}</tbody></table></div><div class="forms-actions" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" id="teachers-prev" ${page <= 0 ? "disabled" : ""}>السابق</button><span class="hint">صفحة ${page + 1} من ${pageCount}</span><button class="btn btn-ghost" id="teachers-next" ${page + 1 >= pageCount ? "disabled" : ""}>التالي</button></div>` : '<div class="empty">لا توجد بيانات مطابقة</div>';
+  tableRoot.innerHTML = teachers.length ? `<div class="tablewrap"><table class="teachers-table"><thead><tr><th>الصورة</th><th>المعلم</th><th>الرقم الشخصي</th><th>القسم</th><th>الوظيفة</th><th>التواصل</th><th></th></tr></thead><tbody>${teachers.map((teacher) => `<tr><td><div class="teacher-avatar" data-teacher-photo="${esc(teacher.id)}">م</div></td><td><strong>${esc(teacher.name)}</strong><div class="hint" dir="ltr">${esc(teacher.nameEn)}</div></td><td class="num">${esc(teacher.personalNo || teacher.employeeNo) || "—"}</td><td>${esc(teacher.department) || "—"}</td><td>${esc(teacher.jobTitle) || "—"}</td><td>${teacher.phone ? `<a href="tel:${esc(teacher.phone)}">${esc(teacher.phone)}</a><br>` : ""}${teacher.email ? `<a href="mailto:${esc(teacher.email)}">${esc(teacher.email)}</a>` : "—"}</td><td><div class="forms-actions"><button class="link-btn" data-edit-teacher="${esc(teacher.id)}">تعديل</button><button class="link-btn forms-danger" data-remove-teacher="${esc(teacher.id)}">حذف</button></div></td></tr>`).join("")}</tbody></table></div><div class="forms-actions" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" id="teachers-prev" ${page <= 0 ? "disabled" : ""}>السابق</button><span class="hint">صفحة ${page + 1} من ${pageCount}</span><button class="btn btn-ghost" id="teachers-next" ${page + 1 >= pageCount ? "disabled" : ""}>التالي</button></div>` : '<div class="empty">لا توجد بيانات مطابقة</div>';
   tableRoot.querySelectorAll("[data-edit-teacher]").forEach((button) => button.addEventListener("click", async () => {
     const teacher = teachers.find((item) => item.id === button.dataset.editTeacher);
     await renderTeachers(root, { query, page, editTeacher: teacher });
     root.querySelector("#teacher-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
-  tableRoot.querySelectorAll("[data-remove-teacher]").forEach((button) => button.addEventListener("click", async () => { if (!confirm("حذف بيانات هذا المعلم؟")) return; await removeTeacher(button.dataset.removeTeacher); await renderTeachers(root, { query, page }); }));
+  tableRoot.querySelectorAll("[data-remove-teacher]").forEach((button) => button.addEventListener("click", async () => { if (!await confirmDialog("حذف بيانات هذا المعلم؟")) return; await removeTeacher(button.dataset.removeTeacher); await renderTeachers(root, { query, page }); }));
   tableRoot.querySelector("#teachers-prev")?.addEventListener("click", () => renderTeachers(root, { query, page: page - 1 }));
   tableRoot.querySelector("#teachers-next")?.addEventListener("click", () => renderTeachers(root, { query, page: page + 1 }));
   let searchTimer;
   root.querySelector("#teacher-search").addEventListener("input", (event) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderTeachers(root, { query: event.target.value.trim(), page: 0 }), 300); });
-  await Promise.all([...tableRoot.querySelectorAll("[data-teacher-photo]")].map(async (image) => {
-    try { const photo = await getTeacherPhoto(image.dataset.teacherPhoto); if (photo) image.src = photo; else image.replaceWith(Object.assign(document.createElement("div"), { className: "teacher-avatar", textContent: "م" })); }
-    catch { image.replaceWith(Object.assign(document.createElement("div"), { className: "teacher-avatar", textContent: "م" })); }
-  }));
+  const photoStatus = root.querySelector("#teacher-photo-status");
+  const profile = getCurrentProfile();
+  if (profile?.role === "admin" || profile?.is_admin === true) {
+    const cleanup = document.createElement("button");
+    cleanup.className = "btn btn-ghost";
+    cleanup.textContent = "حذف صور Supabase القديمة فقط";
+    photoStatus.before(cleanup);
+    cleanup.addEventListener("click", async () => {
+      cleanup.disabled = true;
+      try {
+        const ids = await listLegacyTeacherPhotoIds();
+        if (!ids.length) { photoStatus.textContent = "لا توجد صور قديمة في Supabase."; return; }
+        if (!await confirmDialog(`حذف ${ids.length} صورة قديمة من Supabase نهائيًا؟ لن تُحذف سجلات المعلمين أو الصور المحلية. يمكنك نسخ الصور إلى مجلد قبل الحذف إذا رغبت بالاحتفاظ بها.`)) return;
+        const removed = await removeLegacyTeacherPhotos(ids);
+        const remaining = await listLegacyTeacherPhotoIds();
+        notify(`تم حذف ${removed} صورة قديمة؛ المتبقي ${remaining.length}. سجلات المعلمين محفوظة.`);
+        await renderTeachers(root, { query, page });
+      } catch (error) { notify(error.message); }
+      finally { cleanup.disabled = false; }
+    });
+  }
+  let photoVersion = 0;
+  const loadPhotos = async (prompt = false) => {
+    const version = ++photoVersion;
+    const result = await findTeacherPhotos(teachers, { prompt, refresh: prompt }).catch((error) => {
+      if (prompt && error.name !== "AbortError") notify(error.message);
+      return { connected: false, matches: new Map() };
+    });
+    await Promise.all(teachers.map(async (teacher) => {
+      const target = [...tableRoot.querySelectorAll("[data-teacher-photo]")].find((node) => node.dataset.teacherPhoto === teacher.id);
+      if (!target) return;
+      let url = "", local = false;
+      try {
+        const match = result.matches.get(String(teacher.id));
+        if (match) { url = URL.createObjectURL(await match.handle.getFile()); local = true; }
+      } catch { /* Keep the existing cloud photo as a safe fallback. */ }
+      try { if (!url && teacher.hasPhoto) url = await getTeacherPhoto(teacher.id); } catch { /* Initial remains. */ }
+      if (version !== photoVersion || !target.isConnected) { if (local) URL.revokeObjectURL(url); return; }
+      if (!url) return;
+      const image = document.createElement("img");
+      image.alt = `صورة ${teacher.name}`;
+      image.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:inherit";
+      image.addEventListener("load", () => { if (local) URL.revokeObjectURL(url); }, { once: true });
+      image.addEventListener("error", () => { if (local) URL.revokeObjectURL(url); target.textContent = "م"; }, { once: true });
+      image.src = url;
+      target.replaceChildren(image);
+    }));
+    if (prompt) photoStatus.textContent = result.connected ? `صور محلية مطابقة في هذه الصفحة: ${result.matches.size}. الصور القديمة محفوظة.` : "ربط المجلد يحتاج Chrome أو Edge؛ الصور القديمة متاحة.";
+  };
+  root.querySelector("#teacher-local-photos").addEventListener("click", () => loadPhotos(true));
+  root.querySelector("#teacher-copy-photos").addEventListener("click", async (event) => {
+    if (!window.showDirectoryPicker) { notify("نسخ الصور يحتاج Chrome أو Edge"); return; }
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const folder = await window.showDirectoryPicker({ mode: "readwrite", id: "masar-teacher-photos" });
+      if (!await confirmDialog(`سيتم نسخ صور المعلمين القديمة إلى المجلد «${folder.name}». لن تُحذف صور Supabase ولن يُستبدل أي ملف موجود. تابع؟`)) return;
+      const result = await copyLegacyTeacherPhotos(folder, listTeachersDirectory, getTeacherPhoto, (progress) => { photoStatus.textContent = `نُسخت ${progress.copied} صورة…`; });
+      photoStatus.textContent = `نُسخت ${result.copied} صورة، وتُرك ${result.skipped} ملفًا موجودًا، وتعذّر نسخ ${result.failed}. الصور الأصلية محفوظة في Supabase.`;
+      if (!result.failed) notify("تم نسخ الصور القديمة دون حذف الأصل");
+    } catch (error) { if (error.name !== "AbortError") notify(error.message); }
+    finally { button.disabled = false; }
+  });
+  await loadPhotos();
 }
 
 export async function mountFormsView(container) {

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import "./helpers/fake-cloud-backend.mjs";
 import { clear } from "../src/services/cloud-runtime.js";
-import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers } from "../src/modules/forms/forms-service.js";
+import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers, listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "../src/modules/forms/forms-service.js";
 
 const student = { id: "s-1", name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" };
 globalThis.__MASAR_TEST_AUTH__ = {
@@ -59,6 +59,13 @@ test("teacher batch import uses the personal number as a stable id", async () =>
   assert.ok(teachers.some((teacher) => teacher.id === "teacher-001234567"));
 });
 
+test("editing teacher metadata without photo field preserves the legacy photo", async () => {
+  const teacher = await saveTeacher({ name: "معلم", personalNo: "987", photoDataUrl: "data:image/png;base64,AQID" });
+  const updated = await saveTeacher({ id: teacher.id, name: "معلم محدث" });
+  assert.equal(updated.photoDataUrl, teacher.photoDataUrl);
+  assert.equal(updated.personalNo, "987");
+});
+
 test("teacher directory paginates metadata and fetches a photo only on demand", async () => {
   await importTeachers(Array.from({ length: 30 }, (_, index) => ({ name: `معلم ${String(index).padStart(2, "0")}`, personalNo: String(1000 + index), photoDataUrl: index === 0 ? "data:image/jpeg;base64,AA" : "" })));
   const firstPage = await listTeachersDirectory({ offset: 0, limit: 25 });
@@ -66,4 +73,27 @@ test("teacher directory paginates metadata and fetches a photo only on demand", 
   assert.equal(firstPage.rows.length, 25);
   assert.equal("photoDataUrl" in firstPage.rows[0], false);
   assert.equal(await getTeacherPhoto("teacher-1000"), "data:image/jpeg;base64,AA");
+});
+
+test("legacy photo deletion requires admin and preserves all teacher metadata", async () => {
+  await importTeachers(Array.from({ length: 52 }, (_, index) => ({ name: `معلم ${index}`, personalNo: String(2000 + index), department: "العلوم", photoDataUrl: index % 2 ? "" : "data:image/png;base64,AQID" })));
+  const before = await listTeachers();
+  const ids = await listLegacyTeacherPhotoIds();
+  assert.equal(ids.length, 26);
+  await assert.rejects(() => removeLegacyTeacherPhotos(ids), /للإدمن فقط/);
+  assert.deepEqual(await listTeachers(), before);
+  const originalProfile = globalThis.__MASAR_TEST_AUTH__.getCurrentProfile;
+  globalThis.__MASAR_TEST_AUTH__.getCurrentProfile = () => ({ id: "admin-test", role: "admin" });
+  try {
+    assert.equal(await removeLegacyTeacherPhotos([...ids, ids[0], "missing"]), 26);
+    assert.deepEqual(await listLegacyTeacherPhotoIds(), []);
+    assert.deepEqual(await listTeachers(), before.map((teacher) => {
+      if (!teacher.photoDataUrl) return teacher;
+      const { photoDataUrl, ...metadata } = teacher;
+      return metadata;
+    }));
+    assert.equal(await removeLegacyTeacherPhotos(ids), 0);
+  } finally {
+    globalThis.__MASAR_TEST_AUTH__.getCurrentProfile = originalProfile;
+  }
 });

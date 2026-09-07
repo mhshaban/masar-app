@@ -3,7 +3,7 @@
 // admin-users Edge Function بمفتاح service_role من طرف الخادم — لا صلاحيات
 // إدارية تُتحقق أو تُمنح من الواجهة نفسها.
 import { listUsers, createAccount, setAccountActive, setAccountRole, resetAccountPassword, updateAccount } from "../../services/auth-service.js";
-import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
+import { loadingHtml, emptyHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -139,7 +139,7 @@ async function renderList(container) {
       const row = btn.closest("[data-id]");
       const userId = row.dataset.id;
       const currentlyActive = btn.dataset.active === "true";
-      if (currentlyActive && !confirmDialog("تعطيل هذا الحساب يمنعه من الدخول فورًا — متأكد؟")) return;
+      if (currentlyActive && !await confirmDialog("تعطيل هذا الحساب يمنعه من الدخول فورًا — متأكد؟")) return;
       try {
         await setAccountActive(userId, !currentlyActive);
         showToast(currentlyActive ? "تم تعطيل الحساب" : "تم تفعيل الحساب");

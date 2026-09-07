@@ -1,3 +1,4 @@
+import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
 } from "./promoted-service.js?v=2026-09-06-promoted-dedupe-1";
@@ -140,7 +141,7 @@ export async function renderBatchHistory(root) {
   root.querySelectorAll("[data-action='rollback']").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const batchId = btn.closest("[data-batch]").dataset.batch;
-      if (!confirm("هل تريد التراجع عن هذه الدفعة؟")) return;
+      if (!await confirmDialog("هل تريد التراجع عن هذه الدفعة؟")) return;
       await rollbackPromotedBatch(batchId);
       await renderBatchHistory(root);
     });

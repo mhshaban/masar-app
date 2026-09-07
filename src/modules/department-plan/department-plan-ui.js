@@ -1,3 +1,4 @@
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   listPillars,
   listProjectsByPillar,
@@ -294,7 +295,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
         // project created under a different pillar than the one currently
         // viewed would silently vanish from the list with no feedback.
         await actions.onProjectCreated(created.pillar);
-      } catch (err) { alert(err.message); }
+      } catch (err) { notify(err.message); }
     });
     newForm.querySelector("[data-cancel]").addEventListener("click", () => actions.cancelNewProject());
   }
@@ -305,7 +306,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
   });
   root.querySelectorAll("[data-delete-project]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (!confirm("حذف هذا المشروع وكل إجراءاته نهائيًا؟")) return;
+      if (!await confirmDialog("حذف هذا المشروع وكل إجراءاته نهائيًا؟")) return;
       await deleteProject(btn.dataset.deleteProject);
       await actions.onProjectChanged();
     });
@@ -317,7 +318,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
       try {
         await updateProject(projectId, readProjectForm(form));
         await actions.onProjectChanged();
-      } catch (err) { alert(err.message); }
+      } catch (err) { notify(err.message); }
     });
     form.querySelector("[data-cancel]").addEventListener("click", () => actions.cancelEditProject());
   });
@@ -356,7 +357,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
         }
         if (actionNo != null) await saveProgress(`${projectId}-a${actionNo}`, { followUpItemId });
         await actions.onProjectChanged();
-      } catch (err) { alert(err.message); }
+      } catch (err) { notify(err.message); }
     });
     form.querySelector("[data-cancel]").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -382,7 +383,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
     delBtn.dataset.deleteAction = "1";
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm("حذف هذا الإجراء نهائيًا؟ سيُحذف معه أي تقدم أو تقرير فعالية مسجَّل له.")) return;
+      if (!await confirmDialog("حذف هذا الإجراء نهائيًا؟ سيُحذف معه أي تقدم أو تقرير فعالية مسجَّل له.")) return;
       await deleteAction(projectId, state.editingAction.no);
       await actions.onProjectChanged();
     });
@@ -572,7 +573,7 @@ export async function mountDepartmentPlanView(container) {
       const html = buildFollowUpReportHtml(bySection, stats, new Date().toLocaleString("ar-BH"));
       downloadAsWordDoc("تقرير المتابعة والإحصائيات", html, `تقرير-المتابعة-${new Date().toISOString().slice(0, 10)}`);
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     } finally {
       btn.disabled = false;
       btn.textContent = original;

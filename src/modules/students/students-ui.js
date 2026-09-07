@@ -1,10 +1,11 @@
+import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
 import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-06-student-experience-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles, scheduleFileObjectUrl } from "./student-schedule-local.js?v=2026-09-06-student-schedule-2";
-import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-student-photos-1";
+import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -50,10 +51,10 @@ async function renderStudentEdit(container, student, onCancel, onSaved) {
       const data = Object.fromEntries(new FormData(event.target).entries());
       data.phones = String(data.phones || "").split(/[،,]/).map((value) => value.trim()).filter(Boolean);
       await updateStudent(student.id, data);
-      alert("تم تحديث بيانات الطالب");
+      notify("تم تحديث بيانات الطالب");
       await onSaved();
     } catch (error) {
-      alert(error.message);
+      notify(error.message);
       button.disabled = false;
     }
   });
@@ -90,7 +91,7 @@ export function renderImportSection(root, { onImported, isUpdate }) {
         <button class="btn btn-primary" id="students-import-commit">${isUpdate ? "استبدال السجل الحالي بهذا الملف" : "اعتماد الاستيراد"}</button>
       `;
       previewRoot.querySelector("#students-import-commit").addEventListener("click", async () => {
-        if (isUpdate && !confirm(`سيُستبدل سجل الطلبة الحالي بالكامل بـ${students.length} طالبًا من هذا الملف — لا يوجد دمج. متأكد؟`)) return;
+        if (isUpdate && !await confirmDialog(`سيُستبدل سجل الطلبة الحالي بالكامل بـ${students.length} طالبًا من هذا الملف — لا يوجد دمج. متأكد؟`)) return;
         await commitStudentsImport(students);
         previewRoot.innerHTML = '<p class="hint">تم الاستيراد بنجاح. جارٍ إعادة التحميل…</p>';
         await onImported();
@@ -355,10 +356,10 @@ async function renderDetail(container, id, onBack) {
     try {
       const result = await hydrateStudentPhotos(container, [s], { prompt, refresh });
       if (result.count) photoButton.textContent = "تحديث الصورة";
-      else if (prompt && result.connected) alert("لم أجد صورة باسم الرقم الأكاديمي أو الشخصي لهذا الطالب داخل مجلد مسار.");
+      else if (prompt && result.connected) notify("لم أجد صورة باسم الرقم الأكاديمي أو الشخصي لهذا الطالب داخل مجلد مسار.");
       return result;
     } catch (error) {
-      if (prompt) alert(error.message || "تعذّر عرض صورة الطالب");
+      if (prompt) notify(error.message || "تعذّر عرض صورة الطالب");
       return { connected: false, count: 0 };
     }
   };
@@ -503,11 +504,11 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     if (button) { button.disabled = true; button.textContent = "جارٍ البحث عن الصور…"; }
     try {
       const result = await hydrateStudentPhotos(resultsRoot, loadedResults, { prompt: true, refresh: true });
-      if (!result.connected) alert("ربط الصور يحتاج فتح التطبيق في Chrome أو Edge.");
-      else if (!result.count) alert("لم أجد صورًا بأسماء الأرقام الأكاديمية أو الشخصية للطلبة الظاهرين.");
+      if (!result.connected) notify("ربط الصور يحتاج فتح التطبيق في Chrome أو Edge.");
+      else if (!result.count) notify("لم أجد صورًا بأسماء الأرقام الأكاديمية أو الشخصية للطلبة الظاهرين.");
       else if (button) button.textContent = `تم عرض ${result.count} صورة`;
     } catch (error) {
-      alert(error.message || "تعذّر عرض صور الطلاب");
+      notify(error.message || "تعذّر عرض صور الطلاب");
     } finally {
       if (button) button.disabled = false;
     }
@@ -518,20 +519,20 @@ export async function mountStudentsView(container, { onGoto } = {}) {
     if (!section) return;
     const popup = window.open("", "_blank");
     if (!popup) {
-      alert("اسمح بفتح النافذة المنبثقة لطباعة كشف الشعبة.");
+      notify("اسمح بفتح النافذة المنبثقة لطباعة كشف الشعبة.");
       return;
     }
     try {
       const students = await listStudentsForSection(section);
       if (!students.length) {
         popup.close();
-        alert("لم يتم العثور على طلبة في هذه الشعبة.");
+        notify("لم يتم العثور على طلبة في هذه الشعبة.");
         return;
       }
       printSectionRoster(students, section, popup, { title: state.printTitle, instructions: state.printInstructions });
     } catch (error) {
       popup.close();
-      alert(error.message || "تعذّرت طباعة كشف الشعبة.");
+      notify(error.message || "تعذّرت طباعة كشف الشعبة.");
     }
   };
 

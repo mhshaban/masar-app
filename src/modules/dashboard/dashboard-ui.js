@@ -1,3 +1,4 @@
+import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
 import { NEED_LABELS } from "./followup-needs-service.js";
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-06-current-roster-1";
@@ -58,7 +59,7 @@ function dailyReportHtml(snapshot, generatedAt, reminders = []) {
 
 function printDailyReport(html) {
   const w = window.open("", "_blank");
-  if (!w) return alert("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
+  if (!w) return notify("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
   w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسم الإرشاد الأكاديمي والتوجيه المهني</title><style>@page{size:A4 portrait;margin:0}body{font-family:Cairo,Arial,sans-serif;padding:8mm 9mm;direction:rtl;font-size:9pt;line-height:1.3}body:before{content:"قسم الإرشاد الأكاديمي والتوجيه المهني";display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}th,td{border:1px solid #999;padding:3px 5px;text-align:right}th{background:#1a2744;color:#fff}tr,h1,h2{page-break-inside:avoid;page-break-after:auto}h1{font-size:16pt;margin:0 0 6px}h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}.meta{color:#666;font-size:8pt}.document-approval{margin-top:7mm;padding-top:3mm;border-top:.25mm solid #999;page-break-inside:avoid}.document-approval strong{display:block;margin-bottom:3mm;color:#1a2744}.document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}</style></head><body>${html}<div class="document-approval"><strong>الاعتماد</strong><div><span>يعتمد من: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
 }
@@ -139,7 +140,7 @@ async function renderRemindersCard(root) {
       form.reset();
       await renderRemindersCard(root);
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   });
 }
@@ -311,7 +312,7 @@ export async function mountDashboardView(container, { onGoto }) {
     if (!until) return;
     const reason = prompt("اكتب سبب التأجيل");
     if (!reason) return;
-    try { snoozePriority(btn.dataset.prioritySnooze, until, reason); await mountDashboardView(container, { onGoto }); } catch (error) { alert(error.message); }
+    try { snoozePriority(btn.dataset.prioritySnooze, until, reason); await mountDashboardView(container, { onGoto }); } catch (error) { notify(error.message); }
   }));
   container.querySelectorAll("[data-priority-restore]").forEach((btn) => btn.addEventListener("click", async () => {
     clearPriorityDecision(btn.dataset.priorityRestore); await mountDashboardView(container, { onGoto });
@@ -322,7 +323,7 @@ export async function mountDashboardView(container, { onGoto }) {
       const updated = snapshot.source === "onedrive-local" ? await refreshMasarFolder({ prompt: true }) : await connectMasarFolder();
       if (!updated) throw new Error("لم تُمنح صلاحية قراءة المجلد");
       await mountDashboardView(container, { onGoto });
-    } catch (error) { alert(error.message); }
+    } catch (error) { notify(error.message); }
   });
   const reportHtml = dailyReportHtml(snapshot, new Intl.DateTimeFormat("ar-BH", { dateStyle: "full", timeStyle: "short", timeZone: "Asia/Bahrain" }).format(new Date()), dueReminders);
   container.querySelector("#daily-word").addEventListener("click", () => downloadAsWordDoc("تقرير أولويات اليوم", reportHtml, `أولويات-اليوم-${new Date().toISOString().slice(0,10)}`));

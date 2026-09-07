@@ -1,6 +1,6 @@
 import { ensureXlsx } from "../../services/vendor-loader.js";
 import { ACTION_LABELS, TABLE_LABELS, listAuditLogs } from "./audit-service.js?v=2026-09-04-users-1";
-import { loadingHtml, emptyHtml, errorHtml, showToast } from "../shared/ui-states.js";
+import { loadingHtml, emptyHtml, errorHtml, showToast } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({

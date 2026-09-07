@@ -1,3 +1,4 @@
+import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
 import { saveProgress, addAttachmentLink, removeAttachment } from "../execution/execution-service.js?v=2026-09-06-onedrive-links-1";
 import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
@@ -169,7 +170,7 @@ async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
           entry.progress = await addAttachmentLink(id, { name, url });
           openEditor();
         } catch (err) {
-          alert(err.message);
+          notify(err.message);
         }
       });
 

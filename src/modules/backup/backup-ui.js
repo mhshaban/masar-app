@@ -1,7 +1,7 @@
 import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js?v=2026-08-31-egress-1";
 import { count, clear } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS } from "../../core/config.js";
-import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js";
+import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 function esc(str) {
@@ -85,7 +85,7 @@ async function renderExportSection(root) {
       const cleanupBtn = cleanupRoot.querySelector("#cleanup-agenda-status-btn");
       const cleanupStatus = cleanupRoot.querySelector("#cleanup-status");
       cleanupBtn.addEventListener("click", async () => {
-        if (!confirmDialog(`سيتم حذف ${historicalCount} سجلًا تاريخيًا من agendaStatus فقط. لن تتأثر حالة تنفيذ الإجراءات الحالية. تأكد من تنزيل نسخة احتياطية أولًا. هل تريد المتابعة؟`)) return;
+        if (!await confirmDialog(`سيتم حذف ${historicalCount} سجلًا تاريخيًا من agendaStatus فقط. لن تتأثر حالة تنفيذ الإجراءات الحالية. تأكد من تنزيل نسخة احتياطية أولًا. هل تريد المتابعة؟`)) return;
         cleanupBtn.disabled = true;
         cleanupBtn.textContent = "جارٍ التنظيف…";
         try {
@@ -172,7 +172,7 @@ export function renderImportSection(root, onRestored) {
         <button class="btn btn-primary" id="restore-btn" style="margin-top:12px; background:var(--critical);">استبدال كل البيانات الحالية بهذه النسخة</button>
       `;
       previewRoot.querySelector("#restore-btn").addEventListener("click", async () => {
-        if (!confirmDialog("سيُستبدل كل بيانات مسار المشتركة (لكل المرشدين، وليس هذا الجهاز فقط) بمحتوى الملف نهائيًا. هل أنت متأكد؟")) return;
+        if (!await confirmDialog("سيُستبدل كل بيانات مسار المشتركة (لكل المرشدين، وليس هذا الجهاز فقط) بمحتوى الملف نهائيًا. هل أنت متأكد؟")) return;
         previewRoot.innerHTML = loadingHtml("جارٍ الاستعادة…");
         try {
           await restoreBackup(data);
