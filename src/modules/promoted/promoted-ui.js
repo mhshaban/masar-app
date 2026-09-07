@@ -1,7 +1,7 @@
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
-} from "./promoted-service.js?v=2026-09-06-promoted-dedupe-1";
+} from "./promoted-service.js?v=2026-09-07-academic-fix-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 
 function esc(str) {
@@ -149,7 +149,10 @@ export async function renderBatchHistory(root) {
 }
 
 async function renderPendingList(root, onGoto) {
-  const rows = await listStudentsWithPendingSubjects();
+  const allRows = await listStudentsWithPendingSubjects();
+  const rows = allRows.filter((row) => row.matched);
+  const unmatched = allRows.filter((row) => !row.matched);
+  const unmatchedHtml = unmatched.length ? `<details class="card" style="margin-top:16px;"><summary>سجلات تحتاج مطابقة مع الكشف الحالي (${unmatched.length})</summary><p class="hint">هذه الأرقام غير مرتبطة بطالب في الكشف الحالي؛ السجلات محفوظة ولا تدخل في إجمالي الطلبة الحاليين.</p><div class="tablewrap"><table><thead><tr><th>الرقم الأكاديمي</th><th>المقررات المتبقية</th></tr></thead><tbody>${unmatched.map((row) => `<tr><td>${esc(row.studentId)}</td><td>${row.pendingSubjects.map(esc).join("، ")}</td></tr>`).join("")}</tbody></table></div></details>` : "";
   if (!rows.length) {
     const profile = getCurrentProfile();
     const isAdmin = profile?.role === "admin" || profile?.is_admin === true;
@@ -159,7 +162,7 @@ async function renderPendingList(root, onGoto) {
           لا يوجد طلاب حاليًا (أو لم يُستورَد كشف المرفعين بعد)
           ${isAdmin ? '<div style="margin-top:12px;"><button class="btn btn-primary" id="promoted-goto-imports">الذهاب لتبويب الاستيراد</button></div>' : ""}
         </div>
-      </div>
+      </div>${unmatchedHtml}
     `;
     const gotoBtn = root.querySelector("#promoted-goto-imports");
     if (gotoBtn && onGoto) gotoBtn.addEventListener("click", () => onGoto("imports"));
@@ -169,10 +172,11 @@ async function renderPendingList(root, onGoto) {
     <div class="card">
       <h2>طلاب لديهم مقررات لم تُجتَز بعد (${rows.length})</h2>
       <div class="tablewrap"><table>
-        <thead><tr><th>الطالب</th><th>الصف</th><th>المقررات المتبقية</th></tr></thead>
+        <thead><tr><th>الرقم الأكاديمي</th><th>الطالب</th><th>الصف</th><th>المقررات المتبقية</th></tr></thead>
         <tbody>
           ${rows.map((r) => `
             <tr>
+              <td>${esc(r.studentId)}</td>
               <td>${esc(r.studentName) || esc(r.studentId)}</td>
               <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
               <td>${r.pendingSubjects.map(esc).join("، ")}</td>
@@ -180,7 +184,7 @@ async function renderPendingList(root, onGoto) {
           `).join("")}
         </tbody>
       </table></div>
-    </div>
+    </div>${unmatchedHtml}
   `;
 }
 

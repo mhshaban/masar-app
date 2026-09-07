@@ -2,6 +2,7 @@ import { list as listAll, listWhere, get, save, bulkPut, remove } from "../../se
 import { readWorkbook } from "../../services/xlsx-parser.js";
 import { ensureStudentsSeeded } from "../../services/students-source.js";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
+import { normalizeKey } from "../../services/text-normalize.js";
 
 // "المرفعين" sheet inside the school's master roster workbook: students
 // promoted from prep school with one or more subjects still not cleared.
@@ -189,12 +190,18 @@ export async function rollbackPromotedBatch(batchId) {
 // needs to clear something, not the full roster of everyone ever promoted.
 export async function listStudentsWithPendingSubjects() {
   const [records, students] = await Promise.all([listAll("promotedSubjects"), listAll("students")]);
-  const studentById = new Map(students.map((s) => [String(s.id), s]));
+  const studentById = new Map(students.map((s) => [normalizeKey(s.id), s]));
+  // Imported subject rows use the academic number; roster IDs may be UUIDs.
+  for (const student of students) {
+    if (student.academicId) studentById.set(normalizeKey(student.academicId), student);
+  }
 
   const byStudent = new Map();
   for (const r of records) {
-    if (!byStudent.has(r.studentId)) byStudent.set(r.studentId, []);
-    byStudent.get(r.studentId).push(r);
+    const student = studentById.get(normalizeKey(r.studentId));
+    const key = student ? normalizeKey(student.academicId || student.id) : normalizeKey(r.studentId);
+    if (!byStudent.has(key)) byStudent.set(key, []);
+    byStudent.get(key).push(r);
   }
 
   const rows = [];
@@ -205,6 +212,7 @@ export async function listStudentsWithPendingSubjects() {
     rows.push({
       studentId,
       studentName: student ? student.name : null,
+      matched: !!student,
       level: student ? student.level : null,
       section: student ? student.section : null,
       pendingSubjects: pending,

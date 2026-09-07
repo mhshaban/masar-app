@@ -1,7 +1,7 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-06-student-experience-1";
-import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-07-academic-fix-1";
+import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-08-31-record-edit-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles, scheduleFileObjectUrl } from "./student-schedule-local.js?v=2026-09-06-student-schedule-2";
@@ -410,7 +410,7 @@ async function renderDetail(container, id, onBack) {
     }
   });
 
-  await renderAcademicPath(container.querySelector("#student-academic-path"), String(s.academicId || s.id));
+  await renderAcademicPath(container.querySelector("#student-academic-path"), s);
 }
 
 export async function mountStudentsView(container, { onGoto } = {}) {

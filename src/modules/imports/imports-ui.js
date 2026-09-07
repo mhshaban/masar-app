@@ -7,8 +7,8 @@
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-06-polish-1";
-import { ensureXlsx } from "../../services/vendor-loader.js";
-import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-06-polish-1";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
+import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-07-academic-fix-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },

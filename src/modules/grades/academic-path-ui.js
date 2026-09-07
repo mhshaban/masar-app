@@ -1,4 +1,54 @@
-import { getStudentTermTimeline } from "./term-progress-service.js";
+import { getStudentTermTimeline, getStudentSubjectSummary } from "./term-progress-service.js?v=2026-09-07-academic-fix-1";
+import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
+
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const statusLabels = { absent: "غائب", barred: "محروم" };
+
+export function renderCertificateResults(certificate) {
+  return certificate.terms.filter((term) => term.subjects.length).map((term) => `<section style="margin-top:16px;"><h3>${esc(term.label)}</h3><div class="tablewrap"><table><thead><tr><th>رمز المقرر</th><th>المادة</th><th>الساعات</th><th>الدرجة</th><th>الملاحظات</th></tr></thead><tbody>${term.subjects.map((subject) => `<tr><td>${esc(subject.code)}</td><td>${esc(subject.name)}</td><td>${esc(subject.hours ?? "—")}</td><td class="num">${esc(subject.scoreStatus ? (statusLabels[subject.scoreStatus] || subject.scoreStatus) : (subject.score ?? "—"))}</td><td>${esc(subject.notes || "—")}</td></tr>`).join("")}</tbody></table></div>${term.average != null ? `<p><strong>المعدل الفصلي: ${esc(term.average)}٪</strong> ${esc(term.rating || "")}</p>` : ""}</section>`).join("");
+}
+
+async function mountCertificateResults(root, student) {
+  root.innerHTML = `<h2>شهادة الطالب — نتائج جميع المواد</h2><div class="forms-actions"><button class="btn btn-primary" data-folder>قراءة الشهادات من مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p class="hint">تُقرأ الشهادة على جهازك ويُتحقق من الرقم الأكاديمي داخلها قبل عرض النتائج.</p><p data-status role="status"></p><div data-results></div>`;
+  const status = root.querySelector("[data-status]");
+  const results = root.querySelector("[data-results]");
+  let version = 0;
+  async function readFiles(files, ticket) {
+    const blocks = [], errors = [];
+    for (const source of files) {
+      if (ticket !== version || !root.isConnected) return;
+      status.textContent = `جارٍ قراءة ${source.name}…`;
+      try {
+        const file = source.handle ? await source.handle.getFile() : source;
+        const certificate = await readStudentCertificate(file, student);
+        blocks.push(`<div style="margin-top:16px;"><h3>${esc(source.name)}</h3>${renderCertificateResults(certificate)}</div>`);
+      } catch (error) { errors.push(`${source.name}: ${error.message}`); }
+    }
+    if (ticket !== version || !root.isConnected) return;
+    results.innerHTML = blocks.join("");
+    status.textContent = [blocks.length ? `تم عرض ${blocks.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
+  }
+  async function loadFolder(prompt) {
+    const ticket = ++version;
+    status.textContent = "جارٍ البحث عن شهادة الطالب…";
+    try {
+      const found = await findStudentCertificates(student, { prompt, refresh: prompt });
+      if (ticket !== version || !root.isConnected) return;
+      if (!found.files.length) {
+        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي؛ يمكنك اختيار ملف الشهادة مباشرة." : "اربط مجلد مسار لعرض الشهادة، أو اختر ملف PDF مباشرة.";
+        return;
+      }
+      await readFiles(found.files, ticket);
+    } catch (error) { if (ticket === version) status.textContent = error.name === "AbortError" ? "أُلغي اختيار المجلد." : error.message; }
+  }
+  root.querySelector("[data-folder]").addEventListener("click", () => loadFolder(true));
+  root.querySelector("[data-certificate]").addEventListener("change", (event) => {
+    const files = [...event.target.files];
+    if (files.length) void readFiles(files, ++version);
+    event.target.value = "";
+  });
+  await loadFolder(false);
+}
 
 const CHART_W = 640;
 const CHART_H = 220;
@@ -67,10 +117,16 @@ function wireTermChart(root, points) {
   });
 }
 
-export async function renderAcademicPath(container, studentId) {
-  const timeline = await getStudentTermTimeline(studentId);
+export async function renderAcademicPath(container, student) {
+  if (typeof student !== "object") student = { id: String(student) };
+  const [timeline, subjects] = await Promise.all([
+    getStudentTermTimeline(String(student.academicId || student.id)),
+    getStudentSubjectSummary(student),
+  ]);
 
   container.innerHTML = `
+    <div class="card" id="student-certificate-results" style="margin-bottom:16px;"></div>
+    ${subjects.length ? `<details class="card" style="margin-bottom:16px;" open><summary>ملخص درجات المواد المتاح (${subjects.length})</summary><p class="hint">ملخص التحليل المجمع عبر الفترات؛ درجات كل فصل تظهر في الشهادة أعلاه.</p><div class="tablewrap"><table><thead><tr><th>المادة</th><th>النسبة</th></tr></thead><tbody>${subjects.map((subject) => `<tr><td>${esc(subject.subject)}</td><td>${subject.pct == null ? "—" : `${esc(subject.pct)}٪`}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
     <div class="card">
       <h2>المعدل الفصلي عبر الزمن</h2>
       <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط.</p>
@@ -81,4 +137,5 @@ export async function renderAcademicPath(container, studentId) {
   const chartRoot = container.querySelector("#term-chart-root");
   chartRoot.innerHTML = renderTermLineChart(timeline);
   wireTermChart(chartRoot, timeline);
+  await mountCertificateResults(container.querySelector("#student-certificate-results"), student);
 }

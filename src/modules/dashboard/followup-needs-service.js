@@ -1,7 +1,7 @@
 import { listCandidates as listCaseCandidates } from "../cases/guidance-service.js";
 import { listCandidates as listSupportCandidates } from "../support/support-service.js";
 import { listCandidates as listCareerCandidates } from "../career/career-service.js";
-import { listStudentsWithPendingSubjects } from "../promoted/promoted-service.js";
+import { listStudentsWithPendingSubjects } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { getStudent } from "../students/students-service.js";
 
 export const NEED_LABELS = {

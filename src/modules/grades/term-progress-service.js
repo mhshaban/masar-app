@@ -41,3 +41,10 @@ export async function getStudentTermTimeline(studentId) {
     .map((t) => ({ term: t.term, sortKey: termSortKey(t.term), averagePct: t.averagePct, rating: t.rating }))
     .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 }
+
+export async function getStudentSubjectSummary(student) {
+  const ids = [...new Set([student.academicId, student.id].filter(Boolean).map(String))];
+  const groups = await Promise.all(ids.map((id) => listWhere("academicFlags", "studentId", id)));
+  const records = groups.flat().sort((a, b) => String(b.computedAt || "").localeCompare(String(a.computedAt || "")));
+  return records[0]?.subjects || [];
+}

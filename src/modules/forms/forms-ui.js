@@ -9,7 +9,7 @@ import {
 } from "./forms-service.js?v=2026-09-06-polish-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-2";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-2";
-import { ensureXlsx } from "../../services/vendor-loader.js";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

@@ -1,5 +1,5 @@
 import { getAgendaProgressSummary } from "../agenda/agenda-service.js";
-import { listStudentsNeedingAttention } from "./followup-needs-service.js";
+import { listStudentsNeedingAttention } from "./followup-needs-service.js?v=2026-09-07-academic-fix-1";
 import { listStaleOpenCases } from "../cases/guidance-service.js";
 import { listOverdueActions } from "../support/support-service.js";
 import { rpc, list, listActionProgressStatuses } from "../../services/cloud-runtime.js?v=2026-08-31-priorities-3";

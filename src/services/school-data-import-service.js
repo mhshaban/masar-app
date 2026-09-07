@@ -1,7 +1,7 @@
 import { readWorkbook } from "./xlsx-parser.js";
 import { parseStudentsRows, commitStudentsImport } from "./students-import-service.js";
 import { importTeachers } from "../modules/forms/forms-service.js?v=2026-09-06-polish-1";
-import { parsePromotedRows, previewHistoricalPromotedDuplicates, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-06-promoted-dedupe-1";
+import { parsePromotedRows, previewHistoricalPromotedDuplicates, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { buildBackup, downloadBackup } from "./backup-service.js?v=2026-09-06-school-import-1";
 import { list, remove } from "./cloud-runtime.js";
 

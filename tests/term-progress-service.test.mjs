@@ -3,10 +3,20 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear } from "../src/services/cloud-runtime.js";
-import { termSortKey, getStudentTermTimeline } from "../src/modules/grades/term-progress-service.js";
+import { termSortKey, getStudentTermTimeline, getStudentSubjectSummary } from "../src/modules/grades/term-progress-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
+});
+
+test("subject summary includes every subject, preserves zero and uses only the selected student's identifiers", async () => {
+  const subjects = [{ subject: "رياضيات", pct: 0 }, { subject: "عربي", pct: 91 }];
+  await bulkPut("academicFlags", [
+    { id: "f1", studentId: "20230001", subjects },
+    { id: "f2", studentId: "other", subjects: [{ subject: "بيانات أخرى", pct: 100 }] },
+  ]);
+  assert.deepEqual(await getStudentSubjectSummary({ id: "uuid", academicId: "20230001" }), subjects);
+  assert.deepEqual(await getStudentSubjectSummary({ id: "unknown" }), []);
 });
 
 test("termSortKey orders the first term before the second, including this school's alef-maksura spelling of الثاني", () => {

@@ -34,3 +34,9 @@ function loadScript(path, globalName) {
 export function ensureXlsx() {
   return loadScript("src/vendor/xlsx.core.min.js", "XLSX");
 }
+
+export async function ensurePdfJs() {
+  const library = await loadScript("src/vendor/pdf.min.js", "pdfjsLib");
+  library.GlobalWorkerOptions.workerSrc = absoluteAsset("src/vendor/pdf.worker.min.js");
+  return library;
+}

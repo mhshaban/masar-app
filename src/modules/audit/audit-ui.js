@@ -1,4 +1,4 @@
-import { ensureXlsx } from "../../services/vendor-loader.js";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { ACTION_LABELS, TABLE_LABELS, listAuditLogs } from "./audit-service.js?v=2026-09-04-users-1";
 import { loadingHtml, emptyHtml, errorHtml, showToast } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 

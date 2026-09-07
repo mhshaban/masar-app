@@ -65,6 +65,24 @@ test("getPendingSubjectsForStudent returns every subject row (cleared and pendin
   assert.equal(rows[0].subjectCode, "دين");
 });
 
+test("pending list joins academic numbers to UUID roster records and flags unmatched rows without deleting them", async () => {
+  await bulkPut("students", [{ id: "roster-uuid", academicId: "20234450", name: "طالب حالي", section: "٥ديز١", level: "الثالث" }]);
+  await bulkPut("promotedSubjects", [
+    { id: "a", studentId: "٢٠٢٣٤٤٥٠", subjectCode: "ريض813", cleared: false },
+    { id: "b", studentId: "roster-uuid", subjectCode: "ريض813", cleared: false },
+    { id: "c", studentId: "20230000", subjectCode: "عرب801", cleared: false },
+  ]);
+  const rows = await listStudentsWithPendingSubjects();
+  assert.equal(rows.length, 2);
+  const current = rows.find((row) => row.matched);
+  assert.equal(current.studentName, "طالب حالي");
+  assert.equal(current.studentId, "20234450");
+  assert.equal(current.section, "٥ديز١");
+  assert.deepEqual(current.pendingSubjects, ["ريض813"]);
+  assert.equal(rows.find((row) => !row.matched).studentId, "20230000");
+  assert.equal((await list("promotedSubjects")).length, 3);
+});
+
 test("historical duplicate analysis removes safe copies but leaves an unresolved status conflict", () => {
   const existing = [
     { id: "p1", studentId: "111", subjectCode: "دين", cleared: false },
