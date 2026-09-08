@@ -175,7 +175,7 @@ export async function renderAcademicPath(container, student) {
     const values = [...new Set(certificates.map(c => officialAverage(c.finalCumulativeAverage)).filter(v => v != null))];
     const cumulative = values.length === 1 ? values[0] : summary.finalCumulativeAverage;
     container.querySelector("[data-cumulative]").textContent = cumulative == null ? "غير متوفر" : `${cumulative}٪`;
-    container.querySelector("[data-cumulative-note]").textContent = values.length > 1 ? "توجد قيم تراكمية مختلفة في الشهادات؛ المعروض هو المحفوظ، ويحتاج مراجعة الأصل." : cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "المعدل الرسمي المسجل؛ لا يُحسب من متوسط المعدلات الفصلية.";
+    container.querySelector("[data-cumulative-note]").textContent = values.length > 1 ? "توجد قيم تراكمية مختلفة في الشهادات؛ المعروض هو المحفوظ، ويحتاج مراجعة الأصل." : cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "";
   }
   drawAcademic();
   await mountCertificateResults(container.querySelector("#student-certificate-results"), student, drawAcademic);
