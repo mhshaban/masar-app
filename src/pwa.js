@@ -30,7 +30,7 @@ function showUpdateNotice(registration) {
 
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
-  const registration = await navigator.serviceWorker.register(new URL("../sw.js?v=2026-09-08-note-1", import.meta.url), { scope: "./" });
+  const registration = await navigator.serviceWorker.register(new URL("../sw.js?v=2026-09-08-print-cairo-1", import.meta.url), { scope: "./" });
   if (registration.waiting && navigator.serviceWorker.controller) showUpdateNotice(registration);
   registration.addEventListener("updatefound", () => {
     const worker = registration.installing;

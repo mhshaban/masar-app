@@ -8,7 +8,7 @@ import {
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
-import { downloadAsWordDoc, buildWordDocumentHtml } from "../../services/word-export.js?v=2026-09-08-print-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -217,6 +217,18 @@ function workflowBlock(item) {
   return `<div class="print-approval form-workflow"><strong>استلام ومتابعة الجهة المحال إليها</strong><div class="workflow-options">☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</div><div class="workflow-signatures"><span>اسم المستلم: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
 }
 
+export function formDetailMarkup(item) {
+  return `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><div class="forms-print" id="form-printable">
+    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
+    <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student)}</div>
+    <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
+    <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
+      <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
+      ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
+      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
+    </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
+}
+
 async function printFormDirect(id) {
   const popup = window.open("", "_blank");
   if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
@@ -226,8 +238,26 @@ async function printFormDirect(id) {
     if (!item) throw new Error("الاستمارة غير موجودة");
     if (popup.closed) return;
     popup.document.open();
-    popup.document.write(buildWordDocumentHtml(item.title, buildDepartmentFormReportHtml(item, new Date().toLocaleString("ar-BH"))));
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(item.title || "استمارة القسم")}</title></head><body><main id="direct-form-root"></main></body></html>`);
     popup.document.close();
+    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
+    const root = popup.document.getElementById("direct-form-root");
+    root.innerHTML = formDetailMarkup(item);
+    // Both buttons use the exact same markup and application styles, including Cairo.
+    root.querySelector("[name=status]").value = item.status || "pending";
+    root.querySelector("#feedback-form").addEventListener("submit", event => event.preventDefault());
+    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map(source => new Promise((resolve, reject) => {
+      const link = popup.document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = source.href;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
+      popup.document.head.appendChild(link);
+    }));
+    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
+    await Promise.all(styles);
+    if (popup.closed) return;
+    await Promise.all([400, 600, 700, 800].map(weight => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
     await popup.document.fonts.ready;
     if (popup.closed) return;
     popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
@@ -236,15 +266,7 @@ async function printFormDirect(id) {
 
 async function renderDetail(root, id, back) {
   const item = await getDepartmentForm(id); if (!item) return back();
-  root.innerHTML = `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><div class="forms-print" id="form-printable">
-    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
-    <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student)}</div>
-    <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
-    <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
-      <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
-      ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
-      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
-    </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
+  root.innerHTML = formDetailMarkup(item);
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
   root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); notify("تم حفظ المتابعة"); await renderDetail(root, id, back); });
