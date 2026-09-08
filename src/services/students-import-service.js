@@ -61,7 +61,7 @@ const HEADER_ALIASES = {
   counselorName: ["اسم المرشد"], counselorPhone: ["رقم المرشد"], counselorEmail: ["ايميل المرشد", "إيميل المرشد"],
   counselorDepartment: ["قسم المرشد"], socialGuidance: ["الارشاد الاجتماعي", "الإرشاد الاجتماعي"],
   supportNeeded: ["الدعم المطلوب"], nonArabNationality: ["جنسيات غير عربية"], specializationPreference: ["رغبة التخصص"],
-  minSpecializationThreshold: ["الحد الأدنى للتخصص"], seatNumber: ["رقم المقعد"], committee: ["اللجنة"],
+  minSpecializationThreshold: ["الحد الأدنى للتخصص", "الحد الادنى للتخصص"], seatNumber: ["رقم المقعد"], committee: ["اللجنة"],
 };
 
 function cleanHeader(value) {

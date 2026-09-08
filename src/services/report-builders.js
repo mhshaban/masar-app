@@ -79,6 +79,7 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
       <tr><th>اسم الطالب</th><td>${esc(student.name)}</td><th>الرقم الأكاديمي</th><td>${esc(student.academicId || "—")}</td></tr>
       <tr><th>الرقم الشخصي</th><td>${esc(student.civilId || "—")}</td><th>المستوى والشعبة</th><td>${esc(student.level || "—")} / ${esc(student.section || "—")}</td></tr>
       <tr><th>المسار/التخصص</th><td colspan="3">${esc(student.track || student.specialization || "—")}</td></tr>
+      <tr><th>رغبة التخصص</th><td>${esc(student.specializationPreference ?? "") || "—"}</td><th>الحد الأدنى للتخصص</th><td>${esc(student.minSpecializationThreshold ?? "") || "—"}</td></tr>
       <tr><th>المعدل التراكمي النهائي</th><td colspan="3">${student.finalCumulativeAverage == null ? "—" : `${esc(student.finalCumulativeAverage)}٪`}</td></tr>
     </table>
     <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>

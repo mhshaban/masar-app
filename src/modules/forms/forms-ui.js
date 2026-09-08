@@ -1,13 +1,13 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js";
 import { findTeacherPhotos, copyLegacyTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
-import { listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "./forms-service.js?v=2026-09-06-polish-1";
+import { listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "./forms-service.js?v=2026-09-08-form-fields-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
-} from "./forms-service.js?v=2026-09-06-polish-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-04-form-actor-2";
+} from "./forms-service.js?v=2026-09-08-form-fields-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-2";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -58,6 +58,8 @@ function formExcelRow(item) {
     "الجهة المحال إليها": item.destination || "", "حالة الطلب": STATUS_LABELS[item.status] || item.status || "غير محدد",
     "اسم الطالب": item.student?.name || "", "الرقم الأكاديمي": item.student?.academicId || item.studentId || "", "الرقم الشخصي للطالب": item.student?.civilId || "",
     "المستوى": item.student?.level || "", "الشعبة": item.student?.section || "", "المسار/التخصص": item.student?.track || item.student?.specialization || "",
+    "رغبة التخصص": item.student?.specializationPreference ?? "",
+    "الحد الأدنى للتخصص": item.student?.minSpecializationThreshold ?? "",
     "المعدل التراكمي النهائي": item.student?.finalCumulativeAverage ?? "",
   };
   for (const [key, label] of Object.entries(FORM_FIELD_LABELS)) row[label] = FORM_VALUE_LABELS[item.fields?.[key]] || item.fields?.[key] || "";
@@ -93,7 +95,7 @@ async function exportFormsExcel(forms) {
 function studentCard(student) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
   const average = student.finalCumulativeAverage;
-  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
+  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>رغبة التخصص: ${esc(student.specializationPreference ?? "") || "—"}</span><span>الحد الأدنى للتخصص: ${esc(student.minSpecializationThreshold ?? "") || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
 function typeFields(type, values = {}) {

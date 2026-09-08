@@ -45,6 +45,8 @@ export function studentSnapshot(student) {
     academicId: student.academicId || "", civilId: student.civilId || "",
     level: student.level || "", section: student.section || "", department: student.department || "",
     track: student.track || "", specialization: student.specialization || student.program || "",
+    specializationPreference: student.specializationPreference ?? "",
+    minSpecializationThreshold: student.minSpecializationThreshold ?? "",
     finalCumulativeAverage: averageFrom(student),
     phone: student.phone || student.mobile || "", guardianPhone: student.guardianPhone || "",
   };

@@ -13,19 +13,19 @@ import {
 
 const VIEW_LOADERS = {
   dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-07-academic-fix-1")).mountDashboardView,
-  plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-06-polish-1")).mountDepartmentPlanView,
-  agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-06-polish-1")).mountAgendaView,
-  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-08-academic-1")).mountStudentsView,
+  plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-08-form-fields-1")).mountDepartmentPlanView,
+  agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-08-form-fields-1")).mountAgendaView,
+  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-08-form-fields-1")).mountStudentsView,
   grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-07-review-1")).mountGradesView,
-  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-07-review-1")).mountCasesView,
-  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-07-review-1")).mountSupportView,
+  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-08-form-fields-1")).mountCasesView,
+  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-08-form-fields-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js?v=2026-09-07-review-1")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-07-review-1")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-07-academic-fix-1")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-08-form-fields-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-06-polish-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-07-academic-fix-1")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-08-form-fields-1")).mountImportsView,
 };
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),

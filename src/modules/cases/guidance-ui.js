@@ -5,7 +5,7 @@ import {
 } from "./guidance-service.js";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js";
-import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-02-form-layout-1";
+import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-02-form-layout-1";
 
 function esc(str) {
