@@ -10,7 +10,7 @@ function escTitle(str) {
   }[c]));
 }
 
-export function downloadAsWordDoc(title, bodyHtml, filename) {
+export function buildWordDocumentHtml(title, bodyHtml) {
   const defaultApproval = bodyHtml.includes('class="document-approval"') ? "" : '<div class="document-approval"><strong>الإجراء والتوثيق</strong><table><tr><td>المسؤول: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>';
   const html = `<!doctype html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -42,6 +42,11 @@ export function downloadAsWordDoc(title, bodyHtml, filename) {
 <body dir="rtl"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}${defaultApproval}</body>
 </html>`;
 
+  return html;
+}
+
+export function downloadAsWordDoc(title, bodyHtml, filename) {
+  const html = buildWordDocumentHtml(title, bodyHtml);
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

@@ -1,7 +1,7 @@
 import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-review-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-08-academic-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-08-print-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-08-form-fields-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
@@ -177,10 +177,26 @@ function printSectionRoster(students, section, popup, { title = "", instructions
   const generatedAt = new Intl.DateTimeFormat("ar-BH", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
   const counselor = students.find((student) => student.counselor?.name)?.counselor || {};
   const documentTitle = title.trim() || `كشف طلبة الشعبة ${section}`;
-  popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(documentTitle)}</title><style>@page{size:A4 landscape;margin:9mm}body{font-family:Cairo,"Segoe UI",Tahoma,Arial,sans-serif;color:#111}h1{text-align:center;font-size:17pt;margin:0 0 3mm}.info{display:flex;gap:8mm;flex-wrap:wrap;font-size:10pt;font-weight:700;margin:0 0 3mm}.instructions{border:1px solid #999;padding:2.5mm;min-height:8mm;margin:0 0 4mm;font-size:10pt;white-space:pre-wrap}.meta{font-size:8pt;color:#555;margin-top:3mm}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5pt}thead{display:table-header-group}th,td{border:1px solid #777;padding:1.6mm;text-align:center;vertical-align:middle}th{background:#eee;font-weight:800}tr{break-inside:avoid;height:9mm}.seq{width:4%}.academic{width:12%}.student{width:24%;text-align:right}.phone{width:11%;direction:ltr}.sign{width:23%}</style></head><body><h1>${esc(documentTitle)}</h1><div class="info"><span>اسم الشعبة: ${esc(section)}</span><span>مرشد الشعبة: ${esc(counselor.name) || "—"}</span><span>قسم المرشد: ${esc(counselor.department) || "—"}</span><span>عدد الطلبة: ${students.length}</span></div>${instructions.trim() ? `<div class="instructions"><strong>التعليمات:</strong> ${esc(instructions)}</div>` : ""}<table><thead><tr><th class="seq">م</th><th class="academic">الرقم الأكاديمي</th><th class="student">اسم الطالب</th><th class="phone">رقم التواصل ١</th><th class="phone">رقم التواصل ٢</th><th class="phone">رقم التواصل ٣</th><th class="sign">التوقيع بالاستلام / بالعلم / الملاحظات</th></tr></thead><tbody>${students.map((student, index) => { const phones = (student.phones || []).slice(0, 3); return `<tr><td>${index + 1}</td><td class="phone">${esc(student.academicId || student.id)}</td><td class="student">${esc(student.name)}</td><td class="phone">${esc(phones[0] || "")}</td><td class="phone">${esc(phones[1] || "")}</td><td class="phone">${esc(phones[2] || "")}</td><td></td></tr>`; }).join("")}</tbody></table><div class="meta">قسم الإرشاد الأكاديمي والتوجيه المهني · تاريخ الطباعة: ${esc(generatedAt)}</div></body></html>`);
+  popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(documentTitle)}</title><style>@page{size:A4 portrait;margin:8mm}html,body{margin:0;padding:0}#roster-page{width:194mm;display:flow-root;margin:0 auto;overflow-wrap:anywhere}body{font-family:Cairo,"Segoe UI",Tahoma,Arial,sans-serif;color:#111}h1{text-align:center;font-size:17pt;margin:0 0 3mm}.info{display:flex;gap:8mm;flex-wrap:wrap;font-size:10pt;font-weight:700;margin:0 0 3mm}.instructions{border:1px solid #999;padding:2.5mm;min-height:8mm;margin:0 0 4mm;font-size:10pt;white-space:pre-wrap}.meta{font-size:8pt;color:#555;margin-top:3mm}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}thead{display:table-header-group}th,td{border:1px solid #777;padding:1mm;text-align:center;vertical-align:middle}th{background:#eee;font-weight:800}tr{break-inside:avoid;height:6.5mm}.seq{width:4%}.academic{width:12%}.student{width:24%;text-align:right}.phone{width:11%;direction:ltr}.sign{width:23%}</style></head><body><main id="roster-page"><h1>${esc(documentTitle)}</h1><div class="info"><span>اسم الشعبة: ${esc(section)}</span><span>مرشد الشعبة: ${esc(counselor.name) || "—"}</span><span>قسم المرشد: ${esc(counselor.department) || "—"}</span><span>عدد الطلبة: ${students.length}</span></div>${instructions.trim() ? `<div class="instructions"><strong>التعليمات:</strong> ${esc(instructions)}</div>` : ""}<table><thead><tr><th class="seq">م</th><th class="academic">الرقم الأكاديمي</th><th class="student">اسم الطالب</th><th class="phone">رقم التواصل ١</th><th class="phone">رقم التواصل ٢</th><th class="phone">رقم التواصل ٣</th><th class="sign">التوقيع بالاستلام / بالعلم / الملاحظات</th></tr></thead><tbody>${students.map((student, index) => { const phones = (student.phones || []).slice(0, 3); return `<tr><td>${index + 1}</td><td class="phone">${esc(student.academicId || student.id)}</td><td class="student">${esc(student.name)}</td><td class="phone">${esc(phones[0] || "")}</td><td class="phone">${esc(phones[1] || "")}</td><td class="phone">${esc(phones[2] || "")}</td><td></td></tr>`; }).join("")}</tbody></table><div class="meta">قسم الإرشاد الأكاديمي والتوجيه المهني · تاريخ الطباعة: ${esc(generatedAt)}</div></main></body></html>`);
   popup.document.close();
-  popup.focus();
-  setTimeout(() => popup.print(), 250);
+  // Measure the entire roster, including long instructions, before opening print.
+  // Scale the complete content without removing rows or clipping signatures.
+  const fitPage = () => {
+    if (popup.closed) return;
+    const page = popup.document.getElementById("roster-page");
+    page.style.zoom = "1";
+    const ruler = popup.document.createElement("div");
+    ruler.style.cssText = "position:absolute;visibility:hidden;height:277mm;width:194mm";
+    popup.document.body.appendChild(ruler);
+    const scale = Math.min(1, ruler.getBoundingClientRect().height / Math.max(page.scrollHeight, page.getBoundingClientRect().height), ruler.getBoundingClientRect().width / page.scrollWidth);
+    ruler.remove();
+    page.style.zoom = String(scale * 0.995);
+  };
+  popup.addEventListener("beforeprint", fitPage);
+  void popup.document.fonts.ready.then(() => {
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { fitPage(); popup.focus(); popup.print(); } });
+  });
 }
 
 async function hydrateStudentPhotos(root, students, { prompt = false, refresh = false } = {}) {

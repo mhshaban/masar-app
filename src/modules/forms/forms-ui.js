@@ -8,7 +8,7 @@ import {
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
 import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-04-form-actor-2";
+import { downloadAsWordDoc, buildWordDocumentHtml } from "../../services/word-export.js?v=2026-09-08-print-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -158,7 +158,8 @@ async function renderLog(root, openDetail, openEdit) {
   function draw() {
     const q = root.querySelector("#forms-search").value.trim().toLowerCase(); const status = root.querySelector("#forms-status").value;
     const filtered = forms.filter((item) => (!status || item.status === status) && (!q || `${item.student?.name || ""} ${item.student?.academicId || ""} ${item.title || ""}`.toLowerCase().includes(q)));
-    table.innerHTML = filtered.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الاستمارة</th><th>الطالب</th><th>الجهة/الحالة</th><th></th></tr></thead><tbody>${filtered.map((item) => `<tr><td class="num">${esc(item.createdDate)}</td><td>${esc(item.title)}</td><td><strong>${esc(item.student?.name)}</strong><div class="hint">${esc(item.student?.academicId)}</div></td><td>${item.destination ? `${esc(item.destination)}<br>` : ""}${statusPill(item.status)}</td><td><div class="forms-actions"><button class="btn btn-ghost" data-open="${esc(item.id)}">فتح</button><button class="btn btn-ghost" data-edit-form="${esc(item.id)}">تعديل</button></div></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد استمارات مطابقة</div>';
+    table.innerHTML = filtered.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الاستمارة</th><th>الطالب</th><th>الجهة/الحالة</th><th></th></tr></thead><tbody>${filtered.map((item) => `<tr><td class="num">${esc(item.createdDate)}</td><td>${esc(item.title)}</td><td><strong>${esc(item.student?.name)}</strong><div class="hint">${esc(item.student?.academicId)}</div></td><td>${item.destination ? `${esc(item.destination)}<br>` : ""}${statusPill(item.status)}</td><td><div class="forms-actions"><button class="btn btn-ghost" data-open="${esc(item.id)}">فتح</button><button class="btn btn-ghost" data-edit-form="${esc(item.id)}">تعديل</button><button class="btn btn-ghost" data-print-form="${esc(item.id)}">طباعة</button></div></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد استمارات مطابقة</div>';
+    table.querySelectorAll("[data-print-form]").forEach(button => button.addEventListener("click", () => printFormDirect(button.dataset.printForm)));
     table.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openDetail(button.dataset.open)));
     table.querySelectorAll("[data-edit-form]").forEach((button) => button.addEventListener("click", () => openEdit(button.dataset.editForm)));
   }
@@ -214,6 +215,23 @@ function workflowBlock(item) {
     return `<div class="print-approval form-workflow"><strong>إقرار ولي الأمر</strong><div class="workflow-options">${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</div><div class="workflow-signatures"><span>الاسم: ${esc(item.fields?.guardianName || "................................")}</span><span>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</span><span>التاريخ والتوقيع: ${esc(item.fields?.responseDate || "........ / ........ / ................")} &nbsp; ${esc(item.fields?.signature || "................................")}</span></div></div>`;
   }
   return `<div class="print-approval form-workflow"><strong>استلام ومتابعة الجهة المحال إليها</strong><div class="workflow-options">☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</div><div class="workflow-signatures"><span>اسم المستلم: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
+}
+
+async function printFormDirect(id) {
+  const popup = window.open("", "_blank");
+  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
+  popup.document.body.textContent = "جارٍ تجهيز الاستمارة للطباعة…";
+  try {
+    const item = await getDepartmentForm(id);
+    if (!item) throw new Error("الاستمارة غير موجودة");
+    if (popup.closed) return;
+    popup.document.open();
+    popup.document.write(buildWordDocumentHtml(item.title, buildDepartmentFormReportHtml(item, new Date().toLocaleString("ar-BH"))));
+    popup.document.close();
+    await popup.document.fonts.ready;
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
+  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الاستمارة."); }
 }
 
 async function renderDetail(root, id, back) {

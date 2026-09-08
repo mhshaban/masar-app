@@ -773,3 +773,7 @@
 :root{--failed-grade:#b42318}:root[data-theme="dark"]{--failed-grade:#ff9690}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--failed-grade:#ff9690}}
 .curriculum-failed,.curriculum-grade.curriculum-failed{color:var(--failed-grade);font-weight:800}.curriculum-grade.curriculum-failed{background:transparent}
 @media print{.curriculum-grade.curriculum-failed,.curriculum-failed{color:#b42318!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.curriculum-table tbody tr:last-child td{border-bottom:1px solid #777}}
+
+.certificate-controls{margin-inline-start:auto;justify-content:flex-end}.certificate-controls [data-originals]{justify-content:flex-end}
+
+.certificate-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.certificate-heading h2{margin:0}.certificate-heading>.forms-actions{margin-inline-start:auto;justify-content:flex-end}

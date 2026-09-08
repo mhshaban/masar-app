@@ -10,7 +10,7 @@ export function renderCertificateResults(certificate) {
 }
 
 async function mountCertificateResults(root, student, onCertificates) {
-  root.innerHTML = `<h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button><button class="btn btn-ghost" data-folder>اختيار مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div><div data-results></div></section>`;
+  root.innerHTML = `<div class="certificate-heading"><h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button><button class="btn btn-ghost" data-folder>اختيار مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div class="schedule-controls certificate-controls"><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div></div><div data-results></div></section>`;
   const status = root.querySelector("[data-status]");
   const results = root.querySelector("[data-results]");
   const preview = root.querySelector("[data-preview]");
