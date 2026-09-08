@@ -1,5 +1,5 @@
-import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-07-review-1";
-import { getStudentTermTimeline, getStudentSubjectSummary } from "./term-progress-service.js?v=2026-09-07-academic-fix-1";
+import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-08-academic-1";
+import { getStudentTermTimeline, getStudentAcademicSummary, termSlots, officialAverage } from "./term-progress-service.js?v=2026-09-08-academic-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -9,19 +9,21 @@ export function renderCertificateResults(certificate) {
   return certificate.terms.filter((term) => term.subjects.length).map((term) => `<section style="margin-top:16px;"><h3>${esc(term.label)}</h3><div class="tablewrap"><table><thead><tr><th>رمز المقرر</th><th>المادة</th><th>الساعات</th><th>الدرجة</th><th>الملاحظات</th></tr></thead><tbody>${term.subjects.map((subject) => `<tr><td>${esc(subject.code)}</td><td>${esc(subject.name)}</td><td>${esc(subject.hours ?? "—")}</td><td class="num">${esc(subject.scoreStatus ? (statusLabels[subject.scoreStatus] || subject.scoreStatus) : (subject.score ?? "—"))}</td><td>${esc(subject.notes || "—")}</td></tr>`).join("")}</tbody></table></div>${term.average != null ? `<p><strong>المعدل الفصلي: ${esc(term.average)}٪</strong> ${esc(term.rating || "")}</p>` : ""}</section>`).join("");
 }
 
-async function mountCertificateResults(root, student) {
-  root.innerHTML = `<h2>شهادة الطالب — نتائج جميع المواد</h2><div class="forms-actions"><button class="btn btn-primary" data-folder>قراءة الشهادات من مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p class="hint">تُقرأ الشهادة على جهازك ويُتحقق من الرقم الأكاديمي داخلها قبل عرض النتائج.</p><label class="forms-field">المسار<select data-track><option value="">اختر المسار</option><option value="الصناعي">الصناعي</option><option value="التجاري">التجاري</option></select></label><p data-status role="status"></p><div data-results></div>`;
+async function mountCertificateResults(root, student, onCertificates) {
+  root.innerHTML = `<h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button><button class="btn btn-ghost" data-folder>اختيار مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div><div data-results></div></section>`;
   const status = root.querySelector("[data-status]");
   const results = root.querySelector("[data-results]");
-  const trackSelect = root.querySelector("[data-track]");
-  let loadedCertificates = [];
-  trackSelect.value = curriculumTrack(student);
-  const drawCurriculum = () => { results.innerHTML = renderCurriculumResults(loadedCertificates, trackSelect.value); };
-  trackSelect.addEventListener("change", drawCurriculum);
-  drawCurriculum();
-  let version = 0;
+  const preview = root.querySelector("[data-preview]");
+  const originals = root.querySelector("[data-originals]");
+  let loadedCertificates = [], urls = [], version = 0;
+  const release = () => { urls.forEach(url => URL.revokeObjectURL(url)); urls = []; };
+  const observer = new MutationObserver(() => {
+    if (!root.isConnected) { ++version; release(); observer.disconnect(); }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  root.querySelector("[data-close]").addEventListener("click", () => { ++version; preview.hidden = true; });
   async function readFiles(files, ticket) {
-    const certificates = [], errors = [];
+    const certificates = [], sources = [], errors = [];
     for (const source of files) {
       if (ticket !== version || !root.isConnected) return;
       status.textContent = `جارٍ قراءة ${source.name}…`;
@@ -29,12 +31,21 @@ async function mountCertificateResults(root, student) {
         const file = source.handle ? await source.handle.getFile() : source;
         const certificate = await readStudentCertificate(file, student);
         certificates.push({ ...certificate, sourceName: source.name, lastModified: file.lastModified });
+        sources.push(file);
       } catch (error) { errors.push(`${source.name}: ${error.message}`); }
     }
     if (ticket !== version || !root.isConnected) return;
-    loadedCertificates = certificates;
-    if (!trackSelect.value) trackSelect.value = curriculumTrack(student, certificates);
-    drawCurriculum();
+    if (certificates.length) {
+      release();
+      loadedCertificates = certificates;
+      originals.innerHTML = sources.map(file => {
+        const url = URL.createObjectURL(file); urls.push(url);
+        return `<span class="certificate-source">${sources.length > 1 ? `<small>${esc(file.name)}</small>` : ""}<a class="btn btn-ghost" href="${url}" download="${esc(file.name)}">تنزيل الأصل</a><a class="btn btn-ghost" href="${url}" target="_blank" rel="noopener">فتح / طباعة الأصل</a></span>`;
+      }).join("");
+      results.innerHTML = renderCurriculumResults(certificates, curriculumTrack(student, certificates));
+      preview.hidden = false;
+      onCertificates(certificates);
+    }
     status.textContent = [certificates.length ? `تم عرض ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
   }
   async function loadFolder(prompt) {
@@ -44,19 +55,22 @@ async function mountCertificateResults(root, student) {
       const found = await findStudentCertificates(student, { prompt, refresh: prompt });
       if (ticket !== version || !root.isConnected) return;
       if (!found.files.length) {
-        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي؛ يمكنك اختيار ملف الشهادة مباشرة." : "اربط مجلد مسار لعرض الشهادة، أو اختر ملف PDF مباشرة.";
+        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي؛ يمكنك اختيار ملف الشهادة مباشرة." : "اختر مجلد مسار أو ملف الشهادة لعرضها.";
         return;
       }
       await readFiles(found.files, ticket);
     } catch (error) { if (ticket === version) status.textContent = error.name === "AbortError" ? "أُلغي اختيار المجلد." : error.message; }
   }
+  root.querySelector("[data-show]").addEventListener("click", () => {
+    if (loadedCertificates.length) preview.hidden = false;
+    else void loadFolder(false);
+  });
   root.querySelector("[data-folder]").addEventListener("click", () => loadFolder(true));
   root.querySelector("[data-certificate]").addEventListener("change", (event) => {
     const files = [...event.target.files];
     if (files.length) void readFiles(files, ++version);
     event.target.value = "";
   });
-  await loadFolder(false);
 }
 
 const CHART_W = 640;
@@ -68,7 +82,7 @@ const PAD_B = 26;
 
 function renderTermLineChart(points) {
   if (!points.length) {
-    return '<div class="empty">لا توجد معدلات فصلية بعد — تُستخرج من تحليل شهادات الطالب بواسطة Cowork</div>';
+    return '<div class="empty">لا توجد معدلات فصلية رسمية متاحة بعد</div>';
   }
 
   const plotW = CHART_W - PAD_L - PAD_R;
@@ -128,23 +142,41 @@ function wireTermChart(root, points) {
 
 export async function renderAcademicPath(container, student) {
   if (typeof student !== "object") student = { id: String(student) };
-  const [timeline, subjects] = await Promise.all([
+  const [timeline, summary] = await Promise.all([
     getStudentTermTimeline(String(student.academicId || student.id)),
-    getStudentSubjectSummary(student),
+    getStudentAcademicSummary(student),
   ]);
 
+  const subjects = summary.subjects;
   container.innerHTML = `
+    <div class="card cumulative-card"><span>المعدل التراكمي النهائي</span><strong data-cumulative></strong><small data-cumulative-note></small></div>
     <div class="card" id="student-certificate-results" style="margin-bottom:16px;"></div>
     ${subjects.length ? `<details class="card" style="margin-bottom:16px;" open><summary>ملخص درجات المواد المتاح (${subjects.length})</summary><p class="hint">ملخص التحليل المجمع عبر الفترات؛ درجات كل فصل تظهر في الشهادة أعلاه.</p><div class="tablewrap"><table><thead><tr><th>المادة</th><th>النسبة</th></tr></thead><tbody>${subjects.map((subject) => `<tr><td>${esc(subject.subject)}</td><td>${subject.pct == null ? "—" : `${esc(subject.pct)}٪`}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
     <div class="card">
       <h2>المعدل الفصلي عبر الزمن</h2>
       <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط.</p>
+      <div class="term-average-cards" data-term-slots></div>
       <div id="term-chart-root"></div>
     </div>
   `;
 
   const chartRoot = container.querySelector("#term-chart-root");
-  chartRoot.innerHTML = renderTermLineChart(timeline);
-  wireTermChart(chartRoot, timeline);
-  await mountCertificateResults(container.querySelector("#student-certificate-results"), student);
+  function drawAcademic(certificates = []) {
+    const merged = new Map(timeline.map(point => [point.term, point]));
+    for (const certificate of certificates) for (const term of certificate.terms) {
+      if (officialAverage(term.average) != null) merged.set(term.label, { term: term.label, averagePct: Number(term.average), rating: term.rating });
+    }
+    const slots = termSlots(student, [...merged.values()]);
+    container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${esc(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">معدلات المرحلة الإعدادية بانتظار تزويدها.</p>';
+    const points = slots.filter(p => officialAverage(p.averagePct) != null);
+    chartRoot.innerHTML = renderTermLineChart(points);
+    wireTermChart(chartRoot, points);
+    // Conflicting local official totals are surfaced, never averaged or guessed.
+    const values = [...new Set(certificates.map(c => officialAverage(c.finalCumulativeAverage)).filter(v => v != null))];
+    const cumulative = values.length === 1 ? values[0] : summary.finalCumulativeAverage;
+    container.querySelector("[data-cumulative]").textContent = cumulative == null ? "غير متوفر" : `${cumulative}٪`;
+    container.querySelector("[data-cumulative-note]").textContent = values.length > 1 ? "توجد قيم تراكمية مختلفة في الشهادات؛ المعروض هو المحفوظ، ويحتاج مراجعة الأصل." : cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "المعدل الرسمي المسجل؛ لا يُحسب من متوسط المعدلات الفصلية.";
+  }
+  drawAcademic();
+  await mountCertificateResults(container.querySelector("#student-certificate-results"), student, drawAcademic);
 }

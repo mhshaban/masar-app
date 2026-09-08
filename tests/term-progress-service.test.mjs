@@ -64,3 +64,19 @@ test("getStudentTermTimeline sorts multiple terms chronologically", async () => 
   assert.equal(timeline[0].term, "الفصل الدراسي الأول 2025/2026");
   assert.equal(timeline[1].term, "الفصل الدراسي الثاني 2025/2026");
 });
+
+test('term ordering ignores the level ordinal and normalizes Arabic digits', () => {
+  assert.ok(termSortKey('المستوى الثالث الفصل الأول ٢٠٢٥/٢٠٢٦') < termSortKey('المستوى الثالث الفصل الثاني 2025/2026'));
+});
+test('expected term slots preserve real scores and leave missing averages null', async () => {
+  const {termSlots, officialAverage, getStudentAcademicSummary} = await import('../src/modules/grades/term-progress-service.js');
+  assert.equal(termSlots({level:'الأول'}, []).length, 0);
+  assert.deepEqual(termSlots({level:'الثاني'}, []).map(x=>x.averagePct), [null,null]);
+  assert.deepEqual(termSlots({level:'الثالث'}, [{term:'الفصل الأول', averagePct:0}]).map(x=>x.averagePct), [0,null,null]);
+  assert.equal(officialAverage(null), null);
+  assert.equal(officialAverage(''), null);
+  assert.equal(officialAverage(0), 0);
+  await bulkPut('academicFlags', [{id:'c1', studentId:'a1', finalCumulativeAverage:82.5}, {id:'c2', studentId:'other', finalCumulativeAverage:99}]);
+  assert.equal((await getStudentAcademicSummary({id:'u1',academicId:'a1'})).finalCumulativeAverage,82.5);
+  assert.equal((await getStudentAcademicSummary({id:'unknown'})).finalCumulativeAverage,null);
+});

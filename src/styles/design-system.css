@@ -760,3 +760,16 @@
 @media(max-width:640px){.students-filter-count{width:100%;margin-inline-start:0}.curriculum-table{min-width:760px}}
 @media print{.curriculum-retaken{color:#7138a8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.curriculum-table,.student-timetable{min-width:0;font-size:8pt}.curriculum-table tr,.student-timetable tr{break-inside:avoid}}
 :root{--retaken-grade:#7138a8}:root[data-theme="dark"]{--retaken-grade:#c5a0ff}:root[data-theme="light"]{--retaken-grade:#7138a8}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--retaken-grade:#c5a0ff}}.curriculum-retaken{color:var(--retaken-grade)}
+
+/* Academic documents: complete grid, clear hierarchy, accessible result colors. */
+.curriculum-table,.student-timetable{border-collapse:collapse;border:1px solid var(--border)}
+.curriculum-table thead th,.student-timetable thead th{background:var(--surface-2,var(--surface));font-weight:800;padding:14px 8px}
+.curriculum-table tbody tr:last-child td,.curriculum-table tbody th,.curriculum-table tbody td[rowspan]{border-bottom:1px solid var(--border)}
+.curriculum-table tbody th{line-height:1.8;font-size:12px}.curriculum-scores td{height:44px}.curriculum-codes td{padding-top:12px;padding-bottom:6px}
+.student-timetable td{padding:14px 8px;line-height:1.8}.student-timetable tbody tr:last-child td{border-bottom:1px solid var(--border)}
+.certificate-source{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.certificate-source small{max-width:240px;overflow-wrap:anywhere}
+.cumulative-card{margin-bottom:16px;border-inline-start:4px solid var(--teal-600);display:flex;align-items:center;gap:16px;flex-wrap:wrap}.cumulative-card strong{font-size:30px;color:var(--teal-600)}.cumulative-card small{flex-basis:100%;color:var(--ink-500)}
+.term-average-cards{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.term-average-card{flex:1 1 160px;border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}.term-average-card span{font-size:12px;color:var(--ink-500)}.term-average-card strong{font-size:21px}
+:root{--failed-grade:#b42318}:root[data-theme="dark"]{--failed-grade:#ff9690}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--failed-grade:#ff9690}}
+.curriculum-failed,.curriculum-grade.curriculum-failed{color:var(--failed-grade);font-weight:800}.curriculum-grade.curriculum-failed{background:transparent}
+@media print{.curriculum-grade.curriculum-failed,.curriculum-failed{color:#b42318!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.curriculum-table tbody tr:last-child td{border-bottom:1px solid #777}}

@@ -39,3 +39,18 @@ test('repeated grade gets both a color class and a readable label', () => {
   assert.equal(curriculumTrack({track:'الصناعي'}),'الصناعي');
   assert.equal(curriculumTrack({track:'التجاري'}),'التجاري');
 });
+test('failing scores are red, including repeated failure, while zero and passing boundary remain distinct', () => {
+  for (const score of [0, 49, 49.5]) {
+    const html = renderCurriculumResults([cert('الفصل الأول', score)], 'التجاري');
+    assert.match(html, /class="curriculum-grade curriculum-failed"/);
+  }
+  assert.doesNotMatch(renderCurriculumResults([cert('الفصل الأول', 50)], 'التجاري'), /class="curriculum-grade curriculum-failed"/);
+  const repeated = renderCurriculumResults([cert('الفصل الأول', 20), cert('الفصل الثاني', 40)], 'التجاري');
+  assert.match(repeated, /curriculum-retaken curriculum-failed/);
+  assert.match(repeated, /40<small>معاد<\/small>/);
+  assert.doesNotMatch(renderCurriculumResults([cert('الفصل الأول', null, {scoreStatus:'absent'})], 'التجاري'), /class="curriculum-grade curriculum-failed"/);
+});
+test('student track takes precedence over certificate metadata', () => {
+  assert.equal(curriculumTrack({track:'الصناعي'}, [{track:'التجاري'}]), 'الصناعي');
+  assert.equal(curriculumTrack({department:'التجاري'}), 'التجاري');
+});

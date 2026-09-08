@@ -44,21 +44,25 @@ export function latestCourseResults(certificates) {
 }
 
 export function curriculumTrack(student, certificates = []) {
-  const text = `${student.track || ""} ${certificates.map(c => c.track || "").join(" ")}`;
+  const own = `${student.track || ""} ${student.department || ""}`;
+  const section = normalizeKey(student.section || "");
+  const sectionTrack = /تجر/.test(section) ? "التجاري" : /^[1-6]\s*[^\d\s]+/.test(section) ? "الصناعي" : "";
+  const text = /تجار|صناع/.test(own) ? own : sectionTrack || certificates.map(c => c.track || "").join(" ");
   return /تجاري|تجار/.test(text) ? "التجاري" : /صناع/.test(text) ? "الصناعي" : "";
 }
 
 export function renderCurriculumResults(certificates, track) {
   const template = CURRICULUM_TEMPLATES[track];
-  if (!template) return '<p class="hint">اختر المسار لعرض المقررات.</p>';
+  if (!template) return '<p class="hint">لم يُحدد المسار في بيانات الطالب أو الشهادة.</p>';
   const latest = latestCourseResults(certificates);
   const shown = new Set(template.flatMap(row => row.codes).map(codeKey).filter(Boolean));
   const grade = result => {
     if (!result) return "";
     const value = result.scoreStatus ? ({absent:"غائب",barred:"محروم"}[result.scoreStatus] || result.scoreStatus) : result.score;
+    const failed = !result.scoreStatus && result.score != null && Number.isFinite(Number(result.score)) && Number(result.score) < 50;
     const history = result.attempts.map(a => `${a.term}: ${a.scoreStatus ? ({absent:"غائب",barred:"محروم"}[a.scoreStatus] || a.scoreStatus) : a.score}`).join("؛ ");
-    return `<span class="curriculum-grade${result.repeated ? " curriculum-retaken" : ""}" title="${esc(history)}">${esc(value)}${result.repeated ? '<small>معاد</small>' : ""}</span>`;
+    return `<span class="curriculum-grade${result.repeated ? " curriculum-retaken" : ""}${failed ? " curriculum-failed" : ""}" aria-label="${esc(`${value}${failed ? "، راسب" : ""}${result.repeated ? "، معاد" : ""}`)}" title="${esc(history)}">${esc(value)}${result.repeated ? '<small>معاد</small>' : ""}</span>`;
   };
   const other = [...latest].filter(([code]) => !shown.has(code));
-  return `<p class="hint">الخانة الفارغة تعني عدم وجود درجة. <span class="curriculum-retaken">اللون البنفسجي وعلامة «معاد»</span> يميزان آخر نتيجة للمقرر المعاد.</p><div class="tablewrap"><table class="curriculum-table"><caption>سجل المقررات — المسار ${esc(track)}</caption><thead><tr><th>القسم</th><th>نوع المقرر</th>${[1,2,3,4,5,6].map(n=>`<th>الفصل ${n}</th>`).join("")}</tr></thead><tbody>${template.map(row=>`<tr class="curriculum-codes"><th rowspan="2">${esc(row.department)}</th><td rowspan="2">${esc(row.type)}</td>${row.codes.map(code=>`<td>${esc(code)}</td>`).join("")}</tr><tr class="curriculum-scores">${row.codes.map(code=>`<td>${grade(latest.get(codeKey(code)))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${other.length ? `<details style="margin-top:16px;"><summary>مقررات في الشهادة غير مدرجة بالقالب (${other.length})</summary><div class="tablewrap"><table><thead><tr><th>المقرر</th><th>المادة</th><th>آخر نتيجة</th></tr></thead><tbody>${other.map(([code,result])=>`<tr><td>${esc(code)}</td><td>${esc(result.name)}</td><td>${grade(result)}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
+  return `<p class="hint">الخانة الفارغة تعني عدم وجود درجة. <span class="curriculum-retaken">اللون البنفسجي وعلامة «معاد»</span> يميزان آخر نتيجة للمقرر المعاد. <span class="curriculum-failed">الأحمر للدرجة الأقل من 50</span>، وتبقى علامة «معاد» عند الرسوب بعد الإعادة.</p><div class="tablewrap"><table class="curriculum-table"><caption>سجل المقررات — المسار ${esc(track)}</caption><thead><tr><th>القسم</th><th>نوع المقرر</th>${[1,2,3,4,5,6].map(n=>`<th>الفصل ${n}</th>`).join("")}</tr></thead><tbody>${template.map(row=>`<tr class="curriculum-codes"><th rowspan="2">${esc(row.department)}</th><td rowspan="2">${esc(row.type)}</td>${row.codes.map(code=>`<td>${esc(code)}</td>`).join("")}</tr><tr class="curriculum-scores">${row.codes.map(code=>`<td>${grade(latest.get(codeKey(code)))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${other.length ? `<details style="margin-top:16px;"><summary>مقررات في الشهادة غير مدرجة بالقالب (${other.length})</summary><div class="tablewrap"><table><thead><tr><th>المقرر</th><th>المادة</th><th>آخر نتيجة</th></tr></thead><tbody>${other.map(([code,result])=>`<tr><td>${esc(code)}</td><td>${esc(result.name)}</td><td>${grade(result)}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
 }

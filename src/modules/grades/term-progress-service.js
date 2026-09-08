@@ -1,32 +1,27 @@
 import { listWhere } from "../../services/cloud-runtime.js";
 
-// Term labels are free text (extracted verbatim from the certificate's own
-// line by Cowork's analysis, mirroring how the counselor read them before),
-// so there's no reliable field to sort on directly. This scans for a
-// 4-digit year and an "الأول/الثاني/الثالث" ordinal anywhere in the
-// string — it doesn't assume word order, only that both appear somewhere.
-function extractYear(term) {
-  const text = String(term || "");
-  const ranged = text.match(/(\d{4})\s*\/\s*\d{2,4}/);
-  if (ranged) return ranged[1];
-  const bare = text.match(/\b(\d{4})\b/);
-  return bare ? bare[1] : null;
-}
-
-function extractTermNumber(term) {
-  // This school's real certificates spell "الثاني" as "الثانى" (alef maksura
-  // instead of yeh) — normalize that before matching, or the second term
-  // silently sorts as "unrecognized" (0) and lands before the first.
-  const text = String(term || "").replace(/ى/g, "ي");
-  if (/الثالث/.test(text)) return 3;
-  if (/الثاني/.test(text)) return 2;
-  if (/الأول/.test(text)) return 1;
-  return 0;
-}
+import { certificateTermOrder } from "./curriculum-results.js?v=2026-09-08-academic-1";
 
 export function termSortKey(term) {
-  const year = extractYear(term) || "0000";
-  return `${year}-${extractTermNumber(term)}`;
+  return certificateTermOrder(term).slice(0, 3).map(n => String(n).padStart(4, "0")).join("-");
+}
+
+export function termSlots(student, timeline) {
+  const level = String(student.level || "").replace(/[أإآ]/g, "ا");
+  const count = /الثالث|3|٣/.test(level) ? 3 : /الثاني|الثانى|2|٢/.test(level) ? 2 : 0;
+  const rows = [...timeline].sort((a,b) => termSortKey(a.term).localeCompare(termSortKey(b.term)));
+  return Array.from({ length: Math.max(count, rows.length) }, (_, i) => rows[i] || { term: `الفصل ${["الأول", "الثاني", "الثالث"][i] || i + 1}`, averagePct: null });
+}
+
+export function officialAverage(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100 ? Number(value) : null;
+}
+
+export async function getStudentAcademicSummary(student) {
+  const ids = [...new Set([student.academicId, student.id].filter(Boolean).map(String))];
+  const groups = await Promise.all(ids.map(id => listWhere("academicFlags", "studentId", id)));
+  const records = groups.flat().sort((a,b) => String(b.computedAt || "").localeCompare(String(a.computedAt || "")));
+  return { subjects: records[0]?.subjects || [], finalCumulativeAverage: officialAverage(records.find(r => officialAverage(r.finalCumulativeAverage) != null)?.finalCumulativeAverage) ?? officialAverage(student.finalCumulativeAverage) };
 }
 
 // One point per term for the line chart — the certificate's own stated

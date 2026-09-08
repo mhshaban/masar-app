@@ -15,7 +15,7 @@ const VIEW_LOADERS = {
   dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-07-academic-fix-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-06-polish-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-06-polish-1")).mountAgendaView,
-  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-07-review-1")).mountStudentsView,
+  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-08-academic-1")).mountStudentsView,
   grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-07-review-1")).mountGradesView,
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-07-review-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-07-review-1")).mountSupportView,
