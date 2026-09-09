@@ -6,9 +6,11 @@
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
-import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-06-polish-1";
+import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-09-import-fix-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
-import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-08-form-fields-1";
+import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-09-import-fix-1";
+
+import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
@@ -22,7 +24,7 @@ async function mountSchoolTab(root) {
   root.innerHTML = `
     <div class="card">
       <h2>تحديث بيانات المدرسة من ملف واحد</h2>
-      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين، وينزّل نسخة احتياطية كاملة تلقائيًا قبل الحفظ.</p>
+      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين، ويمكن تنزيل نسخة احتياطية من صفحة النسخ الاحتياطي.</p>
       <input type="file" id="school-import-file" aria-label="ملف كشف الطلاب الشامل" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
       <div id="school-import-preview"></div>
     </div>`;
@@ -49,16 +51,16 @@ async function mountSchoolTab(root) {
           <div class="card stat"><div class="label">صفوف المرفعين</div><div class="value">${data.promotedRows.length}</div></div>
         </div>
         <p class="hint">المرفعين: ${matched} مطابق، ${unmatched} غير مطابق لن يُحفظ، ${duplicateRows} صف مكرر سيُدمج. لن تُحذف مقررات صحيحة غير موجودة في الملف.</p>
-        <p class="hint">السجلات الأكاديمية القديمة خارج كشف الطلاب الحالي: ${staleAcademic.staleFlags.length} سجل تحليل و${staleAcademic.staleAverages.length} معدل فصلي. ستُحذف بعد تنزيل النسخة الاحتياطية.</p>
+        <p class="hint">السجلات الأكاديمية القديمة خارج كشف الطلاب الحالي: ${staleAcademic.staleFlags.length} سجل تحليل و${staleAcademic.staleAverages.length} معدل فصلي. ستُحذف عند تنفيذ التحديث.</p>
         <p class="hint">تكرارات المرفعين القديمة: ${historicalDuplicates.removableCount} سجل زائد آمن للحذف${historicalDuplicates.conflictGroupCount ? `، و${historicalDuplicates.conflictGroupCount} تعارض لن يُحذف تلقائيًا` : "، ولا توجد تعارضات"}.</p>
-        <button class="btn btn-primary" id="school-import-commit">تنزيل نسخة احتياطية ثم تنفيذ التحديث</button>
+        <button class="btn btn-primary" id="school-import-commit">تنفيذ التحديث</button>
         <div id="school-import-status"></div>`;
       preview.querySelector("#school-import-commit").addEventListener("click", async () => {
-        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. ستُنزل نسخة احتياطية أولًا. هل تريد التنفيذ؟`)) return;
+        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. هل تريد التنفيذ؟`)) return;
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;
-        status.innerHTML = '<p class="hint">جارٍ إنشاء النسخة الاحتياطية وتنفيذ التحديث…</p>';
+        status.innerHTML = '<p class="hint">جارٍ تنفيذ التحديث…</p>';
         try {
           const result = await commitSchoolWorkbook(data, { fileName: file.name });
           preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين.</p>`;

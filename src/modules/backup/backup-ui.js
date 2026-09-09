@@ -55,7 +55,7 @@ async function renderExportSection(root) {
       <h2>تصدير نسخة احتياطية</h2>
       <p class="hint">يحمّل ملف JSON واحد يحتوي كل بيانات مسار (الخطة، الأجندة، سجل الطلبة، الدرجات، التذكيرات...) — احتفظ به في مكان آمن (بريدك، قرص خارجي).</p>
       <div id="export-summary">${loadingHtml("جارٍ حساب أعداد السجلات…")}</div>
-      <button class="btn btn-primary" id="export-btn" style="margin-top:12px;" disabled>تنزيل نسخة احتياطية الآن</button>
+      <button class="btn btn-primary" id="export-btn" style="margin-top:12px;">تنزيل نسخة احتياطية الآن</button>
       <div id="export-status" style="margin-top:8px;"></div>
       <div id="historical-cleanup" style="margin-top:16px;"></div>
     </div>
@@ -66,9 +66,34 @@ async function renderExportSection(root) {
   const statusRoot = root.querySelector("#export-status");
   const cleanupRoot = root.querySelector("#historical-cleanup");
 
+  exportBtn.addEventListener("click", async () => {
+    exportBtn.disabled = true;
+    const originalLabel = exportBtn.textContent;
+    exportBtn.textContent = "جارٍ التحضير… قد يستغرق دقيقة مع البيانات الكبيرة";
+    statusRoot.innerHTML = "";
+    try {
+      const fresh = await buildBackup({ force: true });
+      downloadBackup(fresh);
+      await logAuditEvent("export_backup", { tableName: "backup", count: Object.values(fresh.collections || {}).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0) });
+      showToast("تم تنزيل النسخة الاحتياطية بنجاح");
+    } catch (err) {
+      statusRoot.innerHTML = errorHtml(`تعذّر التصدير: ${err.message}`);
+      showToast(`تعذّر التصدير: ${err.message}`, { type: "error" });
+    } finally {
+      exportBtn.disabled = false;
+      exportBtn.textContent = originalLabel;
+    }
+  });
+
   try {
-    const counts = {};
-    for (const name of COLLECTIONS) counts[name] = await count(name);
+    let timer;
+    const counts = await Promise.race([
+      Promise.all(COLLECTIONS.map(async (name) => [name, await count(name)]))
+        .then((entries) => Object.fromEntries(entries)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("انتهت مهلة حساب السجلات. يمكنك تنزيل النسخة الاحتياطية مباشرة.")), 15000);
+      }),
+    ]).finally(() => clearTimeout(timer));
     summaryRoot.innerHTML = renderSummary(counts);
     const historicalCount = Number(counts.agendaStatus || 0);
     if (historicalCount > 0) {
@@ -109,26 +134,6 @@ async function renderExportSection(root) {
   } catch (err) {
     summaryRoot.innerHTML = errorHtml(`تعذّر حساب أعداد السجلات: ${err.message}`);
   }
-  exportBtn.disabled = false;
-
-  exportBtn.addEventListener("click", async () => {
-    exportBtn.disabled = true;
-    const originalLabel = exportBtn.textContent;
-    exportBtn.textContent = "جارٍ التحضير… قد يستغرق دقيقة مع البيانات الكبيرة";
-    statusRoot.innerHTML = "";
-    try {
-      const fresh = await buildBackup();
-      downloadBackup(fresh);
-      await logAuditEvent("export_backup", { tableName: "backup", count: Object.values(fresh.collections || {}).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0) });
-      showToast("تم تنزيل النسخة الاحتياطية بنجاح");
-    } catch (err) {
-      statusRoot.innerHTML = errorHtml(`تعذّر التصدير: ${err.message}`);
-      showToast(`تعذّر التصدير: ${err.message}`, { type: "error" });
-    } finally {
-      exportBtn.disabled = false;
-      exportBtn.textContent = originalLabel;
-    }
-  });
 }
 
 export function renderImportSection(root, onRestored) {
