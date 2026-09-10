@@ -105,7 +105,10 @@ export function parsePlanRows(rows) {
     });
   }
 
-  const projects = order.map((key) => projectsByKey.get(key));
+  // `order` صريح لكل مشروع — id المشاريع يُولَّد عشوائيًا عند bulkPut ولا
+  // يحفظ ترتيب البرامج بالملف، فبدون هذا الحقل تظهر البرامج بترتيب عشوائي
+  // بدل ١،٢،٣... (انظر ترتيب listProjectsByPillar).
+  const projects = order.map((key, index) => ({ ...projectsByKey.get(key), order: index }));
   if (!projects.length) throw new Error("ما فيه أي إجراء صالح بالملف — تأكد من مطابقة أسماء المحاور بالضبط.");
   return { projects, unknownPillars: [...unknownPillars] };
 }

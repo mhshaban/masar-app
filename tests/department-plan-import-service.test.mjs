@@ -39,6 +39,17 @@ test("parsePlanRows groups actions under (pillar, program) projects in file orde
   assert.equal(projects[1].pillar, "التطور الشخصي");
 });
 
+test("parsePlanRows assigns a sequential order matching file position, not creation order", () => {
+  const rows = [
+    ["عنوان"], HEADER,
+    row({ no: 1, pillar: "الانجاز الاكاديمي", program: "١- أول", action: "إجراء" }),
+    row({ no: 2, pillar: "التطور الشخصي", program: "٢- ثاني", action: "إجراء" }),
+    row({ no: 3, pillar: "القيادة", program: "٣- ثالث", action: "إجراء" }),
+  ];
+  const { projects } = parsePlanRows(rows);
+  assert.deepEqual(projects.map((p) => p.order), [0, 1, 2]);
+});
+
 test("parsePlanRows maps دور المكتب to executor, الأقسام المشاركة to follower, and الفئة المستهدفة to target", () => {
   const rows = [
     ["عنوان"], HEADER,
