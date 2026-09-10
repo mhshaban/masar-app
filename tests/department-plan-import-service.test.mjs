@@ -11,14 +11,13 @@ beforeEach(async () => {
 });
 
 const HEADER = [
-  "م", "المحور", "البرنامج", "الإجراء الموحد", "الفئة المستهدفة", "نوع المسؤولية",
-  "دور المكتب", "الشريك/المالك الفني", "مؤشر الأداء KPI", "المستهدف", "مصدر التحقق",
-  "فترة التنفيذ", "حالة التنفيذ", "ملاحظات", "تاريخ بدء التنفيذ المقترح",
-  "تاريخ نهاية التنفيذ المقترح", "مرجع الحصر", "بيانات الحصر", "أولوية التنفيذ", "محطات المتابعة",
+  "م", "المحور", "البرنامج", "الاجراء", "الفئة المستهدفة", "الثبوتيات",
+  "دور المكتب", "الأقسام المشاركة", "فترة التنفيذ", "تاريخ بدء التنفيذ المقترح",
+  "تاريخ نهاية التنفيذ المقترح", "حالة التنفيذ", "بيانات الحصر المطلوبة", "مؤشر الأداء KPI", "المستهدف",
 ];
 
 function row({ no, pillar, program, action, target = "", executor = "", follower = "", evidence = "", period = "", start = "", end = "" }) {
-  return [no, pillar, program, action, "", "مباشر", executor, follower, "", target, evidence, period, "لم يبدأ", "", start, end, "", "", "أساسي", ""];
+  return [no, pillar, program, action, target, evidence, executor, follower, period, start, end, "لم يبدأ", "", "", ""];
 }
 
 test("parsePlanRows groups actions under (pillar, program) projects in file order", () => {
@@ -40,17 +39,17 @@ test("parsePlanRows groups actions under (pillar, program) projects in file orde
   assert.equal(projects[1].pillar, "التطور الشخصي");
 });
 
-test("parsePlanRows maps دور المكتب to executor and الشريك/المالك الفني to follower", () => {
+test("parsePlanRows maps دور المكتب to executor, الأقسام المشاركة to follower, and الفئة المستهدفة to target", () => {
   const rows = [
     ["عنوان"], HEADER,
-    row({ no: 1, pillar: "القيادة", program: "ب", action: "إجراء", executor: "دور المكتب هنا", follower: "الشريك هنا", target: "المستهدف هنا", evidence: "مصدر التحقق هنا", period: "طوال العام" }),
+    row({ no: 1, pillar: "القيادة", program: "ب", action: "إجراء", executor: "دور المكتب هنا", follower: "الأقسام المشاركة هنا", target: "طلاب المدرسة", evidence: "الثبوتيات هنا", period: "طوال العام" }),
   ];
   const { projects } = parsePlanRows(rows);
   const a = projects[0].actions[0];
   assert.equal(a.executor, "دور المكتب هنا");
-  assert.equal(a.follower, "الشريك هنا");
-  assert.equal(a.target, "المستهدف هنا");
-  assert.equal(a.evidence, "مصدر التحقق هنا");
+  assert.equal(a.follower, "الأقسام المشاركة هنا");
+  assert.equal(a.target, "طلاب المدرسة");
+  assert.equal(a.evidence, "الثبوتيات هنا");
   assert.equal(a.period, "طوال العام");
 });
 

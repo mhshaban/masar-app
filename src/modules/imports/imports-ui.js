@@ -9,7 +9,7 @@
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-09-import-fix-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-09-import-fix-1";
-import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-import-1";
+import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-columns-fix-1";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
