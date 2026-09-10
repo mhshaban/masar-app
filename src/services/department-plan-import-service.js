@@ -15,11 +15,11 @@ const clean = (value) => String(value ?? "").replace(/[‎‏‪-‮]/g, "").tri
 const HEADER_ALIASES = {
   pillar: ["المحور"],
   program: ["البرنامج"],
-  action: ["الإجراء الموحد", "الإجراء"],
-  target: ["المستهدف"],
+  action: ["الاجراء", "الإجراء", "الإجراء الموحد"],
+  target: ["الفئة المستهدفة"],
   executor: ["دور المكتب"],
-  follower: ["الشريك/المالك الفني", "الشريك / المالك الفني", "الشريك"],
-  evidence: ["مصدر التحقق"],
+  follower: ["الأقسام المشاركة", "الشريك/المالك الفني", "الشريك / المالك الفني", "الشريك"],
+  evidence: ["الثبوتيات", "مصدر التحقق"],
   period: ["فترة التنفيذ"],
   periodStart: ["تاريخ بدء التنفيذ المقترح"],
   periodEnd: ["تاريخ نهاية التنفيذ المقترح"],
@@ -63,7 +63,7 @@ export function parsePlanRows(rows) {
   const headerIdx = findHeaderRowIndex(rows);
   if (headerIdx === -1) throw new Error("تعذّر إيجاد صف ترويسة الخطة — تأكد من وجود عمودي «المحور» و«البرنامج».");
   const cols = columnMap(rows[headerIdx]);
-  if (cols.action === undefined) throw new Error("تعذّر التعرّف على عمود «الإجراء الموحد».");
+  if (cols.action === undefined) throw new Error("تعذّر التعرّف على عمود «الإجراء».");
 
   const projectsByKey = new Map();
   const order = [];
