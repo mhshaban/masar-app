@@ -1,4 +1,4 @@
-import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-08-academic-1";
+import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-10-template-update-1";
 import { getStudentTermTimeline, getStudentAcademicSummary, termSlots, officialAverage } from "./term-progress-service.js?v=2026-09-08-academic-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 

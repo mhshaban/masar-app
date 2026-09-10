@@ -1,9 +1,13 @@
-import { CURRICULUM_TEMPLATES } from "./curriculum-template.js?v=2026-09-07-review-1";
+import { CURRICULUM_TEMPLATES } from "./curriculum-template.js?v=2026-09-10-template-update-1";
 import { normalizeKey } from "../../services/text-normalize.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const codeKey = value => normalizeKey(value).replace(/\s|ـ/g, "");
 const cleanTerm = value => normalizeKey(value).replace(/[أإآ]/g, "ا").replace(/ى/g, "ي");
+// خلية قالب قد تحمل أكثر من رمز مفصولة بـ"/" (مثل "رسم803/رسم813") لمّا
+// يختلف رمز المقرر الفعلي بحسب فوج الطلبة رغم تمثيله نفس البند بالقالب —
+// أي رمز منها يُطابق يكفي.
+const splitCodes = value => String(value ?? "").split("/").map(c => c.trim()).filter(Boolean);
 
 export function certificateTermOrder(label, index = 0) {
   const text = cleanTerm(label);
@@ -55,7 +59,7 @@ export function renderCurriculumResults(certificates, track) {
   const template = CURRICULUM_TEMPLATES[track];
   if (!template) return '<p class="hint">لم يُحدد المسار في بيانات الطالب أو الشهادة.</p>';
   const latest = latestCourseResults(certificates);
-  const shown = new Set(template.flatMap(row => row.codes).map(codeKey).filter(Boolean));
+  const shown = new Set(template.flatMap(row => row.codes).flatMap(splitCodes).map(codeKey).filter(Boolean));
   const grade = result => {
     if (!result) return "";
     const value = result.scoreStatus ? ({absent:"غائب",barred:"محروم"}[result.scoreStatus] || result.scoreStatus) : result.score;
@@ -63,6 +67,8 @@ export function renderCurriculumResults(certificates, track) {
     const history = result.attempts.map(a => `${a.term}: ${a.scoreStatus ? ({absent:"غائب",barred:"محروم"}[a.scoreStatus] || a.scoreStatus) : a.score}`).join("؛ ");
     return `<span class="curriculum-grade${result.repeated ? " curriculum-retaken" : ""}${failed ? " curriculum-failed" : ""}" aria-label="${esc(`${value}${failed ? "، راسب" : ""}${result.repeated ? "، معاد" : ""}`)}" title="${esc(history)}">${esc(value)}${result.repeated ? '<small>معاد</small>' : ""}</span>`;
   };
+  // خلية بها أكثر من رمز مفصولة بـ"/" — أول رمز فيه نتيجة فعلية هو المعروض.
+  const gradeForCell = code => grade(splitCodes(code).map(part => latest.get(codeKey(part))).find(Boolean));
   const other = [...latest].filter(([code]) => !shown.has(code));
-  return `<p class="hint">الخانة الفارغة تعني عدم وجود درجة. <span class="curriculum-retaken">اللون البنفسجي وعلامة «معاد»</span> يميزان آخر نتيجة للمقرر المعاد. <span class="curriculum-failed">الأحمر للدرجة الأقل من 50</span>، وتبقى علامة «معاد» عند الرسوب بعد الإعادة.</p><div class="tablewrap"><table class="curriculum-table"><caption>سجل المقررات — المسار ${esc(track)}</caption><thead><tr><th>القسم</th><th>نوع المقرر</th>${[1,2,3,4,5,6].map(n=>`<th>الفصل ${n}</th>`).join("")}</tr></thead><tbody>${template.map(row=>`<tr class="curriculum-codes"><th rowspan="2">${esc(row.department)}</th><td rowspan="2">${esc(row.type)}</td>${row.codes.map(code=>`<td>${esc(code)}</td>`).join("")}</tr><tr class="curriculum-scores">${row.codes.map(code=>`<td>${grade(latest.get(codeKey(code)))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${other.length ? `<details style="margin-top:16px;"><summary>مقررات في الشهادة غير مدرجة بالقالب (${other.length})</summary><div class="tablewrap"><table><thead><tr><th>المقرر</th><th>المادة</th><th>آخر نتيجة</th></tr></thead><tbody>${other.map(([code,result])=>`<tr><td>${esc(code)}</td><td>${esc(result.name)}</td><td>${grade(result)}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
+  return `<p class="hint">الخانة الفارغة تعني عدم وجود درجة. <span class="curriculum-retaken">اللون البنفسجي وعلامة «معاد»</span> يميزان آخر نتيجة للمقرر المعاد. <span class="curriculum-failed">الأحمر للدرجة الأقل من 50</span>، وتبقى علامة «معاد» عند الرسوب بعد الإعادة.</p><div class="tablewrap"><table class="curriculum-table"><caption>سجل المقررات — المسار ${esc(track)}</caption><thead><tr><th>القسم</th><th>نوع المقرر</th>${[1,2,3,4,5,6].map(n=>`<th>الفصل ${n}</th>`).join("")}</tr></thead><tbody>${template.map(row=>`<tr class="curriculum-codes"><th rowspan="2">${esc(row.department)}</th><td rowspan="2">${esc(row.type)}</td>${row.codes.map(code=>`<td>${esc(code)}</td>`).join("")}</tr><tr class="curriculum-scores">${row.codes.map(code=>`<td>${gradeForCell(code)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${other.length ? `<details style="margin-top:16px;"><summary>مقررات في الشهادة غير مدرجة بالقالب (${other.length})</summary><div class="tablewrap"><table><thead><tr><th>المقرر</th><th>المادة</th><th>آخر نتيجة</th></tr></thead><tbody>${other.map(([code,result])=>`<tr><td>${esc(code)}</td><td>${esc(result.name)}</td><td>${grade(result)}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
 }

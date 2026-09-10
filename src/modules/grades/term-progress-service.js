@@ -1,6 +1,6 @@
 import { listWhere } from "../../services/cloud-runtime.js";
 
-import { certificateTermOrder } from "./curriculum-results.js?v=2026-09-08-academic-1";
+import { certificateTermOrder } from "./curriculum-results.js?v=2026-09-10-template-update-1";
 
 export function termSortKey(term) {
   return certificateTermOrder(term).slice(0, 3).map(n => String(n).padStart(4, "0")).join("-");

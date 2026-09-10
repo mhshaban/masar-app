@@ -21,8 +21,8 @@ test('latest absence is retained and a same-term second round follows the initia
   assert.equal(result.scoreStatus,'absent');assert.equal(result.repeated,true);
 });
 test('templates retain all six columns and blank score cells, with additional courses preserved separately', () => {
-  assert.equal(CURRICULUM_TEMPLATES['الصناعي'].length,23);
-  assert.equal(CURRICULUM_TEMPLATES['التجاري'].length,22);
+  assert.equal(CURRICULUM_TEMPLATES['الصناعي'].length,25);
+  assert.equal(CURRICULUM_TEMPLATES['التجاري'].length,25);
   for(const track of ['الصناعي','التجاري']){
     const html=renderCurriculumResults([],track);
     assert.equal((html.match(/class="curriculum-scores"/g)||[]).length,CURRICULUM_TEMPLATES[track].length);
@@ -50,6 +50,14 @@ test('failing scores are red, including repeated failure, while zero and passing
   assert.match(repeated, /40<small>معاد<\/small>/);
   assert.doesNotMatch(renderCurriculumResults([cert('الفصل الأول', null, {scoreStatus:'absent'})], 'التجاري'), /class="curriculum-grade curriculum-failed"/);
 });
+test('a template cell with two alternate codes ("code1/code2") matches whichever one the certificate actually has', () => {
+  const withSecondCode = { terms: [{ label: 'الفصل الأول', subjects: [{ code: 'رسم813', name: 'رسم فني', score: 82 }] }] };
+  const html = renderCurriculumResults([withSecondCode], 'الصناعي');
+  assert.ok(html.includes('رسم803/رسم813'), 'template still shows the combined code label');
+  assert.ok(html.includes('>82<'), 'the grade for the second alternate code is matched and shown');
+  assert.ok(!html.includes('غير مدرجة بالقالب'), 'the alternate code must not also leak into the "unlisted courses" section');
+});
+
 test('student track takes precedence over certificate metadata', () => {
   assert.equal(curriculumTrack({track:'الصناعي'}, [{track:'التجاري'}]), 'الصناعي');
   assert.equal(curriculumTrack({department:'التجاري'}), 'التجاري');
