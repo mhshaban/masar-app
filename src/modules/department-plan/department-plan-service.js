@@ -9,9 +9,14 @@ export async function listPillars() {
   return PILLAR_ORDER.filter((p) => present.has(p));
 }
 
+// الترتيب بـ`order` صراحة — لا بالاعتماد على ترتيب `list()` (بحسب id
+// أبجديًا) ولا على ترتيب استرجاع Supabase، لأن id المشاريع يُولَّد عشوائيًا
+// (طابع زمني + سلسلة عشوائية) فما يعكس ترتيب البرامج الفعلي بالملف — كان
+// هذا يظهر البرامج بترتيب عشوائي بدل ١،٢،٣...
 export async function listProjectsByPillar(pillar) {
   const projects = await listAll("departmentPlanProjects");
-  return projects.filter((p) => p.pillar === pillar);
+  return projects.filter((p) => p.pillar === pillar)
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || String(a.id).localeCompare(String(b.id)));
 }
 
 export async function getPlanStats() {
@@ -34,12 +39,15 @@ export async function getProject(id) {
 export async function createProject({ pillar, project_title, program_name, goal_specific, team_lead }) {
   if (!pillar) throw new Error("المحور مطلوب");
   if (!project_title || !project_title.trim()) throw new Error("عنوان المشروع مطلوب");
+  const existing = await listAll("departmentPlanProjects");
+  const nextOrder = existing.length ? Math.max(...existing.map((p) => Number(p.order) || 0)) + 1 : 0;
   return save("departmentPlanProjects", {
     pillar,
     project_title: project_title.trim(),
     program_name: program_name ? program_name.trim() : "",
     goal_specific: goal_specific ? goal_specific.trim() : "",
     team_lead: team_lead ? team_lead.trim() : "",
+    order: nextOrder,
     actions: [],
   });
 }

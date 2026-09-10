@@ -5,7 +5,7 @@ import { COLLECTIONS } from "../src/core/config.js";
 import { bulkPut, clear, get, list } from "../src/services/cloud-runtime.js";
 import {
   createProject, updateProject, deleteProject, getProject,
-  addAction, updateAction, deleteAction, searchActions,
+  addAction, updateAction, deleteAction, searchActions, listProjectsByPillar,
 } from "../src/modules/department-plan/department-plan-service.js";
 
 beforeEach(async () => {
@@ -21,6 +21,22 @@ test("createProject saves an empty actions array ready for addAction", async () 
   const project = await createProject({ pillar: "القيادة", project_title: "مشروع جديد" });
   assert.deepEqual(project.actions, []);
   assert.equal(project.pillar, "القيادة");
+});
+
+test("listProjectsByPillar sorts by the explicit order field, not by id (import ids are randomly generated)", async () => {
+  await bulkPut("departmentPlanProjects", [
+    { id: "z-scrambled-first", pillar: "القيادة", project_title: "٣- ثالث", order: 2, actions: [] },
+    { id: "a-scrambled-second", pillar: "القيادة", project_title: "١- أول", order: 0, actions: [] },
+    { id: "m-scrambled-third", pillar: "القيادة", project_title: "٢- ثاني", order: 1, actions: [] },
+  ]);
+  const projects = await listProjectsByPillar("القيادة");
+  assert.deepEqual(projects.map((p) => p.project_title), ["١- أول", "٢- ثاني", "٣- ثالث"]);
+});
+
+test("createProject appends new projects after existing ones regardless of pillar", async () => {
+  await createProject({ pillar: "القيادة", project_title: "أول" });
+  const second = await createProject({ pillar: "القيادة", project_title: "ثاني" });
+  assert.equal(second.order, 1);
 });
 
 test("updateProject patches only the given fields", async () => {
