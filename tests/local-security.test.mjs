@@ -3,7 +3,6 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   clearSensitiveLocalData,
-  LOCAL_DASHBOARD_CACHE_KEY,
   DAILY_PRIORITY_DECISIONS_KEY,
   LOCAL_FOLDER_HANDLE_DB,
 } from "../src/services/local-security.js";
@@ -33,7 +32,6 @@ beforeEach(async () => {
 });
 
 test("تسجيل الخروج يمسح بيانات الطلبة المحلية ويُبقي تفضيلات الواجهة", async () => {
-  localStorage.setItem(LOCAL_DASHBOARD_CACHE_KEY, '{"students":1}');
   localStorage.setItem(DAILY_PRIORITY_DECISIONS_KEY, '{"s1":"reviewed"}');
   localStorage.setItem("masar_install_dismissed", "1");
   const db = await openFolderDb();
@@ -41,7 +39,6 @@ test("تسجيل الخروج يمسح بيانات الطلبة المحلية 
 
   await clearSensitiveLocalData();
 
-  assert.equal(localStorage.getItem(LOCAL_DASHBOARD_CACHE_KEY), null);
   assert.equal(localStorage.getItem(DAILY_PRIORITY_DECISIONS_KEY), null);
   assert.equal(localStorage.getItem("masar_install_dismissed"), "1");
 

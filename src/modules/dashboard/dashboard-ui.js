@@ -1,8 +1,8 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
 import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-07-academic-fix-1";
-import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-07-academic-fix-1";
-import { connectMasarFolder, refreshMasarFolder, folderAccessSupported, priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-06-current-roster-1";
+import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-10-live-analytics-1";
+import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
 
@@ -49,7 +49,7 @@ function dailyReportHtml(snapshot, generatedAt, reminders = []) {
   const { attentionRows = [], staleCases = [], overdueSupportActions = [], planPriorities = {} } = snapshot;
   const rows = attentionRows.filter((r) => isVisiblePriority(`student:${r.studentId}`)).map((r) => `<tr><td>${esc(r.student?.name || r.studentId)}</td><td>${priorityScore(r.needs)}</td><td>${esc(r.needs.flatMap((n) => n.reasons || []).join("؛ "))}</td></tr>`).join("");
   const planRows = [...(planPriorities.overdue || []), ...(planPriorities.upcoming || [])].filter((r) => isVisiblePriority(`plan:${r.id}`)).map((r) => `<tr><td>${esc(r.project_title || r.program_name || r.pillar)}</td><td>${esc(r.action)}</td><td>${esc(r.period_end || r.periodEnd || r.period_start || r.periodStart || "—")}</td></tr>`).join("");
-  return `<h1>تقرير أولويات اليوم</h1><p class="meta">تاريخ الإنشاء: ${esc(generatedAt)} — المصدر: ${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase (استعلام مخفف)"}</p>
+  return `<h1>تقرير أولويات اليوم</h1><p class="meta">تاريخ الإنشاء: ${esc(generatedAt)} — المصدر: GUIDE / Supabase (استعلام مخفف)</p>
     <h2>الطلاب الأعلى أولوية</h2><table><tr><th>الطالب</th><th>الدرجة</th><th>الأسباب</th></tr>${rows || '<tr><td colspan="3">لا توجد أولويات ظاهرة</td></tr>'}</table>
     <h2>الحالات الإرشادية المتأخرة</h2><table><tr><th>الطالب</th><th>الفئة</th><th>آخر متابعة</th></tr>${staleCases.filter((r) => isVisiblePriority(`case:${r.id}`)).map((r) => `<tr><td>${esc(r.studentName || r.studentId)}</td><td>${esc(r.category)}</td><td>${esc(r.lastActivity)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
     <h2>إجراءات الدعم المتأخرة</h2><table><tr><th>الطالب</th><th>الإجراء</th><th>الاستحقاق</th></tr>${overdueSupportActions.filter((r) => isVisiblePriority(`support:${r.id}`)).map((r) => `<tr><td>${esc(r.plan?.studentName || r.plan?.studentId)}</td><td>${esc(r.action)}</td><td>${esc(r.dueDate)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
@@ -180,11 +180,10 @@ export async function mountDashboardView(container, { onGoto }) {
       <div class="daily-hero-title"><span class="daily-accent" aria-hidden="true"></span><div><h1>شنو يحتاجني اليوم؟</h1><p>لوحة العمل اليومية — قراءة مباشرة من بيانات مسار الحقيقية</p></div></div>
       <div class="daily-hero-meta">
         <strong>${esc(todayLabel)} · قسم الإرشاد الأكاديمي والتوجيه المهني</strong>
-        <span><i class="daily-status-dot"></i>${snapshot.source === "onedrive-local" ? "مجلد مسار المحلي في OneDrive" : "GUIDE / Supabase · استعلام مخفف"}</span>
-        <small>${snapshot.source === "onedrive-local" ? `آخر نسخة: ${esc(snapshot.localFileName || "")} — ${esc(snapshot.sourceUpdatedAt || snapshot.localFileModifiedAt || "")}` : "قراءة خفيفة بلا تنزيل للمرفقات أو الصور"}</small>
+        <span><i class="daily-status-dot"></i>GUIDE / Supabase · استعلام مخفف</span>
+        <small>قراءة خفيفة بلا تنزيل للمرفقات أو الصور</small>
       </div>
       <div class="daily-hero-actions">
-        <button class="btn btn-ghost" id="folder-connect">${snapshot.source === "onedrive-local" ? "تحديث من المجلد" : "ربط مجلد مسار"}</button>
         <button class="btn btn-ghost" id="daily-word">تصدير Word</button><button class="btn btn-ghost" id="daily-print">طباعة</button>
       </div>
     </header>
@@ -263,8 +262,8 @@ export async function mountDashboardView(container, { onGoto }) {
       <div class="daily-section-title"><span>4</span><div><h2>التحليل الأكاديمي التفصيلي</h2><p>الأضعف أكاديميًا والمقررات المعلقة — منفصلة عن عمل اليوم لتقليل التشتيت</p></div></div>
       <div class="card daily-disclosure daily-disclosure-static" style="margin-bottom:20px;">
       <div class="grid g2 daily-split daily-disclosure-body">
-        <div class="daily-inner-panel"><div class="card-head"><h2>الأضعف أكاديميًا — أعلى 10</h2><button class="link-btn" data-goto="grades">فتح الدرجات والتحليلات</button></div><p class="hint">مرتبة حسب المعدل العام والإشارات الأكاديمية المتاحة من النسخة المحلية.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>المعدل</th><th>السبب</th></tr></thead><tbody>${academicWeak.length ? academicWeak.map((row) => `<tr data-goto="grades"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.overallPct == null ? "—" : `${row.overallPct}%`}</td><td>${esc(row.reasons.join(" · "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
-        <div class="daily-inner-panel"><div class="card-head"><h2>أكثر مقررات معلّقة (مرفّع) — أعلى 10</h2><button class="link-btn" data-goto="promoted">فتح سجل المرفعين</button></div><p class="hint">الطلاب ذوو أكبر عدد من المقررات التي لم تُجتز بعد.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>العدد</th><th>المقررات</th></tr></thead><tbody>${promotedTop.length ? promotedTop.map((row) => `<tr data-goto="promoted"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.subjects.length}</td><td>${esc(row.subjects.join("، "))}</td></tr>`).join("") : '<tr><td colspan="3">يتوفر هذا التحليل بعد تحديث مجلد OneDrive المحلي.</td></tr>'}</tbody></table></div></div>
+        <div class="daily-inner-panel"><div class="card-head"><h2>الأضعف أكاديميًا — أعلى 10</h2><button class="link-btn" data-goto="grades">فتح الدرجات والتحليلات</button></div><p class="hint">مرتبة حسب المعدل العام والإشارات الأكاديمية.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>المعدل</th><th>السبب</th></tr></thead><tbody>${academicWeak.length ? academicWeak.map((row) => `<tr data-goto="grades"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.overallPct == null ? "—" : `${row.overallPct}%`}</td><td>${esc(row.reasons.join(" · "))}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد إشارات أكاديمية حاليًا.</td></tr>'}</tbody></table></div></div>
+        <div class="daily-inner-panel"><div class="card-head"><h2>أكثر مقررات معلّقة (مرفّع) — أعلى 10</h2><button class="link-btn" data-goto="promoted">فتح سجل المرفعين</button></div><p class="hint">الطلاب ذوو أكبر عدد من المقررات التي لم تُجتز بعد.</p><div class="tablewrap"><table><thead><tr><th>الطالب</th><th>العدد</th><th>المقررات</th></tr></thead><tbody>${promotedTop.length ? promotedTop.map((row) => `<tr data-goto="promoted"><td><b>${esc(row.student?.name || row.studentId)}</b><small class="daily-table-id">${esc(row.studentId)}</small></td><td>${row.subjects.length}</td><td>${esc(row.subjects.join("، "))}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد مقررات مرفّع معلّقة حاليًا.</td></tr>'}</tbody></table></div></div>
       </div>
       </div>
     </section>
@@ -317,14 +316,6 @@ export async function mountDashboardView(container, { onGoto }) {
   container.querySelectorAll("[data-priority-restore]").forEach((btn) => btn.addEventListener("click", async () => {
     clearPriorityDecision(btn.dataset.priorityRestore); await mountDashboardView(container, { onGoto });
   }));
-  container.querySelector("#folder-connect").addEventListener("click", async () => {
-    try {
-      if (!folderAccessSupported()) throw new Error("افتح نسخة مسار المنشورة عبر Chrome أو Edge ثم أعد المحاولة");
-      const updated = snapshot.source === "onedrive-local" ? await refreshMasarFolder({ prompt: true }) : await connectMasarFolder();
-      if (!updated) throw new Error("لم تُمنح صلاحية قراءة المجلد");
-      await mountDashboardView(container, { onGoto });
-    } catch (error) { notify(error.message); }
-  });
   const reportHtml = dailyReportHtml(snapshot, new Intl.DateTimeFormat("ar-BH", { dateStyle: "full", timeStyle: "short", timeZone: "Asia/Bahrain" }).format(new Date()), dueReminders);
   container.querySelector("#daily-word").addEventListener("click", () => downloadAsWordDoc("تقرير أولويات اليوم", reportHtml, `أولويات-اليوم-${new Date().toISOString().slice(0,10)}`));
   container.querySelector("#daily-print").addEventListener("click", () => printDailyReport(reportHtml));

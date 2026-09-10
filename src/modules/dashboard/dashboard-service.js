@@ -3,7 +3,10 @@ import { listStudentsNeedingAttention } from "./followup-needs-service.js?v=2026
 import { listStaleOpenCases } from "../cases/guidance-service.js";
 import { listOverdueActions } from "../support/support-service.js";
 import { rpc, list, listActionProgressStatuses } from "../../services/cloud-runtime.js?v=2026-08-31-priorities-3";
-import { getCachedLocalSnapshot, refreshMasarFolder } from "./dashboard-local-folder.js?v=2026-09-01-priorities-4";
+import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
+import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
+import { listStudentsWithPendingSubjects } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
+import { getStudent } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 
 function bahrainIsoDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bahrain", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
@@ -44,6 +47,30 @@ async function loadPlanPrioritiesLight() {
   }
 }
 
+// الأضعف أكاديميًا وأعلى مقررات مرفّع معلّقة، لأعلى 10 بكل قائمة — مسار
+// التوافق فقط (RPC الحي masar_dashboard_snapshot_v2 يحسبها بنفسه). يعيد
+// استخدام نفس خدمات الترشيح المستخدمة بشاشتي الدرجات والمرفعين بدل تكرار
+// منطق الفلترة/المطابقة بالروستر الحالي.
+async function loadLocalAnalytics() {
+  const [gradeSummaries, pendingRows, projects] = await Promise.all([
+    computeStudentGradeSummaries(),
+    listStudentsWithPendingSubjects(),
+    list("departmentPlanProjects"),
+  ]);
+  const academicWeak = await Promise.all(gradeSummaries.slice(0, 10).map(async (s) => ({
+    studentId: s.studentId,
+    student: await getStudent(s.studentId),
+    overallPct: s.avgPct,
+    barredCount: s.barredCount,
+    reasons: s.reasons,
+  })));
+  const promotedTop = pendingRows.filter((r) => r.matched).slice(0, 10)
+    .map((r) => ({ studentId: r.studentId, student: { name: r.studentName }, subjects: r.pendingSubjects }));
+  const pillarCounts = {};
+  for (const project of projects) for (const action of project.actions || []) pillarCounts[project.pillar] = (pillarCounts[project.pillar] || 0) + 1;
+  return { academicWeak, promotedTop, planSummary: { projectCount: projects.length, pillarCounts } };
+}
+
 // Used to compose this via one masar_dashboard_snapshot RPC — worthwhile
 // back when grade-flags scanned the full raw grades table (22,982+ rows) on
 // every dashboard load. Now that grade candidates come from academicFlags
@@ -53,11 +80,6 @@ async function loadPlanPrioritiesLight() {
 // migration).
 export async function loadDashboardSnapshot() {
   if (!globalThis.__MASAR_TEST_BACKEND__) {
-    const cachedLocal = getCachedLocalSnapshot();
-    if (cachedLocal) {
-      refreshMasarFolder().catch(() => null);
-      return cachedLocal;
-    }
     try {
       const [snapshot, planPriorities] = await Promise.all([
         rpc("masar_dashboard_snapshot_v2", { p_stale_days: 14, p_attention_limit: 20 }),
@@ -68,8 +90,14 @@ export async function loadDashboardSnapshot() {
         agenda: snapshot.agenda || { total: 0, done: 0, ongoing: 0, notStarted: 0 },
         attentionRows,
         attentionCount: Number(snapshot.attentionCount || 0),
+        attentionBreakdown: snapshot.attentionBreakdown || {},
+        highPriorityCount: Number(snapshot.highPriorityCount || 0),
+        totalStudents: Number(snapshot.totalStudents || 0),
         staleCases: snapshot.staleCases || [],
         overdueSupportActions: snapshot.overdueSupportActions || [],
+        academicWeak: snapshot.academicWeak || [],
+        promotedTop: snapshot.promotedTop || [],
+        planSummary: snapshot.planSummary || { projectCount: 0, pillarCounts: {} },
         planPriorities,
         source: "supabase-light",
       };
@@ -77,11 +105,20 @@ export async function loadDashboardSnapshot() {
       console.warn("تعذر استخدام لقطة الرئيسية المخفّضة؛ سيُستخدم المسار التوافقي", error);
     }
   }
-  const [agenda, attentionRows, staleCases, overdueSupportActions] = await Promise.all([
+  const [agenda, attentionRows, staleCases, overdueSupportActions, localAnalytics, students] = await Promise.all([
     getAgendaProgressSummary(),
     listStudentsNeedingAttention(),
     listStaleOpenCases(),
     listOverdueActions(),
+    loadLocalAnalytics(),
+    list("students"),
   ]);
-  return { agenda, attentionRows, attentionCount: attentionRows.length, staleCases, overdueSupportActions, planPriorities: { overdue: [], upcoming: [], undated: [], unavailable: true } };
+  const attentionBreakdown = { case: 0, support: 0, career: 0, promoted: 0 };
+  for (const row of attentionRows) for (const need of row.needs) if (need.type in attentionBreakdown) attentionBreakdown[need.type] += 1;
+  const highPriorityCount = attentionRows.filter((row) => priorityLevel(priorityScore(row.needs)) === "high").length;
+  return {
+    agenda, attentionRows, attentionCount: attentionRows.length, attentionBreakdown, highPriorityCount, totalStudents: students.length,
+    staleCases, overdueSupportActions, ...localAnalytics,
+    planPriorities: { overdue: [], upcoming: [], undated: [], unavailable: true },
+  };
 }

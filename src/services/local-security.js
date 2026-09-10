@@ -1,6 +1,5 @@
 // بيانات محلية مشتقة من سجلات الطلبة أو مرتبطة بوصول المستخدم إلى مجلد
 // OneDrive. تُمسح عند تسجيل الخروج، بينما تبقى تفضيلات الواجهة غير الحساسة.
-export const LOCAL_DASHBOARD_CACHE_KEY = "masar-local-dashboard-snapshot-v1";
 export const DAILY_PRIORITY_DECISIONS_KEY = "masar-daily-priority-decisions-v1";
 export const LOCAL_FOLDER_HANDLE_DB = "masar-folder-access";
 
@@ -25,7 +24,6 @@ function deleteIndexedDb(name) {
 }
 
 export async function clearSensitiveLocalData() {
-  removeLocalValue(LOCAL_DASHBOARD_CACHE_KEY);
   removeLocalValue(DAILY_PRIORITY_DECISIONS_KEY);
   await deleteIndexedDb(LOCAL_FOLDER_HANDLE_DB);
 }
