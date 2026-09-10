@@ -17,6 +17,7 @@ export const ACTION_LABELS = {
   import_students: "استيراد سجل الطلبة",
   import_teachers: "استيراد سجل المعلمين",
   import_promoted: "استيراد مقررات المرفعين",
+  import_department_plan: "تحديث خطة القسم",
   cleanup_historical_agenda_status: "تنظيف بيانات المتابعة التاريخية",
   update_student: "تعديل بيانات طالب",
   update_teacher: "تعديل بيانات معلم",

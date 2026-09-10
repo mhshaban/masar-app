@@ -12,7 +12,7 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-08-print-1")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-10-live-analytics-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-08-print-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-08-print-1")).mountAgendaView,
   students: async () => (await import("./modules/students/students-ui.js?v=2026-09-08-note-1")).mountStudentsView,
@@ -25,7 +25,7 @@ const VIEW_LOADERS = {
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-09-import-fix-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-09-import-fix-1")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-10-plan-import-1")).mountImportsView,
 };
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),
