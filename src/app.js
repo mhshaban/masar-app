@@ -25,7 +25,7 @@ const VIEW_LOADERS = {
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-09-import-fix-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-09-import-fix-1")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-10-plan-import-1")).mountImportsView,
 };
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),

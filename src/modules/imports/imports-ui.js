@@ -9,11 +9,13 @@
 import { renderImportSection as renderBackupRestoreImport } from "../backup/backup-ui.js?v=2026-09-09-import-fix-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-09-import-fix-1";
+import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-import-1";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
+  { key: "plan", label: "تحديث الخطة" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
 
@@ -75,6 +77,54 @@ async function mountSchoolTab(root) {
   });
 }
 
+export async function mountPlanTab(root) {
+  await ensureXlsx();
+  root.innerHTML = `
+    <div class="card">
+      <h2>تحديث خطة القسم من ملف الخطة التنفيذية</h2>
+      <p class="hint">استبدال كامل: يحذف كل مشاريع وإجراءات خطة القسم الحالية ويستبدلها بمحتوى الملف. تقدّم التنفيذ وربط بنود تقرير المتابعة الرسمي للإجراءات الحالية يُحذف معها — الخطة الجديدة تبدأ بلا تنفيذ مسجَّل.</p>
+      <input type="file" id="plan-import-file" aria-label="ملف الخطة التنفيذية" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
+      <div id="plan-import-preview"></div>
+    </div>`;
+  const input = root.querySelector("#plan-import-file");
+  const preview = root.querySelector("#plan-import-preview");
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    preview.innerHTML = '<p class="hint">جارٍ تحليل الملف…</p>';
+    try {
+      const { projects, unknownPillars } = await parsePlanWorkbook(file);
+      const replacePreview = await previewPlanReplace(projects);
+      preview.innerHTML = `
+        <div class="grid g3" style="margin-bottom:16px;">
+          <div class="card stat"><div class="label">المشاريع الجديدة</div><div class="value">${replacePreview.newProjectsCount}</div></div>
+          <div class="card stat"><div class="label">الإجراءات الجديدة</div><div class="value">${replacePreview.newActionsCount}</div></div>
+          <div class="card stat"><div class="label">الخطة الحالية</div><div class="value">${replacePreview.existingProjectsCount} مشروعًا</div></div>
+        </div>
+        ${unknownPillars.length ? `<p class="hint" style="color:var(--critical);">تجاهلت ${esc(unknownPillars.join("، "))} — محور غير معروف، تحقق من عمود «المحور» بالملف.</p>` : ""}
+        ${replacePreview.droppedPillars.length ? `<p class="hint" style="color:var(--critical);">محور${replacePreview.droppedPillars.length > 1 ? "ات" : ""} ${esc(replacePreview.droppedPillars.join("، "))} غير موجود بالملف الجديد — مشاريعه وإجراءاته الحالية ستُحذف نهائيًا.</p>` : ""}
+        <button class="btn btn-primary" id="plan-import-commit">تنفيذ تحديث الخطة</button>
+        <div id="plan-import-status"></div>`;
+      preview.querySelector("#plan-import-commit").addEventListener("click", async () => {
+        if (!await confirmDialog(`سيُحذف ${replacePreview.existingProjectsCount} مشروعًا و${replacePreview.existingActionsCount} إجراءً حاليًا، وتُستبدل بـ${replacePreview.newProjectsCount} مشروعًا و${replacePreview.newActionsCount} إجراءً من الملف. تقدّم التنفيذ وربط بنود تقرير المتابعة الحاليان يُحذفان معها. هل تريد التنفيذ؟`)) return;
+        const button = preview.querySelector("#plan-import-commit");
+        const status = preview.querySelector("#plan-import-status");
+        button.disabled = true;
+        status.innerHTML = '<p class="hint">جارٍ تنفيذ التحديث…</p>';
+        try {
+          const result = await commitPlanReplace(projects);
+          preview.innerHTML = `<p class="hint" role="status">تم تحديث خطة القسم بنجاح: ${result.projectsCount} مشروعًا و${result.actionsCount} إجراءً، بعد حذف ${result.removedProjectsCount} مشروعًا سابقًا.</p>`;
+        } catch (error) {
+          button.disabled = false;
+          status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+        }
+      });
+    } catch (error) {
+      preview.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+    }
+  });
+}
+
 async function mountBackupTab(root) {
   renderBackupRestoreImport(root, async () => {
     window.location.reload();
@@ -93,7 +143,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { school: mountSchoolTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, plan: mountPlanTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
