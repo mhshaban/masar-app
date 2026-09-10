@@ -182,12 +182,12 @@ function actionFormHtml(action, followUpOptions, currentFollowUpItemId) {
         <form class="action-form" style="display:flex; flex-direction:column; gap:8px; padding:10px 0;">
           <textarea name="action" placeholder="نص الإجراء" required rows="2" style="${FIELD_STYLE} resize:vertical;">${esc(action?.action) || ""}</textarea>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input name="target" placeholder="المستهدف" value="${esc(action?.target) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="executor" placeholder="المنفذ" value="${esc(action?.executor) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="follower" placeholder="المتابع" value="${esc(action?.follower) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="target" placeholder="الفئة المستهدفة" value="${esc(action?.target) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="executor" placeholder="دور المكتب" value="${esc(action?.executor) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="follower" placeholder="الأقسام المشاركة" value="${esc(action?.follower) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input name="evidence" placeholder="الثبوتية" value="${esc(action?.evidence) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="evidence" placeholder="الثبوتيات" value="${esc(action?.evidence) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
             <input name="period" placeholder="وصف الفترة (مثال: طوال العام الدراسي)" value="${esc(action?.period) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
@@ -261,7 +261,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
           ${project.team_lead ? `<p class="hint" style="margin-top:-10px;">رئيس الفريق: ${esc(project.team_lead)}</p>` : ""}
         `}
         <div class="tablewrap"><table>
-          <thead><tr><th>#</th><th>الإجراء</th><th>المستهدف</th><th>المنفذ</th><th>فترة التنفيذ</th></tr></thead>
+          <thead><tr><th>#</th><th>الإجراء</th><th>الفئة المستهدفة</th><th>دور المكتب</th><th>فترة التنفيذ</th></tr></thead>
           <tbody>
             ${(project.actions || []).map((a) => (
               state.editingAction && state.editingAction.projectId === project.id && state.editingAction.no === a.no
@@ -404,7 +404,7 @@ function renderSearchResults(root, results, onPick) {
         <li class="row-item" data-project="${esc(r.projectId)}" data-no="${esc(r.action.no)}" style="cursor:pointer;">
           <div class="body">
             <div class="title">${esc(r.action.action)}</div>
-            <div class="meta">${esc(r.pillar)} — ${esc(r.projectTitle)}${r.action.executor ? ` · المنفذ: ${esc(r.action.executor)}` : ""}</div>
+            <div class="meta">${esc(r.pillar)} — ${esc(r.projectTitle)}${r.action.executor ? ` · دور المكتب: ${esc(r.action.executor)}` : ""}</div>
           </div>
         </li>
       `).join("")}
