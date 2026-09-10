@@ -202,12 +202,6 @@ export async function mountAgendaView(container) {
       <div><h1>الأجندة التنفيذية</h1><div class="sub">كل إجراءات خطة القسم — مجمّعة افتراضيًا بحسب تاريخ التنفيذ، أو بحسب نص الفترة الأصلي من الملف</div></div>
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
     </div>
-    <div class="sens" style="border-color: var(--warning); background: var(--warning-bg); color: var(--warning);">
-      إجراءات هذه النسخة الأولى من الخطة نصّها الأصلي وصفي بلا تاريخ محدد (مثل "الأسبوع الثاني من سبتمبر")، فتظهر بقسم "بلا تاريخ محدد" بآخر القائمة. من شاشة "خطة القسم"، فتح أي إجراء للتعديل صار فيه حقلا "تاريخ بداية/نهاية التنفيذ" — أي إجراء تحدّد له تاريخين ينتقل تلقائيًا لترتيبه الزمني الصحيح هنا.
-    </div>
-    <div class="card" style="margin-bottom:16px;">
-      <p class="hint" style="margin:0;">اضغط على أي إجراء لتسجيل حالته وعدد المستفيدين والثبوتية، ولربطه ببند من تقرير المتابعة الرسمي — هذا التحديث الوحيد الذي تحتاجه؛ تقرير المتابعة والإحصائيات يُحسبان منه تلقائيًا.</p>
-    </div>
     <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
       <div class="tab active" data-sort="date" role="tab" aria-selected="true">حسب التاريخ</div>
       <div class="tab" data-sort="text" role="tab" aria-selected="false">حسب نص الفترة</div>
