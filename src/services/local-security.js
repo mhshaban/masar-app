@@ -2,6 +2,7 @@
 // OneDrive. تُمسح عند تسجيل الخروج، بينما تبقى تفضيلات الواجهة غير الحساسة.
 export const DAILY_PRIORITY_DECISIONS_KEY = "masar-daily-priority-decisions-v1";
 export const LOCAL_FOLDER_HANDLE_DB = "masar-folder-access";
+export const ROSTER_EXPORT_SNAPSHOT_DB = "masar-roster-export-snapshots";
 
 function removeLocalValue(key) {
   try { localStorage.removeItem(key); } catch { /* التخزين قد يكون معطّلًا */ }
@@ -26,4 +27,5 @@ function deleteIndexedDb(name) {
 export async function clearSensitiveLocalData() {
   removeLocalValue(DAILY_PRIORITY_DECISIONS_KEY);
   await deleteIndexedDb(LOCAL_FOLDER_HANDLE_DB);
+  await deleteIndexedDb(ROSTER_EXPORT_SNAPSHOT_DB);
 }

@@ -12,6 +12,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academi
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-11-curriculum-import-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
 import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
+import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
 import { list } from "../../services/cloud-runtime.js";
 import { getMasarFolderName, forgetMasarFolder } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 
@@ -21,6 +22,7 @@ const TABS = [
   { key: "school", label: "تحديث شامل" },
   { key: "plan", label: "تحديث الخطة" },
   { key: "averages", label: "تحديث المعدلات" },
+  { key: "changes", label: "تصدير التحديثات" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
 
@@ -214,6 +216,51 @@ async function mountAveragesTab(root) {
   });
 }
 
+function summarizeRosterExport(result) {
+  if (!result.totalRows) return "لا توجد تحديثات منذ آخر تصدير.";
+  const parts = [];
+  if (result.newCount) parts.push(`${result.newCount} جديد`);
+  if (result.changedCount) parts.push(`${result.changedCount} معدّل`);
+  if (result.deletedCount) parts.push(`${result.deletedCount} محذوف`);
+  return `تم تنزيل الملف — ${parts.join("، ")}.`;
+}
+
+async function mountChangesTab(root) {
+  root.innerHTML = `
+    <div class="card">
+      <h2>تصدير تحديثات سجل الطلبة</h2>
+      <p class="hint">ملف Excel بالطلاب الجدد أو الذين تغيّر أي حقل من بياناتهم منذ آخر تصدير فقط — عمود "الحالة" (جديد/معدّل/محذوف)، والأعمدة الأخرى تقتصر على الحقول التي تغيّرت فعليًا. أول تصدير يشمل كل السجل الحالي كـ"جديد" (لا نسخة سابقة يُقارَن بها).</p>
+      <button class="btn btn-primary" id="export-students-changes">تصدير تحديثات الطلبة (Excel)</button>
+      <div id="export-students-status"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h2>تصدير تحديثات سجل المعلمين</h2>
+      <p class="hint">نفس الفكرة لسجل المعلمين — بيانات المعلمين الأساسية فقط (الصور خارج هذا التصدير، تُدار من شاشة المعلمين).</p>
+      <button class="btn btn-primary" id="export-teachers-changes">تصدير تحديثات المعلمين (Excel)</button>
+      <div id="export-teachers-status"></div>
+    </div>`;
+
+  function wire(buttonId, statusId, exportFn) {
+    const button = root.querySelector(`#${buttonId}`);
+    const status = root.querySelector(`#${statusId}`);
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.innerHTML = '<p class="hint">جارٍ التصدير…</p>';
+      try {
+        const result = await exportFn();
+        status.innerHTML = `<p class="hint" role="status">${esc(summarizeRosterExport(result))}</p>`;
+      } catch (error) {
+        status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  wire("export-students-changes", "export-students-status", exportStudentsRosterChanges);
+  wire("export-teachers-changes", "export-teachers-status", exportTeachersRosterChanges);
+}
+
 async function mountBackupTab(root) {
   renderBackupRestoreImport(root, async () => {
     window.location.reload();
@@ -232,7 +279,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { school: mountSchoolTab, plan: mountPlanTab, averages: mountAveragesTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, plan: mountPlanTab, averages: mountAveragesTab, changes: mountChangesTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
