@@ -1,8 +1,6 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js";
-import { findTeacherPhotos, copyLegacyTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
-import { listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { getCurrentProfile } from "../../services/auth-service.js";
+import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
@@ -287,7 +285,7 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null }
   const pageCount = Math.max(1, Math.ceil(total / TEACHERS_PAGE_SIZE));
   const current = editTeacher || {};
   root.innerHTML = `<div class="card forms-card"><h2>${editTeacher ? "تعديل بيانات المعلم" : "إضافة معلم"}</h2><form id="teacher-form" class="forms-grid"><input type="hidden" name="id" value="${esc(current.id || "")}"><input type="hidden" name="createdAt" value="${esc(current.createdAt || "")}">${field("اسم المعلم", "name", "text", true, current.name || "")}${field("الاسم باللغة الإنجليزية", "nameEn", "text", false, current.nameEn || "")}${field("الرقم الشخصي", "personalNo", "text", false, current.personalNo || "")}${field("الرقم الوظيفي", "employeeNo", "text", false, current.employeeNo || "")}${field("المسمى الوظيفي", "jobTitle", "text", false, current.jobTitle || "")}${field("القسم / المادة", "department", "text", false, current.department || "")}${field("رقم التواصل", "phone", "tel", false, current.phone || "")}${field("البريد الإلكتروني", "email", "email", false, current.email || "")}${area("ملاحظات", "notes", false, current.notes || "")}<p class="hint forms-wide">الصور الجديدة تُقرأ من مجلد مسار باسم الرقم الشخصي أو الوظيفي. الصور القديمة محفوظة ولا تتأثر بتعديل البيانات.</p><div class="forms-actions forms-wide"><button class="btn btn-primary">${editTeacher ? "حفظ التعديلات" : "حفظ المعلم"}</button>${editTeacher ? '<button class="btn btn-ghost" type="button" id="teacher-edit-cancel">إلغاء التعديل</button>' : ""}</div></form></div>
-    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${total})</h2><div class="hint">الصورة المحلية أولًا، والصورة القديمة بديل عند عدم وجودها.</div></div><div class="search"><input id="teacher-search" type="search" value="${esc(query)}" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div class="forms-actions"><button class="btn btn-ghost" id="teacher-local-photos">ربط / تحديث الصور المحلية</button><button class="btn btn-ghost" id="teacher-copy-photos">نسخ الصور القديمة إلى مجلد</button></div><p class="hint" id="teacher-photo-status"></p><div id="teachers-table"></div></div>`;
+    <div class="card"><div class="forms-toolbar"><div><h2>جدول بيانات المعلمين (${total})</h2><div class="hint">الصورة المحلية أولًا، والصورة القديمة بديل عند عدم وجودها.</div></div><div class="search"><input id="teacher-search" type="search" value="${esc(query)}" placeholder="بحث بالاسم أو الرقم أو القسم..."></div></div><div id="teachers-table"></div></div>`;
   root.querySelector("#teacher-edit-cancel")?.addEventListener("click", () => renderTeachers(root, { query, page }));
   root.querySelector("#teacher-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -312,34 +310,10 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null }
   tableRoot.querySelector("#teachers-next")?.addEventListener("click", () => renderTeachers(root, { query, page: page + 1 }));
   let searchTimer;
   root.querySelector("#teacher-search").addEventListener("input", (event) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderTeachers(root, { query: event.target.value.trim(), page: 0 }), 300); });
-  const photoStatus = root.querySelector("#teacher-photo-status");
-  const profile = getCurrentProfile();
-  if (profile?.role === "admin" || profile?.is_admin === true) {
-    const cleanup = document.createElement("button");
-    cleanup.className = "btn btn-ghost";
-    cleanup.textContent = "حذف صور Supabase القديمة فقط";
-    photoStatus.before(cleanup);
-    cleanup.addEventListener("click", async () => {
-      cleanup.disabled = true;
-      try {
-        const ids = await listLegacyTeacherPhotoIds();
-        if (!ids.length) { photoStatus.textContent = "لا توجد صور قديمة في Supabase."; return; }
-        if (!await confirmDialog(`حذف ${ids.length} صورة قديمة من Supabase نهائيًا؟ لن تُحذف سجلات المعلمين أو الصور المحلية. يمكنك نسخ الصور إلى مجلد قبل الحذف إذا رغبت بالاحتفاظ بها.`)) return;
-        const removed = await removeLegacyTeacherPhotos(ids);
-        const remaining = await listLegacyTeacherPhotoIds();
-        notify(`تم حذف ${removed} صورة قديمة؛ المتبقي ${remaining.length}. سجلات المعلمين محفوظة.`);
-        await renderTeachers(root, { query, page });
-      } catch (error) { notify(error.message); }
-      finally { cleanup.disabled = false; }
-    });
-  }
   let photoVersion = 0;
-  const loadPhotos = async (prompt = false) => {
+  const loadPhotos = async () => {
     const version = ++photoVersion;
-    const result = await findTeacherPhotos(teachers, { prompt, refresh: prompt }).catch((error) => {
-      if (prompt && error.name !== "AbortError") notify(error.message);
-      return { connected: false, matches: new Map() };
-    });
+    const result = await findTeacherPhotos(teachers, { prompt: false, refresh: false }).catch(() => ({ connected: false, matches: new Map() }));
     await Promise.all(teachers.map(async (teacher) => {
       const target = [...tableRoot.querySelectorAll("[data-teacher-photo]")].find((node) => node.dataset.teacherPhoto === teacher.id);
       if (!target) return;
@@ -359,22 +333,7 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null }
       image.src = url;
       target.replaceChildren(image);
     }));
-    if (prompt) photoStatus.textContent = result.connected ? `صور محلية مطابقة في هذه الصفحة: ${result.matches.size}. الصور القديمة محفوظة.` : "ربط المجلد يحتاج Chrome أو Edge؛ الصور القديمة متاحة.";
   };
-  root.querySelector("#teacher-local-photos").addEventListener("click", () => loadPhotos(true));
-  root.querySelector("#teacher-copy-photos").addEventListener("click", async (event) => {
-    if (!window.showDirectoryPicker) { notify("نسخ الصور يحتاج Chrome أو Edge"); return; }
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const folder = await window.showDirectoryPicker({ mode: "readwrite", id: "masar-teacher-photos" });
-      if (!await confirmDialog(`سيتم نسخ صور المعلمين القديمة إلى المجلد «${folder.name}». لن تُحذف صور Supabase ولن يُستبدل أي ملف موجود. تابع؟`)) return;
-      const result = await copyLegacyTeacherPhotos(folder, listTeachersDirectory, getTeacherPhoto, (progress) => { photoStatus.textContent = `نُسخت ${progress.copied} صورة…`; });
-      photoStatus.textContent = `نُسخت ${result.copied} صورة، وتُرك ${result.skipped} ملفًا موجودًا، وتعذّر نسخ ${result.failed}. الصور الأصلية محفوظة في Supabase.`;
-      if (!result.failed) notify("تم نسخ الصور القديمة دون حذف الأصل");
-    } catch (error) { if (error.name !== "AbortError") notify(error.message); }
-    finally { button.disabled = false; }
-  });
   await loadPhotos();
 }
 
