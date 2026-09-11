@@ -1,4 +1,4 @@
-import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-10-template-update-1";
+import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-11-curriculum-import-1";
 import { getStudentTermTimeline, getStudentAcademicSummary, termSlots, officialAverage } from "./term-progress-service.js?v=2026-09-08-academic-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 
@@ -42,7 +42,7 @@ async function mountCertificateResults(root, student, onCertificates) {
         const url = URL.createObjectURL(file); urls.push(url);
         return `<span class="certificate-source">${sources.length > 1 ? `<small>${esc(file.name)}</small>` : ""}<a class="btn btn-ghost" href="${url}" download="${esc(file.name)}">تنزيل الأصل</a><a class="btn btn-ghost" href="${url}" target="_blank" rel="noopener">فتح / طباعة الأصل</a></span>`;
       }).join("");
-      results.innerHTML = renderCurriculumResults(certificates, curriculumTrack(student, certificates));
+      results.innerHTML = await renderCurriculumResults(certificates, curriculumTrack(student, certificates));
       preview.hidden = false;
       onCertificates(certificates);
     }

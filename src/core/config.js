@@ -7,6 +7,7 @@ export const DB_VERSION = 5;
 
 export const COLLECTIONS = [
   "departmentPlanProjects",
+  "curriculumTemplates",
   "agendaStatus",
   "actionProgress",
   "followUpItems",

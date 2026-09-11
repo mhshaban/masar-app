@@ -1,7 +1,7 @@
 import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-review-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-10-template-update-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-11-curriculum-import-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-08-form-fields-1";
 import { getCurrentProfile } from "../../services/auth-service.js";

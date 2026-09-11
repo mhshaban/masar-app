@@ -1,4 +1,4 @@
-import { CURRICULUM_TEMPLATES } from "./curriculum-template.js?v=2026-09-10-template-update-1";
+import { loadCurriculumTemplates } from "../../services/curriculum-template-service.js?v=2026-09-11-curriculum-import-1";
 import { normalizeKey } from "../../services/text-normalize.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -55,8 +55,9 @@ export function curriculumTrack(student, certificates = []) {
   return /تجاري|تجار/.test(text) ? "التجاري" : /صناع/.test(text) ? "الصناعي" : "";
 }
 
-export function renderCurriculumResults(certificates, track) {
-  const template = CURRICULUM_TEMPLATES[track];
+export async function renderCurriculumResults(certificates, track) {
+  const templates = await loadCurriculumTemplates();
+  const template = templates[track];
   if (!template) return '<p class="hint">لم يُحدد المسار في بيانات الطالب أو الشهادة.</p>';
   const latest = latestCourseResults(certificates);
   const shown = new Set(template.flatMap(row => row.codes).flatMap(splitCodes).map(codeKey).filter(Boolean));

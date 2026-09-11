@@ -2,6 +2,7 @@ import { readWorkbook } from "./xlsx-parser.js";
 import { parseStudentsRows, commitStudentsImport } from "./students-import-service.js?v=2026-09-08-form-fields-1";
 import { importTeachers } from "../modules/forms/forms-service.js?v=2026-09-08-form-fields-1";
 import { parsePromotedRows, previewHistoricalPromotedDuplicates, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
+import { parseCurriculumTemplateSheets, commitCurriculumTemplates } from "./curriculum-template-service.js?v=2026-09-11-curriculum-import-1";
 import { list, remove } from "./cloud-runtime.js";
 
 const clean = (value) => String(value ?? "").replace(/[‎‏‪-‮]/g, "").trim();
@@ -55,7 +56,10 @@ export async function parseSchoolWorkbook(file) {
   const students = parseStudentsRows(sheets[studentsSheet] || []);
   const teachers = parseTeachersRows(sheets[teachersSheet] || []);
   const promotedRows = parsePromotedRows(sheets[promotedSheet] || [], students);
-  return { students, teachers, promotedRows, sheets: { students: studentsSheet, teachers: teachersSheet, promoted: promotedSheet } };
+  // شيتا "الصناعي" و"التجاري" (قالب المقررات) اختياريان — الملف الشامل لا
+  // يحتاج يتضمّنهما كل مرة؛ لو موجودين يُحدَّث القالب، ولو غائبين يبقى كما هو.
+  const curriculumTemplates = parseCurriculumTemplateSheets(sheets);
+  return { students, teachers, promotedRows, curriculumTemplates, sheets: { students: studentsSheet, teachers: teachersSheet, promoted: promotedSheet } };
 }
 
 export async function previewStaleAcademicRecords(students) {
@@ -80,5 +84,6 @@ export async function commitSchoolWorkbook(data, { fileName }) {
   const academicPrune = await pruneStaleAcademicRecords(data.students);
   const teachersCount = await importTeachers(data.teachers);
   const promotedBatch = await commitPromotedBatch(data.promotedRows, { fileName });
-  return { studentsCount: studentsResult.count, teachersCount, promotedBatch, academicPrune };
+  const curriculumResult = await commitCurriculumTemplates(data.curriculumTemplates || {});
+  return { studentsCount: studentsResult.count, teachersCount, promotedBatch, academicPrune, curriculumResult };
 }
