@@ -2,12 +2,12 @@ import { loadCurriculumTemplates } from "../../services/curriculum-template-serv
 import { normalizeKey } from "../../services/text-normalize.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const codeKey = value => normalizeKey(value).replace(/\s|ـ/g, "");
+export const codeKey = value => normalizeKey(value).replace(/\s|ـ/g, "");
 const cleanTerm = value => normalizeKey(value).replace(/[أإآ]/g, "ا").replace(/ى/g, "ي");
 // خلية قالب قد تحمل أكثر من رمز مفصولة بـ"/" (مثل "رسم803/رسم813") لمّا
 // يختلف رمز المقرر الفعلي بحسب فوج الطلبة رغم تمثيله نفس البند بالقالب —
 // أي رمز منها يُطابق يكفي.
-const splitCodes = value => String(value ?? "").split("/").map(c => c.trim()).filter(Boolean);
+export const splitCodes = value => String(value ?? "").split("/").map(c => c.trim()).filter(Boolean);
 
 export function certificateTermOrder(label, index = 0) {
   const text = cleanTerm(label);

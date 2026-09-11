@@ -13,6 +13,7 @@ import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalProm
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
 import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
+import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-11-curriculum-gap-1";
 import { list } from "../../services/cloud-runtime.js";
 import { getMasarFolderName, forgetMasarFolder } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 
@@ -149,6 +150,13 @@ async function mountAveragesTab(root) {
       <button class="btn btn-ghost" id="averages-reset-folder">إعادة تعيين مجلد "مسار"</button>
       <div id="averages-progress"></div>
       <div id="averages-preview"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h2>تدقيق قالب المقررات</h2>
+      <p class="hint">يمسح نفس مجلد الشهادات، ويجمع كل رمز مقرر ظهر بدرجة ناجحة (٥٠٪ فأكثر، بلا غياب/حرمان) ولم يكن موجودًا بقالب المقررات لأي من المسارين — لاكتشاف مقررات جديدة يحتاج القالب تحديثها. قراءة فقط، لا يُغيّر القالب أو أي بيانات بنفسه؛ ينزّل ملف Excel للمراجعة اليدوية.</p>
+      <button class="btn btn-ghost" id="gaps-scan">مسح الشهادات وتنزيل تقرير الفجوات</button>
+      <div id="gaps-progress"></div>
+      <div id="gaps-result"></div>
     </div>`;
   const scanButton = root.querySelector("#averages-scan");
   const resetButton = root.querySelector("#averages-reset-folder");
@@ -213,6 +221,32 @@ async function mountAveragesTab(root) {
     } catch (error) {
       progress.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
       scanButton.disabled = false;
+    }
+  });
+
+  const gapsButton = root.querySelector("#gaps-scan");
+  const gapsProgress = root.querySelector("#gaps-progress");
+  const gapsResult = root.querySelector("#gaps-result");
+  gapsButton.addEventListener("click", async () => {
+    gapsButton.disabled = true;
+    gapsResult.innerHTML = "";
+    gapsProgress.innerHTML = '<p class="hint">جارٍ فتح المجلد…</p>';
+    try {
+      const scan = await scanCurriculumGaps((done, total) => {
+        gapsProgress.innerHTML = `<p class="hint">جارٍ قراءة الشهادات: ${done} من ${total}…</p>`;
+      });
+      gapsProgress.innerHTML = "";
+      gapsButton.disabled = false;
+      if (!scan) return;
+      if (!scan.rows.length) {
+        gapsResult.innerHTML = `<p class="hint" role="status">لا توجد مقررات غير مدرجة بالقالب — فُحصت ${scan.certificatesRead} شهادة.</p>`;
+        return;
+      }
+      await downloadCurriculumGapsWorkbook(scan.rows);
+      gapsResult.innerHTML = `<p class="hint" role="status">تم تنزيل تقرير الفجوات: ${scan.rows.length} رمز مقرر غير مدرج، من أصل ${scan.certificatesRead} شهادة مقروءة. "الفصل" بالتقرير تخمين من ترتيب شهادات كل طالب زمنيًا — راجعه قبل تحديث القالب.</p>`;
+    } catch (error) {
+      gapsProgress.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+      gapsButton.disabled = false;
     }
   });
 }
