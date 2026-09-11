@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import "./helpers/fake-cloud-backend.mjs";
 import { clear } from "../src/services/cloud-runtime.js";
-import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers, listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos } from "../src/modules/forms/forms-service.js";
+import { createDepartmentForm, listDepartmentForms, updateDepartmentForm, saveTeacher, listTeachers, listTeachersDirectory, getTeacherPhoto, importTeachers, listLegacyTeacherPhotoIds, removeLegacyTeacherPhotos, listFormsForStudent } from "../src/modules/forms/forms-service.js";
 
 const student = { id: "s-1", name: "طالب تجريبي", academicId: "2026001", civilId: "123", level: "الثاني", section: "201", track: "علمي" };
 globalThis.__MASAR_TEST_AUTH__ = {
@@ -96,4 +96,15 @@ test("legacy photo deletion requires admin and preserves all teacher metadata", 
   } finally {
     globalThis.__MASAR_TEST_AUTH__.getCurrentProfile = originalProfile;
   }
+});
+
+test("listFormsForStudent returns only that student's forms", async () => {
+  const other = { ...student, id: "s-2", academicId: "2026002" };
+  await createDepartmentForm("social_guidance", student, { reason: "حالة أولى" });
+  await createDepartmentForm("registration", student, { reason: "طلب ثانٍ" });
+  await createDepartmentForm("social_guidance", other, { reason: "طالب آخر" });
+
+  const rows = await listFormsForStudent(student.id);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((f) => f.studentId === student.id));
 });

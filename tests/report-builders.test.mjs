@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
-  buildDepartmentFormReportHtml,
+  buildDepartmentFormReportHtml, buildStudentProfileReportHtml,
 } from "../src/services/report-builders.js";
 
 test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
@@ -93,4 +93,53 @@ test("buildSupportPlansReportHtml lists each plan's actions with Arabic status l
   assert.match(html, /نشطة/);
   assert.match(html, /جلسة تقوية/);
   assert.match(html, /قيد التنفيذ/);
+});
+
+test("buildStudentProfileReportHtml includes every section with real data", () => {
+  const data = {
+    student: {
+      name: "أحمد سالم", academicId: "2026001", civilId: "123456", level: "الثالث", section: "أ١",
+      department: "الحاسب", track: "الصناعي", phones: ["36000000"], email: "a@x.com", transport: "حافلة",
+      counselor: { name: "مرشد الشعبة", phone: "36111111" }, notes: "طالب متعاون",
+    },
+    academicSummary: { finalCumulativeAverage: 88.5, subjects: [{ subject: "الرياضيات", pct: 75 }] },
+    termTimeline: [{ term: "الفصل الأول", averagePct: 82, rating: "جيد جدًا" }],
+    cases: [{ category: "أكاديمية", title: "متابعة معدل", status: "open", notes: "يحتاج متابعة", sessions: [{ date: "2026-01-01", note: "جلسة أولى", nextStep: "متابعة الأسبوع القادم" }] }],
+    supportPlans: [{ domain: "الرياضيات", status: "active", goal: "رفع المعدل", actions: [{ action: "جلسة تقوية", dueDate: "2026-09-10", status: "not_started" }] }],
+    careerSessions: [{ date: "2026-02-01", topic: "اختيار التخصص الجامعي", notes: "ميول هندسية", recommendation: "هندسة" }],
+    pendingSubjects: [{ subjectCode: "ريض101" }],
+    forms: [{ title: "طلب تغيير شعبة", createdDate: "2026-03-01", status: "pending" }],
+  };
+  const html = buildStudentProfileReportHtml(data, "2026-09-11");
+
+  assert.match(html, /أحمد سالم/);
+  assert.match(html, /2026001/);
+  assert.match(html, /88\.5٪/);
+  assert.match(html, /جيد جدًا/);
+  assert.match(html, /متابعة معدل/);
+  assert.match(html, /جلسة أولى/);
+  assert.match(html, /مفتوحة/);
+  assert.match(html, /رفع المعدل/);
+  assert.match(html, /جلسة تقوية/);
+  assert.match(html, /اختيار التخصص الجامعي/);
+  assert.match(html, /هندسة/);
+  assert.match(html, /ريض101/);
+  assert.match(html, /طلب تغيير شعبة/);
+  assert.match(html, /بانتظار الإجراء/);
+});
+
+test("buildStudentProfileReportHtml shows a clear placeholder for every empty section instead of an empty table", () => {
+  const data = {
+    student: { name: "طالب جديد" },
+    academicSummary: { finalCumulativeAverage: null, subjects: [] },
+    termTimeline: [],
+    cases: [], supportPlans: [], careerSessions: [], pendingSubjects: [], forms: [],
+  };
+  const html = buildStudentProfileReportHtml(data, "2026-09-11");
+  assert.match(html, /لا توجد معدلات فصلية رسمية بعد/);
+  assert.match(html, /لا توجد حالات إرشادية/);
+  assert.match(html, /لا توجد خطط دعم/);
+  assert.match(html, /لا توجد جلسات توجيه مهني/);
+  assert.match(html, /لا توجد مقررات معلَّقة/);
+  assert.match(html, /لا توجد استمارات مرتبطة بهذا الطالب/);
 });

@@ -1,10 +1,16 @@
-import { list as listAll, get, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, get, save, remove } from "../../services/cloud-runtime.js";
 import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
 
 export const CASE_CATEGORIES = ["أكاديمية", "سلوكية", "اجتماعية", "نفسية"];
 
 export async function listCases() {
   const cases = await listAll("guidanceCases");
+  return cases.sort((a, b) => (b.openedDate || "").localeCompare(a.openedDate || ""));
+}
+
+// كل الحالات (مفتوحة ومُغلقة) لطالب معيّن — يستخدمها ملف الطالب الشامل.
+export async function listCasesForStudent(studentId) {
+  const cases = await listWhere("guidanceCases", "studentId", String(studentId));
   return cases.sort((a, b) => (b.openedDate || "").localeCompare(a.openedDate || ""));
 }
 

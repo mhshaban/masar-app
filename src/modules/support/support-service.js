@@ -1,4 +1,4 @@
-import { list as listAll, get, save, remove } from "../../services/cloud-runtime.js";
+import { list as listAll, listWhere, get, save, remove } from "../../services/cloud-runtime.js";
 import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
 
 const NEXT_STATUS = { not_started: "ongoing", ongoing: "done", done: "not_started" };
@@ -9,6 +9,12 @@ export async function listPlans() {
     if (a.status !== b.status) return a.status === "active" ? -1 : 1;
     return (b.startDate || "").localeCompare(a.startDate || "");
   });
+}
+
+// كل خطط الدعم (نشطة ومكتملة ومُلغاة) لطالب معيّن — يستخدمها ملف الطالب الشامل.
+export async function listPlansForStudent(studentId) {
+  const plans = await listWhere("supportPlans", "studentId", String(studentId));
+  return plans.sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
 }
 
 export async function getPlan(id) {
