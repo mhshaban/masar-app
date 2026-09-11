@@ -1,11 +1,10 @@
 // تحديث معدلات الطلبة (academicFlags/termAverages) مباشرة من داخل التطبيق —
 // يمسح مجلد "مسار" المحلي (نفس مجلد صور/شهادات الطلبة، File System Access
 // API، كروم/إيدج فقط) بحثًا عن شهادات PDF، يحلّلها بمتصفح المستخدم نفسه
-// (pdf.js المُضمَّن أصلًا بالتطبيق)، ويكتب النتيجة لـSupabase مباشرة —
-// بديل داخل التطبيق لسكربت scripts/cowork-analyze-grades.mjs الذي يحتاج
-// Node.js/Terminal على جهاز منفصل. بنفس المنطق بالضبط (استبدال كامل لا
-// تراكم، مصدر واحد فقط شهادات PDF الرسمية، بلا اعتماد على درجات الوقفة
-// التقويمية) — راجع README قسم "استيراد الدرجات والشهادات" للخلفية الكاملة.
+// (pdf.js المُضمَّن أصلًا بالتطبيق)، ويكتب النتيجة لـSupabase مباشرة — بلا
+// أي سكربت أو أداة خارج التطبيق. استبدال كامل لا تراكم، مصدر واحد فقط
+// شهادات PDF الرسمية، بلا اعتماد على درجات الوقفة التقويمية — راجع README
+// قسم "استيراد الدرجات والشهادات" للخلفية الكاملة.
 import { getMasarFolderHandle } from "../modules/dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 import { extractPdfTextRows } from "./pdf-text-rows.js?v=2026-09-11-academic-averages-1";
 import { parseCertificateRows } from "../../scripts/lib/certificate-parser.mjs";
@@ -39,7 +38,7 @@ export async function scanCertificatesFolder() {
 }
 
 // صف درجة موحّد مؤقت بالذاكرة فقط لحساب academicFlags — لا يُكتب لقاعدة
-// البيانات صفًا صفًا أبدًا (بلا اختلاف عن scripts/cowork-analyze-grades.mjs).
+// البيانات صفًا صفًا أبدًا.
 function unifiedRow({ studentId, subjectCode, subjectName, score, scoreStatus, term, sourceFile }) {
   return { studentId, subjectCode, subjectName, score, scoreStatus, term, sourceFile };
 }
@@ -88,9 +87,8 @@ export async function readCertificateFile(file) {
   return { kind: "certificate", cert };
 }
 
-// نفس منطق aggregateStudent/تعارضات termAverages بـscripts/cowork-analyze-grades.mjs
-// بالضبط، لكن يأخذ نتائج شهادات مُحلَّلة مسبقًا (بدل قراءة ملفات) — قابل
-// للاختبار بلا أي واجهة متصفح أو pdf.js حقيقي.
+// يأخذ نتائج شهادات مُحلَّلة مسبقًا (بدل قراءة ملفات) — قابل للاختبار بلا
+// أي واجهة متصفح أو pdf.js حقيقي.
 export function buildAcademicAverages(certResults, students) {
   const byAcademicId = new Map(students.filter((s) => s.academicId).map((s) => [String(s.academicId), s]));
 
