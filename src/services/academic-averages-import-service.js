@@ -1,10 +1,11 @@
 // تحديث معدلات الطلبة (academicFlags/termAverages) مباشرة من داخل التطبيق —
-// يمسح مجلد "مسار" المحلي (نفس مجلد صور/شهادات الطلبة، File System Access
-// API، كروم/إيدج فقط) بحثًا عن شهادات PDF، يحلّلها بمتصفح المستخدم نفسه
-// (pdf.js المُضمَّن أصلًا بالتطبيق)، ويكتب النتيجة لـSupabase مباشرة — بلا
-// أي سكربت أو أداة خارج التطبيق. استبدال كامل لا تراكم، مصدر واحد فقط
-// شهادات PDF الرسمية، بلا اعتماد على درجات الوقفة التقويمية — راجع README
-// قسم "استيراد الدرجات والشهادات" للخلفية الكاملة.
+// يمسح مجلد "مسار" المحلي (نفس مجلد صور الطلبة والمعلمين وجداول/شهادات
+// الطلبة، File System Access API، كروم/إيدج فقط) بحثًا عن شهادات PDF،
+// يحلّلها بمتصفح المستخدم نفسه (pdf.js المُضمَّن أصلًا بالتطبيق)، ويكتب
+// النتيجة لـSupabase مباشرة — بلا أي سكربت أو أداة خارج التطبيق. استبدال
+// كامل لا تراكم، مصدر واحد فقط شهادات PDF الرسمية، بلا اعتماد على درجات
+// الوقفة التقويمية — راجع README قسم "استيراد الدرجات والشهادات" للخلفية
+// الكاملة.
 import { getMasarFolderHandle } from "../modules/dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 import { extractPdfTextRows } from "./pdf-text-rows.js?v=2026-09-11-academic-averages-1";
 import { parseCertificateRows } from "../../scripts/lib/certificate-parser.mjs";
@@ -30,7 +31,8 @@ async function walkPdfFiles(directory, prefix = "", depth = 0) {
 }
 
 // نافذة اختيار المجلد تظهر فقط أول مرة (أو لو أُلغيت الصلاحية) — نفس مجلد
-// "مسار" المستخدَم أصلًا لصور/جداول/شهادات الطلبة، فلا يُطلب اختياره مرتين.
+// "مسار" المستخدَم أصلًا لصور الطلبة والمعلمين وجداول/شهادات الطلبة، فلا
+// يُطلب اختياره مرتين.
 export async function scanCertificatesFolder() {
   const folder = await getMasarFolderHandle({ prompt: true });
   if (!folder) return null;
