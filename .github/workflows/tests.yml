@@ -41,11 +41,11 @@ jobs:
       - uses: actions/configure-pages@v5
       - name: Prepare static application
         run: |
-          mkdir -p _site/scripts/lib
+          mkdir -p _site/scripts
           cp index.html manifest.webmanifest offline.html sw.js _site/
           cp -R icons _site/icons
           cp -R src _site/src
-          cp scripts/lib/certificate-parser.mjs scripts/lib/score-conventions.mjs scripts/lib/document-classifier.mjs _site/scripts/lib/
+          cp -R scripts/lib _site/scripts/lib
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v4
         with:
