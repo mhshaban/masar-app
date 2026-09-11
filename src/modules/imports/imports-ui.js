@@ -1,8 +1,10 @@
 // شاشة الاستيراد الموحَّدة (إدمن فقط): تحديث شامل من ملف المدرسة الواحد،
 // مع إبقاء النسخ الاحتياطي والاستعادة الآمنة في التبويب الثاني فقط.
 //
-// الدرجات والشهادات: استيرادها انتقل بالكامل لـCowork (تحليل خارج التطبيق
-// من ملفات OneDrive)، فلا تبويب استيراد لها هنا بعد الآن — راجع README.
+// الدرجات والشهادات: تحديث معدلات الطلبة (academicFlags/termAverages) من
+// شهادات PDF صار متاحًا من هنا مباشرة (تبويب "تحديث المعدلات") — يمسح
+// المتصفح مجلد "مسار" المحلي ويحلّله بنفسه، بديل داخل التطبيق لسكربت
+// scripts/cowork-analyze-grades.mjs المنفصل (لا يزال متاحًا لمن يفضّله).
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
@@ -10,12 +12,15 @@ import { renderImportSection as renderBackupRestoreImport } from "../backup/back
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-11-curriculum-import-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
+import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
+import { list } from "../../services/cloud-runtime.js";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
   { key: "plan", label: "تحديث الخطة" },
+  { key: "averages", label: "تحديث المعدلات" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
 
@@ -127,6 +132,72 @@ export async function mountPlanTab(root) {
   });
 }
 
+async function mountAveragesTab(root) {
+  if (!folderScanSupported()) {
+    root.innerHTML = `<div class="card"><h2>تحديث معدلات الطلبة من الشهادات</h2><p class="hint" style="color:var(--critical);">هذه الميزة تحتاج متصفح كروم أو إيدج (وصول لمجلد محلي) — غير مدعومة بمتصفحك الحالي.</p></div>`;
+    return;
+  }
+  root.innerHTML = `
+    <div class="card">
+      <h2>تحديث معدلات الطلبة من الشهادات</h2>
+      <p class="hint">يمسح مجلد "مسار" المحلي بحثًا عن شهادات PDF (نفس المجلد المستخدَم لصور/جداول/شهادات الطلبة)، ويحسب معدل كل طالب من شهاداته الرسمية فقط — استبدال كامل لكل المعدلات الحالية، لا تراكم.</p>
+      <button class="btn btn-primary" id="averages-scan">اختيار مجلد الشهادات ومسحه</button>
+      <div id="averages-progress"></div>
+      <div id="averages-preview"></div>
+    </div>`;
+  const scanButton = root.querySelector("#averages-scan");
+  const progress = root.querySelector("#averages-progress");
+  const preview = root.querySelector("#averages-preview");
+
+  scanButton.addEventListener("click", async () => {
+    scanButton.disabled = true;
+    preview.innerHTML = "";
+    progress.innerHTML = '<p class="hint">جارٍ فتح المجلد…</p>';
+    try {
+      const files = await scanCertificatesFolder();
+      if (!files) { progress.innerHTML = ""; scanButton.disabled = false; return; }
+      if (!files.length) {
+        progress.innerHTML = '<p class="hint" style="color:var(--critical);">لم يُعثر على أي ملف PDF داخل المجلد المختار.</p>';
+        scanButton.disabled = false;
+        return;
+      }
+      const students = await list("students");
+      const result = await analyzeCertificateFiles(files, students, (done, total) => {
+        progress.innerHTML = `<p class="hint">جارٍ قراءة الشهادات: ${done} من ${total}…</p>`;
+      });
+      progress.innerHTML = "";
+      scanButton.disabled = false;
+      const { academicFlagsRecords, termAveragesRecords, summary } = result;
+      preview.innerHTML = `
+        <div class="grid g3" style="margin:16px 0;">
+          <div class="card stat"><div class="label">شهادات قُرئت</div><div class="value">${summary.certificatesRead}</div></div>
+          <div class="card stat"><div class="label">طلاب بمعدلات محدَّثة</div><div class="value">${academicFlagsRecords.length}</div></div>
+          <div class="card stat"><div class="label">معدلات فصلية رسمية</div><div class="value">${termAveragesRecords.length}</div></div>
+        </div>
+        <p class="hint">جداول حصص تم تجاهلها: ${summary.scheduleSkipped} · ملفات بها خطأ: ${summary.errorsCount} · ملفات مشكوك فيها (عدد مقررات غير منطقي): ${summary.suspiciousCount} · أرقام أكاديمية غير مطابقة لسجل الطلبة: ${summary.unmatchedCount}${summary.termConflictsCount ? ` · ⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة: ${summary.termConflictsCount} (اعتُمد آخر ملف قُرئ)` : ""}</p>
+        <button class="btn btn-primary" id="averages-commit">تنفيذ التحديث</button>
+        <div id="averages-commit-status"></div>`;
+      preview.querySelector("#averages-commit").addEventListener("click", async () => {
+        if (!await confirmDialog(`سيُستبدَل كل ما هو محفوظ حاليًا بمعدلات ${academicFlagsRecords.length} طالبًا و${termAveragesRecords.length} معدّلًا فصليًا من الشهادات المقروءة. أي طالب لا شهادة له بهذا المسح ستُحذف معدلاته القديمة. هل تريد التنفيذ؟`)) return;
+        const commitButton = preview.querySelector("#averages-commit");
+        const status = preview.querySelector("#averages-commit-status");
+        commitButton.disabled = true;
+        status.innerHTML = '<p class="hint">جارٍ الحفظ…</p>';
+        try {
+          const commitResult = await commitAcademicAverages({ academicFlagsRecords, termAveragesRecords });
+          status.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${commitResult.academicFlagsCount} طالبًا، ${commitResult.termAveragesCount} معدّلًا فصليًا. حُذف ${commitResult.removedFlagsCount} سجل تحليل و${commitResult.removedTermsCount} معدّلًا فصليًا لم يعد لهما مصدر.</p>`;
+        } catch (error) {
+          commitButton.disabled = false;
+          status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+        }
+      });
+    } catch (error) {
+      progress.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+      scanButton.disabled = false;
+    }
+  });
+}
+
 async function mountBackupTab(root) {
   renderBackupRestoreImport(root, async () => {
     window.location.reload();
@@ -145,7 +216,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { school: mountSchoolTab, plan: mountPlanTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, plan: mountPlanTab, averages: mountAveragesTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
