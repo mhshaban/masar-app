@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { clear, bulkPut } from "../src/services/cloud-runtime.js";
-import { listOverdueActions } from "../src/modules/support/support-service.js";
+import { listOverdueActions, listPlansForStudent } from "../src/modules/support/support-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -58,4 +58,14 @@ test("listOverdueActions excludes overdue actions belonging to a completed or ca
     { id: "a2", planId: "p2", action: "خطة ملغاة", status: "not_started", dueDate: daysAgo(3) },
   ]);
   assert.equal((await listOverdueActions()).length, 0);
+});
+
+test("listPlansForStudent returns only that student's plans (any status), most recently started first", async () => {
+  await bulkPut("supportPlans", [
+    { id: "p1", studentId: "s1", status: "completed", startDate: "2026-01-01" },
+    { id: "p2", studentId: "s1", status: "active", startDate: "2026-03-01" },
+    { id: "p3", studentId: "s2", status: "active", startDate: "2026-02-01" },
+  ]);
+  const rows = await listPlansForStudent("s1");
+  assert.deepEqual(rows.map((p) => p.id), ["p2", "p1"]);
 });

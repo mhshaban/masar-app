@@ -7,6 +7,13 @@ import { parseStudentsWorkbook, commitStudentsImport } from "../../services/stud
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
+import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-08-academic-1";
+import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js";
+import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js";
+import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
+import { listFormsForStudent } from "../forms/forms-service.js?v=2026-09-08-form-fields-1";
+import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-09-11-student-profile-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -294,7 +301,7 @@ async function renderDetail(container, id, onBack) {
         </div>
       </div>
       <div class="meta">الرقم الأكاديمي ${esc(s.academicId) || "—"}</div>
-      <div class="forms-actions"><button class="btn btn-ghost" id="student-photo-load">عرض الصورة</button><button class="btn btn-primary" id="student-edit">تعديل بيانات الطالب</button></div>
+      <div class="forms-actions"><button class="btn btn-ghost" id="student-photo-load">عرض الصورة</button><button class="btn btn-ghost" id="student-profile-export">تصدير ملف الطالب (Word)</button><button class="btn btn-primary" id="student-edit">تعديل بيانات الطالب</button></div>
     </div>
 
     ${hasGuidanceFlags ? `
@@ -368,6 +375,34 @@ async function renderDetail(container, id, onBack) {
 
   container.querySelector("#students-back").addEventListener("click", onBack);
   container.querySelector("#student-edit").addEventListener("click", () => renderStudentEdit(container, s, () => renderDetail(container, id, onBack), () => renderDetail(container, id, onBack)));
+  container.querySelector("#student-profile-export").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const [academicSummary, termTimeline, cases, supportPlans, careerSessions, forms] = await Promise.all([
+        getStudentAcademicSummary(s),
+        getStudentTermTimeline(String(s.academicId || s.id)),
+        listCasesForStudent(s.id),
+        listPlansForStudent(s.id),
+        getCareerSessionsForStudent(s.id),
+        listFormsForStudent(s.id),
+      ]);
+      const [casesWithSessions, plansWithActions] = await Promise.all([
+        Promise.all(cases.map(async (c) => ({ ...c, sessions: await listCaseSessions(c.id) }))),
+        Promise.all(supportPlans.map(async (p) => ({ ...p, actions: await listPlanActions(p.id) }))),
+      ]);
+      const html = buildStudentProfileReportHtml({
+        student: s, academicSummary, termTimeline,
+        cases: casesWithSessions, supportPlans: plansWithActions, careerSessions,
+        pendingSubjects, forms,
+      }, new Date().toLocaleString("ar-BH"));
+      downloadAsWordDoc(`ملف الطالب — ${s.name || s.id}`, html, `ملف-الطالب-${s.academicId || s.id}`);
+    } catch (error) {
+      notify(error.message || "تعذّر تصدير ملف الطالب");
+    } finally {
+      button.disabled = false;
+    }
+  });
   const photoButton = container.querySelector("#student-photo-load");
   const loadDetailPhoto = async (prompt = false, refresh = false) => {
     try {

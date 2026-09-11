@@ -80,6 +80,13 @@ export async function listDepartmentForms() {
   return rows.sort((a, b) => `${b.createdDate || ""}${b.updatedAt || ""}`.localeCompare(`${a.createdDate || ""}${a.updatedAt || ""}`));
 }
 
+// كل الاستمارات المرتبطة بطالب معيّن (تحويلات، طلب تغيير شعبة، موافقة ولي
+// الأمر...) — يستخدمها ملف الطالب الشامل بدل تصفّح شاشة الاستمارات كاملة.
+export async function listFormsForStudent(studentId) {
+  const rows = await listWhere("departmentForms", "studentId", String(studentId));
+  return rows.sort((a, b) => (b.createdDate || "").localeCompare(a.createdDate || ""));
+}
+
 export async function getDepartmentForm(id) {
   const item = await get("departmentForms", id);
   if (!item?.student) return item;

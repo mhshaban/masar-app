@@ -27,6 +27,9 @@ function departmentFormEntryFooter(item) {
 const AGENDA_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم" };
 const FOLLOWUP_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد الإنجاز", done: "تم", not_done: "لم ينجز", unknown: "غير محدد" };
 const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد التنفيذ", done: "تم" };
+const CASE_STATUS_LABELS = { open: "مفتوحة", closed: "مُغلقة" };
+const SUPPORT_PLAN_STATUS_LABELS = { active: "نشطة", completed: "مكتملة", cancelled: "مُلغاة" };
+const DEPARTMENT_FORM_STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
 
 const DEPARTMENT_FORM_FIELD_ORDER = {
   referral: ["reason", "requestedAction", "notes"],
@@ -163,6 +166,81 @@ export function buildGuidanceCasesReportHtml(cases, exportedAt) {
           : '<tr><td colspan="3">لا توجد جلسات مسجَّلة</td></tr>'}
       </table>
     `).join("")}
+  `;
+}
+
+// ملف طالب شامل واحد — كل ما يخصه بمكان واحد للطباعة/التسليم (اجتماع ولي
+// أمر مثلًا): البيانات الأساسية، المسار الأكاديمي، الحالات الإرشادية
+// وجلساتها، خطط الدعم وإجراءاتها، جلسات التوجيه المهني، المقررات
+// المرفَّعة المعلَّقة، والاستمارات المرتبطة (تحويلات/طلبات/موافقات ولي
+// الأمر). المستدعي يجمع البيانات (cases مع .sessions، plans مع .actions)
+// بنفس نمط تقارير الحالات/الدعم أعلاه.
+export function buildStudentProfileReportHtml(data, exportedAt) {
+  const { student, academicSummary, termTimeline, cases, supportPlans, careerSessions, pendingSubjects, forms } = data;
+  return `
+    <h1>ملف الطالب الشامل</h1>
+    <p class="meta">تاريخ التصدير: ${esc(exportedAt)}</p>
+
+    <h2>البيانات الأساسية</h2>
+    <table>
+      <tr><th>الاسم</th><td>${esc(student.name)}</td><th>الرقم الأكاديمي</th><td>${esc(student.academicId) || "—"}</td></tr>
+      <tr><th>الرقم الشخصي</th><td>${esc(student.civilId) || "—"}</td><th>المستوى / الشعبة</th><td>${esc(student.level) || "—"} / ${esc(student.section) || "—"}</td></tr>
+      <tr><th>القسم</th><td>${esc(student.department) || "—"}</td><th>المسار / التخصص</th><td>${esc(student.track) || "—"}</td></tr>
+      <tr><th>أرقام الاتصال</th><td colspan="3">${(student.phones || []).map(esc).join(" · ") || "—"}</td></tr>
+      <tr><th>البريد الإلكتروني</th><td>${esc(student.email) || "—"}</td><th>المواصلات</th><td>${esc(student.transport) || "—"}</td></tr>
+      <tr><th>مرشد الشعبة</th><td colspan="3">${esc(student.counselor?.name) || "—"}${student.counselor?.phone ? ` — ${esc(student.counselor.phone)}` : ""}</td></tr>
+      <tr><th>ملاحظات الطالب</th><td colspan="3">${esc(student.notes) || "—"}</td></tr>
+    </table>
+
+    <h2>المسار الأكاديمي</h2>
+    <table><tr><th>المعدل التراكمي النهائي</th><td>${academicSummary.finalCumulativeAverage == null ? "—" : `${esc(academicSummary.finalCumulativeAverage)}٪`}</td></tr></table>
+    ${termTimeline.length ? `
+      <table>
+        <tr><th>الفصل</th><th>المعدل</th><th>التقدير</th></tr>
+        ${termTimeline.map((t) => `<tr><td>${esc(t.term)}</td><td>${t.averagePct == null ? "—" : `${esc(t.averagePct)}٪`}</td><td>${esc(t.rating || "—")}</td></tr>`).join("")}
+      </table>` : '<p class="meta">لا توجد معدلات فصلية رسمية بعد.</p>'}
+    ${academicSummary.subjects.length ? `
+      <table>
+        <tr><th>المادة</th><th>النسبة</th></tr>
+        ${academicSummary.subjects.map((s) => `<tr><td>${esc(s.subject)}</td><td>${s.pct == null ? "—" : `${esc(s.pct)}٪`}</td></tr>`).join("")}
+      </table>` : ""}
+
+    <h2>الحالات الإرشادية (${cases.length})</h2>
+    ${cases.length ? cases.map((c) => `
+      <h3>${esc(c.category)}${c.title ? ` — ${esc(c.title)}` : ""} (${esc(CASE_STATUS_LABELS[c.status] || c.status)})</h3>
+      ${c.notes ? `<p class="meta">ملاحظات: ${esc(c.notes)}</p>` : ""}
+      <table>
+        <tr><th>التاريخ</th><th>الملاحظة</th><th>الخطوة التالية</th></tr>
+        ${(c.sessions && c.sessions.length) ? c.sessions.map((s) => `<tr><td>${esc(s.date)}</td><td>${esc(s.note)}</td><td>${esc(s.nextStep || "—")}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد جلسات مسجَّلة</td></tr>'}
+      </table>
+    `).join("") : '<p class="meta">لا توجد حالات إرشادية.</p>'}
+
+    <h2>خطط الدعم الفردية (${supportPlans.length})</h2>
+    ${supportPlans.length ? supportPlans.map((p) => `
+      <h3>${esc(p.domain) || "—"} (${esc(SUPPORT_PLAN_STATUS_LABELS[p.status] || p.status)})</h3>
+      ${p.goal ? `<p>الهدف: ${esc(p.goal)}</p>` : ""}
+      <table>
+        <tr><th>الإجراء</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr>
+        ${(p.actions && p.actions.length) ? p.actions.map((a) => `<tr><td>${esc(a.action)}</td><td>${esc(a.dueDate || "—")}</td><td>${esc(PLAN_ACTION_STATUS_LABELS[a.status] || a.status)}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد إجراءات مسجَّلة</td></tr>'}
+      </table>
+    `).join("") : '<p class="meta">لا توجد خطط دعم.</p>'}
+
+    <h2>التوجيه المهني (${careerSessions.length})</h2>
+    ${careerSessions.length ? `
+      <table>
+        <tr><th>التاريخ</th><th>الموضوع</th><th>الملاحظات</th><th>التوصية</th></tr>
+        ${careerSessions.map((s) => `<tr><td>${esc(s.date)}</td><td>${esc(s.topic)}</td><td>${esc(s.notes || "—")}</td><td>${esc(s.recommendation || "—")}</td></tr>`).join("")}
+      </table>` : '<p class="meta">لا توجد جلسات توجيه مهني.</p>'}
+
+    <h2>مقررات مرفَّع لم تُستوفَ بعد (${pendingSubjects.length})</h2>
+    ${pendingSubjects.length ? `<p>${pendingSubjects.map((r) => esc(r.subjectCode || "غير محدد")).join("، ")}</p>` : '<p class="meta">لا توجد مقررات معلَّقة.</p>'}
+
+    <h2>الاستمارات المرتبطة (${forms.length})</h2>
+    ${forms.length ? `
+      <table>
+        <tr><th>النوع</th><th>التاريخ</th><th>الحالة</th></tr>
+        ${forms.map((f) => `<tr><td>${esc(f.title || f.type || "—")}</td><td>${esc(f.createdDate || "—")}</td><td>${esc(DEPARTMENT_FORM_STATUS_LABELS[f.status] || f.status || "—")}</td></tr>`).join("")}
+      </table>` : '<p class="meta">لا توجد استمارات مرتبطة بهذا الطالب.</p>'}
   `;
 }
 

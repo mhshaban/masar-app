@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { clear, bulkPut } from "../src/services/cloud-runtime.js";
-import { listStaleOpenCases } from "../src/modules/cases/guidance-service.js";
+import { listStaleOpenCases, listCasesForStudent } from "../src/modules/cases/guidance-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -55,4 +55,14 @@ test("listStaleOpenCases sorts the most-neglected case first", async () => {
 
   const stale = await listStaleOpenCases(14);
   assert.deepEqual(stale.map((c) => c.id), ["more-stale", "less-stale"]);
+});
+
+test("listCasesForStudent returns only that student's cases (open and closed), newest first", async () => {
+  await bulkPut("guidanceCases", [
+    { id: "c1", studentId: "s1", status: "closed", openedDate: "2026-01-01" },
+    { id: "c2", studentId: "s1", status: "open", openedDate: "2026-03-01" },
+    { id: "c3", studentId: "s2", status: "open", openedDate: "2026-02-01" },
+  ]);
+  const rows = await listCasesForStudent("s1");
+  assert.deepEqual(rows.map((c) => c.id), ["c2", "c1"]);
 });
