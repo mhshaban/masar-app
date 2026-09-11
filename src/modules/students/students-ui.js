@@ -433,7 +433,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
 
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>سجل الطلبة</h1><div class="sub">من كشف الطلاب الفعلي</div></div>
+      <div><h1>سجل الطلبة</h1></div>
     </div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>

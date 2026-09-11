@@ -222,7 +222,7 @@ async function renderPlanDetail(container, id, onBack) {
 export async function mountSupportView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>خطط الدعم الفردية</h1><div class="sub">خطة تدخل للطالب مع إجراءات متابَعة كقائمة مهام — مرشَّحة تلقائيًا من الدرجات المستوردة</div></div>
+      <div><h1>خطط الدعم الفردية</h1><div class="sub">خطة تدخل للطالب مع إجراءات متابَعة كقائمة مهام</div></div>
       <button class="btn btn-ghost" id="support-export-btn">تصدير Word</button>
     </div>
     <div id="support-new-form" style="margin-bottom:16px;"></div>

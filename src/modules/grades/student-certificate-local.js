@@ -1,6 +1,6 @@
 import { getMasarFolderHandle } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 import { normalizeKey } from "../../services/text-normalize.js";
-import { ensurePdfJs } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
+import { extractPdfTextRows } from "../../services/pdf-text-rows.js?v=2026-09-11-academic-averages-1";
 import { parseCertificateRows } from "../../../scripts/lib/certificate-parser.mjs";
 import { looksLikeScheduleDocument, MAX_PLAUSIBLE_SUBJECTS_PER_TERM } from "../../../scripts/lib/document-classifier.mjs";
 
@@ -47,24 +47,6 @@ export function validatedCertificate(rows, student) {
 }
 
 export async function readStudentCertificate(file, student) {
-  const library = await ensurePdfJs();
-  const task = library.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false });
-  try {
-    const pdf = await task.promise;
-    const rows = [];
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const items = content.items.filter((item) => item.str?.trim()).map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] })).sort((a, b) => b.y - a.y);
-      const pageRows = [];
-      for (const item of items) {
-        let row = pageRows.find((entry) => Math.abs(entry.y - item.y) < 3);
-        if (!row) { row = { y: item.y, items: [] }; pageRows.push(row); }
-        row.items.push(item);
-      }
-      for (const row of pageRows) rows.push(row.items.sort((a, b) => b.x - a.x).map((item) => item.text));
-      page.cleanup();
-    }
-    return validatedCertificate(rows, student);
-  } finally { await task.destroy(); }
+  const rows = await extractPdfTextRows(file);
+  return validatedCertificate(rows, student);
 }

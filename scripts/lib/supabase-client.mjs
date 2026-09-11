@@ -57,10 +57,13 @@ export async function login(email, password) {
 }
 
 // يسجّل الدخول تفاعليًا بالطرفية — يرجّع access token، بلا كتابة أي شيء
-// لملف ولا إرسال لغير Supabase مباشرة.
+// لملف ولا إرسال لغير Supabase مباشرة. لو MASAR_LOGIN_ID/MASAR_LOGIN_PASSWORD
+// موجودتان بمتغيرات البيئة (تمررهما ملفات التشغيل بنقرة واحدة بـ
+// scripts/launchers/ بعد جمعهما من نافذة حوار نظام التشغيل بدل كتابة أمر)
+// يُستخدَمان مباشرة بلا سؤال الطرفية إطلاقًا.
 export async function loginInteractive() {
-  const identifier = await prompt("اسم المستخدم أو الإيميل: ");
-  const password = await promptHidden("كلمة المرور: ");
+  const identifier = process.env.MASAR_LOGIN_ID || (await prompt("اسم المستخدم أو الإيميل: "));
+  const password = process.env.MASAR_LOGIN_PASSWORD || (await promptHidden("كلمة المرور: "));
   console.log("جارٍ تسجيل الدخول...");
   const email = (await resolveIdentifier(identifier)) || identifier;
   const token = await login(email, password);

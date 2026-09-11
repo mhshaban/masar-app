@@ -19,6 +19,7 @@ export const ACTION_LABELS = {
   import_promoted: "استيراد مقررات المرفعين",
   import_department_plan: "تحديث خطة القسم",
   import_curriculum_template: "تحديث قالب المقررات",
+  import_academic_averages: "تحديث معدلات الطلبة",
   cleanup_historical_agenda_status: "تنظيف بيانات المتابعة التاريخية",
   update_student: "تعديل بيانات طالب",
   update_teacher: "تعديل بيانات معلم",
@@ -27,6 +28,7 @@ export const ACTION_LABELS = {
 export const TABLE_LABELS = {
   departmentPlanProjects: "خطة القسم",
   curriculumTemplates: "قالب المقررات",
+  academicFlags: "معدلات الطلبة",
   actionProgress: "تنفيذ الخطة",
   reminders: "التذكيرات",
   guidanceCases: "الحالات الإرشادية",

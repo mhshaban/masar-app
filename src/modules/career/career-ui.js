@@ -193,7 +193,7 @@ async function renderStudentDetail(container, studentId, onBack) {
 export async function mountCareerView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>التوجيه المهني</h1><div class="sub">جلسات وتوصيات التوجيه الجامعي والمهني — مرشَّحة تلقائيًا لطلاب السنة النهائية</div></div>
+      <div><h1>التوجيه المهني</h1><div class="sub">جلسات وتوصيات التوجيه الجامعي والمهني</div></div>
     </div>
     <div id="career-new-form" style="margin-bottom:16px;"></div>
     <div id="career-table" style="margin-bottom:16px;"></div>
