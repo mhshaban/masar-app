@@ -13,6 +13,7 @@ import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalProm
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
 import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
 import { list } from "../../services/cloud-runtime.js";
+import { getMasarFolderName, forgetMasarFolder } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
@@ -140,13 +141,29 @@ async function mountAveragesTab(root) {
     <div class="card">
       <h2>تحديث معدلات الطلبة من الشهادات</h2>
       <p class="hint">يمسح مجلد "مسار" المحلي بحثًا عن شهادات PDF (نفس المجلد المستخدَم لصور/جداول/شهادات الطلبة)، ويحسب معدل كل طالب من شهاداته الرسمية فقط — استبدال كامل لكل المعدلات الحالية، لا تراكم.</p>
+      <p class="hint" id="averages-folder-status"></p>
       <button class="btn btn-primary" id="averages-scan">اختيار مجلد الشهادات ومسحه</button>
+      <button class="btn btn-ghost" id="averages-reset-folder">إعادة تعيين مجلد "مسار"</button>
       <div id="averages-progress"></div>
       <div id="averages-preview"></div>
     </div>`;
   const scanButton = root.querySelector("#averages-scan");
+  const resetButton = root.querySelector("#averages-reset-folder");
+  const folderStatus = root.querySelector("#averages-folder-status");
   const progress = root.querySelector("#averages-progress");
   const preview = root.querySelector("#averages-preview");
+
+  async function refreshFolderStatus() {
+    const name = await getMasarFolderName();
+    folderStatus.textContent = name ? `المجلد المتصل حاليًا: ${name}` : "لا يوجد مجلد متصل حاليًا — سيُطلب اختياره عند أول مسح.";
+  }
+  await refreshFolderStatus();
+
+  resetButton.addEventListener("click", async () => {
+    if (!await confirmDialog('سيُنسى المجلد المتصل حاليًا، وسيُطلب اختيار مجلد "مسار" من جديد عند أول مسح لاحق. هل تريد المتابعة؟')) return;
+    await forgetMasarFolder();
+    await refreshFolderStatus();
+  });
 
   scanButton.addEventListener("click", async () => {
     scanButton.disabled = true;

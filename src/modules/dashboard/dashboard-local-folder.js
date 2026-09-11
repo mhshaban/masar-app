@@ -47,7 +47,37 @@ async function getHandle() {
   }
 }
 
+async function deleteHandle() {
+  const db = await openHandleDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(HANDLE_STORE, "readwrite");
+      transaction.objectStore(HANDLE_STORE).delete(HANDLE_KEY);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
 export function folderAccessSupported() { return typeof window !== "undefined" && "showDirectoryPicker" in window; }
+
+// ينسى المجلد المحفوظ حاليًا (اختيار خاطئ، أو المجلد انتقل/تغيّر اسمه) —
+// أول استدعاء لاحق لـgetMasarFolderHandle({prompt:true}) يعيد فتح نافذة
+// اختيار المجلد من جديد بدل الاعتماد على المحفوظ صامتًا.
+export async function forgetMasarFolder() {
+  await deleteHandle();
+}
+
+// اسم المجلد المتصل حاليًا (بلا طلب صلاحية) — لعرضه بالواجهة فقط، null لو
+// ما فيه مجلد محفوظ أو المتصفح لا يدعم الميزة أصلًا.
+export async function getMasarFolderName() {
+  if (!folderAccessSupported()) return null;
+  const handle = await getHandle();
+  return handle ? handle.name : null;
+}
 
 export async function getMasarFolderHandle({ prompt = false } = {}) {
   if (!folderAccessSupported()) return null;
