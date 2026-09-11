@@ -1,36 +1,38 @@
 #!/usr/bin/env node
 // سكربت تحليل الدرجات والشهادات لصالح Cowork — يقرأ مجلد OneDrive المزامَن
-// محليًا (ملفات إكسل درجات الوقفة التقويمية + شهادات PDF "سجل الطالب
-// الدراسي")، يحسب بيانات أكاديمية مجمَّعة فقط (معدل عام + معدل لكل مقرر لكل
-// طالب)، ويكتبها لمسار عبر Supabase REST — بلا تخزين أي صف درجة فردي
-// بقاعدة بيانات مسار (راجع README، قسم "استيراد الدرجات والشهادات: مسار
-// يصغّر، Cowork يحلل" للتصميم الكامل).
+// محليًا (شهادات PDF "سجل الطالب الدراسي" فقط)، يحسب بيانات أكاديمية
+// مجمَّعة فقط (معدل عام + معدل لكل مقرر لكل طالب)، ويكتبها لمسار عبر
+// Supabase REST — بلا تخزين أي صف درجة فردي بقاعدة بيانات مسار (راجع
+// README، قسم "استيراد الدرجات والشهادات: مسار يصغّر، Cowork يحلل"
+// للتصميم الكامل).
 //
-// **استبدال كامل، لا تراكم**: شغّله دائمًا على المجلد الكامل (كل الشهادات
-// + كل ملفات الوقفة التقويمية)، لا فقط الملفات الجديدة — كل تشغيلة تمسح
-// academicFlags/termAverages بالكامل وتكتبهما من الصفر من كل الملفات
-// الموجودة بالمجلد وقت التشغيل.
+// **مصدر واحد فقط — شهادات PDF الرسمية**: كان هذا السكربت يقرأ أيضًا ملفات
+// إكسل "درجات الوقفة التقويمية" ويدمجها مع الشهادات بحساب `academicFlags`
+// — أُلغي هذا المصدر بالكامل بقرار المرشد (الوقفة التقويمية تقييم جزئي
+// غير رسمي، لا يجوز خلطه بمعدلات مبنية على شهادة رسمية معتمدة). كل أرقام
+// `academicFlags`/`termAverages` الآن من شهادات PDF فقط، بلا استثناء
+// (parser الإكسل القديم حُذف بالكامل — راجع تاريخ git لو احتجت مرجعًا).
+//
+// **استبدال كامل، لا تراكم**: شغّله دائمًا على المجلد الكامل (كل
+// الشهادات)، لا فقط الملفات الجديدة — كل تشغيلة تمسح academicFlags/
+// termAverages بالكامل وتكتبهما من الصفر من كل الشهادات الموجودة بالمجلد
+// وقت التشغيل.
 //
 // طبقات المنطق منقولة حرفيًا (لا إعادة اختراع) من الكود اللي كان بالتطبيق
 // قبل نقل الاستيراد هنا — راجع scripts/lib/*.mjs.
 //
 // الاستخدام:
-//   npm install   (مرة واحدة — يجلب pdfjs-dist وxlsx كمان)
+//   npm install   (مرة واحدة — يجلب pdfjs-dist كمان)
 //   node scripts/cowork-analyze-grades.mjs /path/to/onedrive-folder [--dry-run]
 //
 // --dry-run: يشغّل كل شيء (قراءة، تحليل، مطابقة، تسجيل دخول لجلب سجل
 // الطلبة) بلا الخطوة الأخيرة (مسح وكتابة academicFlags/termAverages) —
 // لمراجعة الملخص قبل أي تعديل فعلي على قاعدة البيانات.
-//
-// تسمية ملفات الإكسل: كل ملف "درجات وقفة تقويمية" يُعامَل كفترة مستقلة،
-// واسم الفترة المحفوظ هو اسم الملف نفسه (بدون الامتداد) — سمِّ كل ملف
-// بوضوح، مثال: "الوقفة الأولى - الفصل الأول 2025-2026.xlsx".
 
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { extractPdfRows } from "./lib/pdf-rows.mjs";
 import { parseCertificateRows } from "./lib/certificate-parser.mjs";
-import { parseCheckpointWorkbook } from "./lib/checkpoint-xlsx-parser.mjs";
 import { subjectKeyForGrade } from "./lib/subject-groups.mjs";
 import { gradeRowPct } from "./lib/score-conventions.mjs";
 import { loginInteractive, fetchStudents, listIds, deleteIds, bulkPut } from "./lib/supabase-client.mjs";
@@ -64,46 +66,12 @@ function isXlsx(file) {
   return lower.endsWith(".xlsx") || lower.endsWith(".xls");
 }
 
-// صف درجة موحّد (سواء من إكسل وقفة تقويمية أو شهادة PDF) — نفس الشكل
-// اللي كان يُخزَّن بجدول grades سابقًا، لكن هنا مؤقت بالذاكرة فقط لحساب
-// academicFlags، لا يُكتب لقاعدة البيانات صفًا صفًا أبدًا. sourceFile محفوظ
-// فقط للتشخيص بـ--student=، لا يدخل بأي حساب ولا يُكتب لأي مكان.
+// صف درجة موحّد (من شهادة PDF) — نفس الشكل اللي كان يُخزَّن بجدول grades
+// سابقًا، لكن هنا مؤقت بالذاكرة فقط لحساب academicFlags، لا يُكتب لقاعدة
+// البيانات صفًا صفًا أبدًا. sourceFile محفوظ فقط للتشخيص بـ--student=، لا
+// يدخل بأي حساب ولا يُكتب لأي مكان.
 function unifiedRow({ studentId, subjectCode, subjectName, score, scoreStatus, maxScore, percentage, term, sourceFile }) {
   return { studentId, subjectCode, subjectName, score, scoreStatus, maxScore: maxScore ?? null, percentage: percentage ?? null, term, sourceFile };
-}
-
-// ملف كشف الطلاب الكامل (أو شيت "التسجيل" الحساس بداخله) ممنوع يُستورَد
-// لأي غرض بعد قرار "مسار يصغّر" — حتى لو صادف عمودَي 'رقم الطالب'/'الدرجة'
-// بالغلط بأحد شيتاته، يُرفض بالاسم صراحةً بدل الاعتماد على اكتشاف الأعمدة
-// فقط (رُصد فعليًا: هذا بالضبط ما حصل بتجربة حقيقية).
-const FORBIDDEN_FILENAME_RE = /كشف\s*طلاب\s*المدرسة|التسجيل/;
-
-async function collectFromXlsx(files) {
-  const allRows = [];
-  const skipped = [];
-  for (const file of files) {
-    const baseName = path.basename(file);
-    const term = baseName.replace(/\.(xlsx|xls)$/i, "");
-    if (FORBIDDEN_FILENAME_RE.test(baseName)) {
-      skipped.push({ file, reason: "ملف كشف الطلاب الكامل (أو يشبه اسمه) — ممنوع استيراده هنا مهما كانت أعمدته، تجاهلته عمدًا." });
-      continue;
-    }
-    try {
-      const buf = await readFile(file);
-      const parsed = parseCheckpointWorkbook(buf);
-      if (!parsed) {
-        skipped.push({ file, reason: "تعذّر التعرّف على أعمدة 'رقم الطالب'/'الدرجة' — تجاهلته." });
-        continue;
-      }
-      for (const r of parsed.rows) {
-        allRows.push(unifiedRow({ ...r, term, sourceFile: baseName }));
-      }
-      console.log(`  ✓ ${baseName}: ${parsed.rows.length} صفًا (الفترة: ${term})`);
-    } catch (err) {
-      skipped.push({ file, reason: err.message });
-    }
-  }
-  return { rows: allRows, skipped };
 }
 
 async function collectFromPdfs(files) {
@@ -242,21 +210,19 @@ async function main() {
   const allFiles = await walk(folder);
   const pdfFiles = allFiles.filter(isPdf).sort();
   const xlsxFiles = allFiles.filter(isXlsx).sort();
-  console.log(`لقيت ${pdfFiles.length} ملف شهادة PDF و${xlsxFiles.length} ملف إكسل وقفة تقويمية.\n`);
-  if (!pdfFiles.length && !xlsxFiles.length) {
-    console.error("ما لقيت أي ملف PDF أو إكسل داخل هذا المجلد (بما فيها المجلدات الفرعية).");
+  console.log(`لقيت ${pdfFiles.length} ملف شهادة PDF.`);
+  if (xlsxFiles.length) {
+    console.log(`تجاهلت ${xlsxFiles.length} ملف إكسل (درجات وقفة تقويمية أو غيرها) — مصدر الدرجات الوحيد الآن شهادات PDF الرسمية فقط.\n`);
+  } else {
+    console.log("");
+  }
+  if (!pdfFiles.length) {
+    console.error("ما لقيت أي ملف شهادة PDF داخل هذا المجلد (بما فيها المجلدات الفرعية).");
     process.exit(1);
   }
 
-  console.log("جارٍ قراءة ملفات الإكسل (الوقفة التقويمية)...");
-  const { rows: xlsxRows, skipped: xlsxSkipped } = xlsxFiles.length
-    ? await collectFromXlsx(xlsxFiles)
-    : { rows: [], skipped: [] };
-
-  console.log("\nجارٍ قراءة ملفات الشهادات (PDF)...");
-  const { rows: pdfRows, termSummaries, finalCumulativeSummaries, errors: pdfErrors, scheduleSkipped, suspicious, ok: pdfOk } = pdfFiles.length
-    ? await collectFromPdfs(pdfFiles)
-    : { rows: [], termSummaries: [], finalCumulativeSummaries: [], errors: [], scheduleSkipped: [], suspicious: [], ok: 0 };
+  console.log("جارٍ قراءة ملفات الشهادات (PDF)...");
+  const { rows: pdfRows, termSummaries, finalCumulativeSummaries, errors: pdfErrors, scheduleSkipped, suspicious, ok: pdfOk } = await collectFromPdfs(pdfFiles);
 
   const token = await loginInteractive();
 
@@ -265,7 +231,7 @@ async function main() {
   const byAcademicId = new Map(students.filter((s) => s.academicId).map((s) => [String(s.academicId), s]));
   console.log(`${students.length} طالبًا بالسجل.\n`);
 
-  const allRows = [...xlsxRows, ...pdfRows];
+  const allRows = pdfRows;
   const matchedRows = allRows.filter((r) => byAcademicId.has(String(r.studentId)));
   const unmatchedIds = new Set(allRows.filter((r) => !byAcademicId.has(String(r.studentId))).map((r) => r.studentId));
   const matchedTerms = termSummaries.filter((t) => byAcademicId.has(String(t.studentId)));
@@ -337,11 +303,7 @@ async function main() {
     console.log(`ملفات PDF فيها خطأ (${pdfErrors.length}):`);
     printCapped(pdfErrors, (e) => `  - ${path.basename(e.file)}: ${e.reason}`);
   }
-  if (xlsxSkipped.length) {
-    console.log(`ملفات إكسل تم تجاهلها (${xlsxSkipped.length}):`);
-    printCapped(xlsxSkipped, (s) => `  - ${path.basename(s.file)}: ${s.reason}`);
-  }
-  console.log(`صفوف درجات (إكسل + PDF) قبل المطابقة: ${allRows.length}`);
+  console.log(`صفوف درجات (PDF) قبل المطابقة: ${allRows.length}`);
   console.log(`صفوف مطابقة لطالب بالسجل: ${matchedRows.length}`);
   if (unmatchedIds.size) {
     console.log(`أرقام أكاديمية غير مطابقة لأي طالب بالسجل (${unmatchedIds.size}): ${[...unmatchedIds].join("، ")}`);
