@@ -31,6 +31,18 @@ test('parseCurriculumTemplateSheets parses only the tracks whose sheet is presen
   assert.deepEqual(templates['الصناعي'][1].codes, ['', '', 'كود803', '', '', '']);
 });
 
+test('parseCurriculumTemplateSheets matches sheet names by containment, not exact match — the real combined workbook names them "مقررات الصناعي"/"مقررات التجاري"', () => {
+  const sheets = {
+    'كشف الطلاب': [HEADER],
+    'مقررات الصناعي': [HEADER, ['قسم أ', 'تخصصية', 'كود801', '', '', '', '', '']],
+    'مقررات التجاري': [HEADER, ['قسم ب', 'تخصصية', 'كود802', '', '', '', '', '']],
+  };
+  const templates = parseCurriculumTemplateSheets(sheets);
+  assert.deepEqual(new Set(Object.keys(templates)), new Set(['الصناعي', 'التجاري']));
+  assert.equal(templates['الصناعي'][0].department, 'قسم أ');
+  assert.equal(templates['التجاري'][0].department, 'قسم ب');
+});
+
 test('commitCurriculumTemplates writes only the tracks given, and loadCurriculumTemplates reads them back', async () => {
   const templates = { 'الصناعي': [{ department: 'قسم أ', type: 'تخصصية', codes: ['كود801', '', '', '', '', ''] }] };
   const result = await commitCurriculumTemplates(templates);

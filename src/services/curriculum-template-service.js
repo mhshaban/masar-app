@@ -1,8 +1,12 @@
-// استيراد قالب المقررات (شيتا "الصناعي" و"التجاري") من نفس ملف كشف
+// استيراد قالب المقررات (شيتا مسار الصناعي والتجاري) من نفس ملف كشف
 // المدرسة الشامل — اختياري تمامًا: لو الشيتان غير موجودين بالملف، لا يتأثر
 // بقية الاستيراد (الطلبة/المعلمين/المرفعين) ويبقى قالب المقررات المحفوظ
 // كما هو. هذا يلغي الحاجة لطلب تحديث الكود يدويًا كل مرة يصدر ملف
 // "المقررات.xlsx" محدَّث — يكفي إضافة شيتيه لملف كشف المدرسة الشامل.
+//
+// اسم الشيت يُطابَق بالاحتواء لا بالتطابق الحرفي (نفس أسلوب findSheet
+// بـschool-data-import-service.js) — الملف الفعلي المستخدم سمّاها "مقررات
+// الصناعي"/"مقررات التجاري" وليس "الصناعي"/"التجاري" وحدهما.
 import { list, bulkPut } from "./cloud-runtime.js";
 import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-curriculum-import-1";
 
@@ -26,14 +30,20 @@ function parseTrackSheet(rows) {
   return departments;
 }
 
+function findTrackSheetName(sheetNames, track) {
+  return sheetNames.find((name) => clean(name).includes(track));
+}
+
 // يرجّع {} لو ما فيه أي شيت من الشيتين بالملف — تمييز متعمَّد عن "شيت
 // موجود لكن فارغ" حتى تقدر شاشة الاستيراد تعرض حالة واضحة (سيُحدَّث/لن
 // يتغيّر) بدل افتراض غامض.
 export function parseCurriculumTemplateSheets(sheets) {
   const templates = {};
+  const sheetNames = Object.keys(sheets);
   for (const track of TRACKS) {
-    if (!sheets[track]) continue;
-    const departments = parseTrackSheet(sheets[track]);
+    const sheetName = findTrackSheetName(sheetNames, track);
+    if (!sheetName) continue;
+    const departments = parseTrackSheet(sheets[sheetName]);
     if (departments.length) templates[track] = departments;
   }
   return templates;
