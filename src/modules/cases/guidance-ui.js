@@ -232,7 +232,7 @@ async function renderCaseDetail(container, id, onBack) {
 export async function mountCasesView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>المتابعات والحالات الإرشادية</h1><div class="sub">حالة تُفتح للطالب، مع جلسات متابعة عبر الوقت — مرشَّحة تلقائيًا من الدرجات المستوردة</div></div>
+      <div><h1>المتابعات والحالات الإرشادية</h1></div>
       <button class="btn btn-ghost" id="cases-export-btn">تصدير Word</button>
     </div>
     <div id="cases-new-form" style="margin-bottom:16px;"></div>

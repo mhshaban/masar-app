@@ -177,7 +177,7 @@ export async function mountDashboardView(container, { onGoto }) {
 
   container.innerHTML = `<div class="daily-dashboard">
     <header class="daily-hero">
-      <div class="daily-hero-title"><span class="daily-accent" aria-hidden="true"></span><div><h1>أولويات اليوم</h1><p>لوحة العمل اليومية — قراءة مباشرة من بيانات مسار الحقيقية</p></div></div>
+      <div class="daily-hero-title"><span class="daily-accent" aria-hidden="true"></span><div><h1>أولويات اليوم</h1><p>لوحة العمل اليومية</p></div></div>
       <div class="daily-hero-meta">
         <strong>${esc(todayLabel)} · قسم الإرشاد الأكاديمي والتوجيه المهني</strong>
       </div>

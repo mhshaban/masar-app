@@ -199,7 +199,7 @@ async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
 export async function mountAgendaView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>الأجندة التنفيذية</h1><div class="sub">كل إجراءات خطة القسم — مجمّعة افتراضيًا بحسب تاريخ التنفيذ، أو بحسب نص الفترة الأصلي من الملف</div></div>
+      <div><h1>الأجندة التنفيذية</h1></div>
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
     </div>
     <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
