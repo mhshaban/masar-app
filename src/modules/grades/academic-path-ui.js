@@ -10,7 +10,7 @@ export function renderCertificateResults(certificate) {
 }
 
 async function mountCertificateResults(root, student, onCertificates) {
-  root.innerHTML = `<div class="certificate-heading"><h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button><button class="btn btn-ghost" data-folder>اختيار مجلد مسار</button><label class="btn btn-ghost">اختيار شهادة PDF<input data-certificate type="file" accept=".pdf" multiple hidden></label></div></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div class="schedule-controls certificate-controls"><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div></div><div data-results></div></section>`;
+  root.innerHTML = `<div class="certificate-heading"><h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button></div></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div class="schedule-controls certificate-controls"><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div></div><div data-results></div></section>`;
   const status = root.querySelector("[data-status]");
   const results = root.querySelector("[data-results]");
   const preview = root.querySelector("[data-preview]");
@@ -48,28 +48,22 @@ async function mountCertificateResults(root, student, onCertificates) {
     }
     status.textContent = [certificates.length ? `تم عرض ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
   }
-  async function loadFolder(prompt) {
+  async function loadFolder() {
     const ticket = ++version;
     status.textContent = "جارٍ البحث عن شهادة الطالب…";
     try {
-      const found = await findStudentCertificates(student, { prompt, refresh: prompt });
+      const found = await findStudentCertificates(student, { prompt: false, refresh: false });
       if (ticket !== version || !root.isConnected) return;
       if (!found.files.length) {
-        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي؛ يمكنك اختيار ملف الشهادة مباشرة." : "اختر مجلد مسار أو ملف الشهادة لعرضها.";
+        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي بمجلد مسار." : 'مجلد مسار غير متصل — اتصل به من الإدارة ← الاستيراد ← "تحديث المعدلات".';
         return;
       }
       await readFiles(found.files, ticket);
-    } catch (error) { if (ticket === version) status.textContent = error.name === "AbortError" ? "أُلغي اختيار المجلد." : error.message; }
+    } catch (error) { if (ticket === version) status.textContent = error.message; }
   }
   root.querySelector("[data-show]").addEventListener("click", () => {
     if (loadedCertificates.length) preview.hidden = false;
-    else void loadFolder(false);
-  });
-  root.querySelector("[data-folder]").addEventListener("click", () => loadFolder(true));
-  root.querySelector("[data-certificate]").addEventListener("change", (event) => {
-    const files = [...event.target.files];
-    if (files.length) void readFiles(files, ++version);
-    event.target.value = "";
+    else void loadFolder();
   });
 }
 
