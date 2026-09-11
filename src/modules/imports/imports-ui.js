@@ -142,7 +142,7 @@ async function mountAveragesTab(root) {
   root.innerHTML = `
     <div class="card">
       <h2>تحديث معدلات الطلبة من الشهادات</h2>
-      <p class="hint">يمسح مجلد "مسار" المحلي بحثًا عن شهادات PDF (نفس المجلد المستخدَم لصور/جداول/شهادات الطلبة)، ويحسب معدل كل طالب من شهاداته الرسمية فقط — استبدال كامل لكل المعدلات الحالية، لا تراكم.</p>
+      <p class="hint">يمسح مجلد "مسار" المحلي بحثًا عن شهادات PDF (نفس المجلد المستخدَم لصور/جداول/شهادات الطلبة وصور المعلمين)، ويحسب معدل كل طالب من شهاداته الرسمية فقط — استبدال كامل لكل المعدلات الحالية، لا تراكم.</p>
       <p class="hint" id="averages-folder-status"></p>
       <button class="btn btn-primary" id="averages-scan">اختيار مجلد الشهادات ومسحه</button>
       <button class="btn btn-ghost" id="averages-reset-folder">إعادة تعيين مجلد "مسار"</button>
