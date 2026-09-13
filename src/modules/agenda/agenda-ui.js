@@ -1,8 +1,8 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
 import { saveProgress, addAttachmentLink, removeAttachment } from "../execution/execution-service.js?v=2026-09-06-onedrive-links-1";
-import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
+import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -238,6 +238,6 @@ export async function mountAgendaView(container) {
   container.querySelector("#agenda-export-btn").addEventListener("click", async () => {
     const entries = await listAgendaEntries();
     const html = buildAgendaReportHtml(entries, new Date().toLocaleString("ar-BH"));
-    downloadAsWordDoc("تقرير الإجراءات", html, `تقرير-الاجراءات-${new Date().toISOString().slice(0, 10)}`);
+    downloadAsWordDoc("تقرير الإجراءات", html, `تقرير-الاجراءات-${new Date().toISOString().slice(0, 10)}`, { orientation: "landscape" });
   });
 }

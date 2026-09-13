@@ -37,6 +37,16 @@ test("listAgendaEntries includes projectId/no explicitly on each entry, not just
   assert.equal(entries[0].no, 7);
 });
 
+test("listAgendaEntries carries the project's explicit order as projectOrder, falling back to Infinity when unset — the Word export groups programs by this, not by arbitrary fetch order", async () => {
+  await bulkPut("departmentPlanProjects", [
+    { id: "p1", pillar: "القيادة", project_title: "م", order: 3, actions: [{ no: 1, action: "أ" }] },
+    { id: "p2", pillar: "القيادة", project_title: "ن", actions: [{ no: 1, action: "ب" }] },
+  ]);
+  const entries = await listAgendaEntries();
+  assert.equal(entries.find((e) => e.projectId === "p1").projectOrder, 3);
+  assert.equal(entries.find((e) => e.projectId === "p2").projectOrder, Infinity);
+});
+
 test("groupByPeriod orders groups chronologically by their earliest periodStart, not by the order actions appear in the file (real bug reported by the counselor)", async () => {
   await bulkPut("departmentPlanProjects", [
     {

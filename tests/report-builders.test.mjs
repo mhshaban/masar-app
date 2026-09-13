@@ -71,6 +71,34 @@ test("buildAgendaReportHtml renders one row per entry with Arabic status labels"
   assert.equal((html.match(/<tr>/g) || []).length, 3); // header + 2 rows
 });
 
+test("buildAgendaReportHtml renders the target category, execution date range, and participating departments columns", () => {
+  const entries = [
+    {
+      pillar: "القيادة", project_title: "م", action: "إجراء", target: "طلاب المدرسة", follower: "الإعلام المدرسي والقيادة",
+      periodStart: "2026-09-06", periodEnd: "2026-09-17", progress: { status: "not_started" },
+    },
+  ];
+  const html = buildAgendaReportHtml(entries, "2026-08-01");
+  assert.match(html, /طلاب المدرسة/);
+  assert.match(html, /الإعلام المدرسي والقيادة/);
+  assert.match(html, /٦ سبتمبر ٢٠٢٦ - ١٧ سبتمبر ٢٠٢٦/);
+});
+
+test("buildAgendaReportHtml groups entries by pillar (in the fixed order) then by project, ordered by the project's explicit `order` — not by their arbitrary order of appearance in `entries`", () => {
+  const entries = [
+    { pillar: "التطور الشخصي", projectId: "p-tt", project_title: "برنامج ب", projectOrder: 1, action: "إجراء التطور", progress: { status: "not_started" } },
+    { pillar: "الانجاز الاكاديمي", projectId: "p-later", project_title: "برنامج متأخر", projectOrder: 2, action: "إجراء متأخر", progress: { status: "not_started" } },
+    { pillar: "الانجاز الاكاديمي", projectId: "p-first", project_title: "برنامج أول", projectOrder: 1, action: "إجراء أول", progress: { status: "not_started" } },
+  ];
+  const html = buildAgendaReportHtml(entries, "2026-08-01");
+  const pillarPos = html.indexOf("المحور: الانجاز الاكاديمي");
+  const pillarPos2 = html.indexOf("المحور: التطور الشخصي");
+  assert.ok(pillarPos !== -1 && pillarPos2 !== -1 && pillarPos < pillarPos2, "الانجاز الاكاديمي must come before التطور الشخصي, per the fixed pillar order");
+  const firstPos = html.indexOf("برنامج أول");
+  const laterPos = html.indexOf("برنامج متأخر");
+  assert.ok(firstPos !== -1 && laterPos !== -1 && firstPos < laterPos, "برنامج أول (order 1) must come before برنامج متأخر (order 2)");
+});
+
 test("buildGuidanceCasesReportHtml lists each case's sessions in a table, or a placeholder row when empty", () => {
   const cases = [
     { studentName: "طالب أول", category: "أكاديمية", status: "open", title: "متابعة", sessions: [{ date: "2026-01-01", note: "جلسة أولى", nextStep: "متابعة" }] },

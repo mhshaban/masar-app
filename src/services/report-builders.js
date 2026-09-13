@@ -129,24 +129,75 @@ export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
   `;
 }
 
+const AGENDA_PILLAR_ORDER = ["الانجاز الاكاديمي", "التطور الشخصي", "القيادة"];
+
+// "YYYY-MM-DD" -> "6 سبتمبر 2026" — يبني التاريخ محليًا بمكوّناته الرقمية
+// صراحةً (لا تحليل ISO عبر `new Date(iso)` مباشرة) لتفادي انزياح المنطقة
+// الزمنية اللي ممكن يحوّل اليوم لتاريخ مجاور (نفس أسلوب monthLabel
+// بـagenda-service.js).
+function formatPlanDate(iso) {
+  if (!iso) return null;
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("ar-BH", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function agendaExecutionDate(e) {
+  const start = formatPlanDate(e.periodStart);
+  const end = formatPlanDate(e.periodEnd);
+  if (start && end) return start === end ? start : `${start} - ${end}`;
+  return start || end || "—";
+}
+
+// مجمَّع بحسب المحور (بترتيب ثابت) ثم البرنامج داخله — بترتيب `order`
+// الصريح المخزَّن بالمشروع (لا بترتيب استرجاع البيانات العشوائي، نفس سبب
+// اعتماد `order` بـlistProjectsByPillar في department-plan-service.js)،
+// فتظهر البرامج ١، ٢، ٣... بدل ترتيب عشوائي.
 export function buildAgendaReportHtml(entries, exportedAt) {
+  const pillars = new Map();
+  for (const e of entries) {
+    if (!pillars.has(e.pillar)) pillars.set(e.pillar, new Map());
+    const projects = pillars.get(e.pillar);
+    if (!projects.has(e.projectId)) projects.set(e.projectId, { title: e.project_title, order: e.projectOrder ?? Infinity, entries: [] });
+    projects.get(e.projectId).entries.push(e);
+  }
+
+  const pillarNames = [...pillars.keys()].sort((a, b) => {
+    const ia = AGENDA_PILLAR_ORDER.indexOf(a);
+    const ib = AGENDA_PILLAR_ORDER.indexOf(b);
+    return (ia === -1 ? AGENDA_PILLAR_ORDER.length : ia) - (ib === -1 ? AGENDA_PILLAR_ORDER.length : ib);
+  });
+
   return `
     <h1>تقرير الإجراءات (الأجندة التنفيذية)</h1>
     <p class="meta">تاريخ التصدير: ${esc(exportedAt)} — ${entries.length} إجراءً</p>
-    <table>
-      <tr><th>المحور</th><th>المشروع</th><th>الإجراء</th><th>الحالة</th><th>المستفيدون</th><th>الثبوتية</th><th>تقرير الفعالية</th></tr>
-      ${entries.map((e) => `
-        <tr>
-          <td>${esc(e.pillar)}</td>
-          <td>${esc(e.project_title || "")}</td>
-          <td>${esc(e.action)}</td>
-          <td>${esc(AGENDA_STATUS_LABELS[e.progress.status] || e.progress.status)}</td>
-          <td>${e.progress.participantsCount ?? "—"}</td>
-          <td>${esc(e.progress.proofNote || "—")}</td>
-          <td>${esc(e.progress.effectivenessReport || "—")}</td>
-        </tr>
-      `).join("")}
-    </table>
+    ${pillarNames.map((pillar) => {
+      const projects = [...pillars.get(pillar).values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, "ar"));
+      return `
+        <h2>المحور: ${esc(pillar)}</h2>
+        ${projects.map((project) => `
+          <h3>البرنامج: ${esc(project.title)}</h3>
+          <table>
+            <tr>
+              <th>#</th><th>الإجراء</th><th>الفئة المستهدفة</th><th>تاريخ التنفيذ</th><th>الأقسام المشاركة</th>
+              <th>الحالة</th><th>المستفيدون</th><th>الثبوتية</th><th>تقرير الفعالية</th>
+            </tr>
+            ${project.entries.map((e, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${esc(e.action)}</td>
+                <td>${esc(e.target || "—")}</td>
+                <td>${esc(agendaExecutionDate(e))}</td>
+                <td>${esc(e.follower || "—")}</td>
+                <td>${esc(AGENDA_STATUS_LABELS[e.progress.status] || e.progress.status)}</td>
+                <td>${e.progress.participantsCount ?? "—"}</td>
+                <td>${esc(e.progress.proofNote || "—")}</td>
+                <td>${esc(e.progress.effectivenessReport || "—")}</td>
+              </tr>
+            `).join("")}
+          </table>
+        `).join("")}
+      `;
+    }).join("")}
   `;
 }
 

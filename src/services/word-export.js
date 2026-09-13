@@ -10,7 +10,7 @@ function escTitle(str) {
   }[c]));
 }
 
-export function buildWordDocumentHtml(title, bodyHtml) {
+export function buildWordDocumentHtml(title, bodyHtml, { orientation = "portrait" } = {}) {
   const defaultApproval = bodyHtml.includes('class="document-approval"') ? "" : '<div class="document-approval"><strong>الإجراء والتوثيق</strong><table><tr><td>المسؤول: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>';
   const html = `<!doctype html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -18,7 +18,7 @@ export function buildWordDocumentHtml(title, bodyHtml) {
 <meta charset="utf-8">
 <title>${escTitle(title)}</title>
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 ${orientation === "landscape" ? "landscape" : "portrait"}; margin: 12mm; }
   html, body { width: 100%; }
   body { font-family: "Cairo", "Arial", sans-serif; direction: rtl; font-size: 10pt; line-height: 1.35; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
@@ -45,8 +45,8 @@ export function buildWordDocumentHtml(title, bodyHtml) {
   return html;
 }
 
-export function downloadAsWordDoc(title, bodyHtml, filename) {
-  const html = buildWordDocumentHtml(title, bodyHtml);
+export function downloadAsWordDoc(title, bodyHtml, filename, options = {}) {
+  const html = buildWordDocumentHtml(title, bodyHtml, options);
   const blob = new Blob(["﻿", html], { type: "application/msword" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

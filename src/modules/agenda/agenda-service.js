@@ -18,6 +18,7 @@ export async function listAgendaEntries() {
         // يحتوي شرطة "-" (صيغة معرّفات cloud-runtime.js: طابع زمني-عشوائي)،
         // فتفكيك id بحثًا عن "-a" غير موثوق أبدًا.
         projectId: project.id,
+        projectOrder: project.order ?? Infinity,
         no: action.no,
         pillar: project.pillar,
         project_title: project.project_title,
