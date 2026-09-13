@@ -1,5 +1,5 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { listAgendaEntries } from "../agenda/agenda-service.js";
+import { listAgendaEntries } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
 
 function aggregateStatus(entries) {
   if (!entries.length) return "not_started";
