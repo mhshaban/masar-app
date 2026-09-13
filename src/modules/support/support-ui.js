@@ -5,8 +5,8 @@ import {
 } from "./support-service.js";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js";
-import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
+import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

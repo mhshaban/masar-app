@@ -5,8 +5,8 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-08-form-fields-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-08-print-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
