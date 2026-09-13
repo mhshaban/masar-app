@@ -10,7 +10,20 @@ function escTitle(str) {
   }[c]));
 }
 
+// Real Microsoft Word's HTML/MHTML import filter ignores the plain CSS3
+// `@page { size: A4 landscape }` on its own (confirmed: a first attempt at
+// this shipped with only that rule and still opened portrait in Word) — it
+// only honors its own `mso-page-orientation` descriptor on a *named* page
+// section (`@page Section1`), with the page's physical `size` given in
+// points and pre-swapped for landscape, applied to content via
+// `div.Section1 { page: Section1; }`. The plain `@page` rule is kept
+// alongside it for browsers/print-preview, which ignore the unfamiliar
+// `Section1`/`mso-*` rule but do understand the CSS3 one.
+const A4_PORTRAIT_PT = "595.3pt 841.9pt";
+const A4_LANDSCAPE_PT = "841.9pt 595.3pt";
+
 export function buildWordDocumentHtml(title, bodyHtml, { orientation = "portrait" } = {}) {
+  const landscape = orientation === "landscape";
   const defaultApproval = bodyHtml.includes('class="document-approval"') ? "" : '<div class="document-approval"><strong>الإجراء والتوثيق</strong><table><tr><td>المسؤول: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>';
   const html = `<!doctype html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -18,7 +31,9 @@ export function buildWordDocumentHtml(title, bodyHtml, { orientation = "portrait
 <meta charset="utf-8">
 <title>${escTitle(title)}</title>
 <style>
-  @page { size: A4 ${orientation === "landscape" ? "landscape" : "portrait"}; margin: 12mm; }
+  @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 12mm; }
+  @page Section1 { size: ${landscape ? A4_LANDSCAPE_PT : A4_PORTRAIT_PT}; mso-page-orientation: ${landscape ? "landscape" : "portrait"}; margin: 12mm; }
+  div.Section1 { page: Section1; }
   html, body { width: 100%; }
   body { font-family: "Cairo", "Arial", sans-serif; direction: rtl; font-size: 10pt; line-height: 1.35; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
@@ -39,7 +54,7 @@ export function buildWordDocumentHtml(title, bodyHtml, { orientation = "portrait
   .document-entry-footer span { display: block; margin-top: 2px; }
 </style>
 </head>
-<body dir="rtl"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}${defaultApproval}</body>
+<body dir="rtl"><div class="Section1"><div class="document-header">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${bodyHtml}${defaultApproval}</div></body>
 </html>`;
 
   return html;
