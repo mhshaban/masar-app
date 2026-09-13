@@ -47,43 +47,67 @@ test("listAgendaEntries carries the project's explicit order as projectOrder, fa
   assert.equal(entries.find((e) => e.projectId === "p2").projectOrder, Infinity);
 });
 
-test("groupByPeriod orders groups chronologically by their earliest periodStart, not by the order actions appear in the file (real bug reported by the counselor)", async () => {
+test("groupByPeriod orders groups by the month/week named in the period text itself, not by periodStart — the same period text is often tagged with wildly inconsistent periodStart values across its own actions (real bug reported by the counselor: whole groups jumped to the top of the list because one of their actions happened to carry an early periodStart, even though the text clearly names a later week)", async () => {
   await bulkPut("departmentPlanProjects", [
     {
       id: "p1",
       pillar: "القيادة",
       project_title: "م",
       actions: [
-        // بالملف الأصلي "20 سبتمبر" يظهر قبل "الأسبوع الثاني من سبتمبر" رغم
-        // إنه أبكر منه فعليًا — هذا بالضبط الخلل المُبلَّغ عنه.
-        { no: 1, action: "متأخر بالنص لكنه أبكر فعليًا", period: "20 سبتمبر", periodStart: "2026-09-05" },
-        { no: 2, action: "أول بالنص لكنه أبكر فعليًا", period: "الأسبوع الثاني من سبتمبر", periodStart: "2026-09-08" },
+        // "الأسبوع الرابع" (متأخر بالنص) لكن periodStart مبكر جدًا (تقريب
+        // خشن عند إدخال البيانات) — يجب ألا يقفز لأول الترتيب بسببه.
+        { no: 1, action: "أ", period: "الأسبوع الرابع من سبتمبر", periodStart: "2026-09-01" },
+        { no: 2, action: "ب", period: "الأسبوع الأول من سبتمبر", periodStart: "2026-09-17" },
+        { no: 3, action: "ج", period: "الأسبوع الثاني من أكتوبر", periodStart: "2026-09-06" },
       ],
     },
   ]);
 
   const entries = await listAgendaEntries();
   const groups = await groupByPeriod(entries);
-  assert.deepEqual([...groups.keys()], ["20 سبتمبر", "الأسبوع الثاني من سبتمبر"]);
+  assert.deepEqual([...groups.keys()], ["الأسبوع الأول من سبتمبر", "الأسبوع الرابع من سبتمبر", "الأسبوع الثاني من أكتوبر"]);
 });
 
-test("groupByPeriod pushes every group with no dated action into a separate, always-last bucket, instead of mixing them with dated groups", async () => {
+test("groupByPeriod orders months by the school year (starting September), not by the calendar month number — April/May of the following calendar year must sort after September-December, not before", async () => {
   await bulkPut("departmentPlanProjects", [
     {
       id: "p1",
       pillar: "القيادة",
       project_title: "م",
       actions: [
-        { no: 1, action: "غير مؤرَّخ", period: "طوال العام الدراسي" },
-        { no: 2, action: "مؤرَّخ متأخر", period: "لاحقًا", periodStart: "2026-12-01" },
+        { no: 1, action: "أ", period: "منتصف شهر أبريل" },
+        { no: 2, action: "ب", period: "الأسبوع الأول من سبتمبر" },
+        { no: 3, action: "ج", period: "الأسبوع الأول من نوفمبر" },
       ],
     },
   ]);
 
   const entries = await listAgendaEntries();
   const groups = await groupByPeriod(entries);
-  const keys = [...groups.keys()];
-  assert.deepEqual(keys, ["لاحقًا", "طوال العام الدراسي"], "the dated group must sort before the undated one regardless of insertion order");
+  assert.deepEqual([...groups.keys()], ["الأسبوع الأول من سبتمبر", "الأسبوع الأول من نوفمبر", "منتصف شهر أبريل"]);
+});
+
+test("groupByPeriod pushes the known whole-year/whole-term periods (no specific month) after every month-specific period, in the fixed order the counselor asked for, and pushes actions with no period text at all to the very end", async () => {
+  await bulkPut("departmentPlanProjects", [
+    {
+      id: "p1",
+      pillar: "القيادة",
+      project_title: "م",
+      actions: [
+        { no: 1, action: "أ" }, // بلا period إطلاقًا
+        { no: 2, action: "ب", period: "الفصل الدراسي الثاني" },
+        { no: 3, action: "ج", period: "طوال العام الدراسي" },
+        { no: 4, action: "د", period: "الأسبوع الأول من سبتمبر" },
+        { no: 5, action: "هـ", period: "الفصلان الدراسيان" },
+      ],
+    },
+  ]);
+
+  const entries = await listAgendaEntries();
+  const groups = await groupByPeriod(entries);
+  assert.deepEqual([...groups.keys()], [
+    "الأسبوع الأول من سبتمبر", "طوال العام الدراسي", "الفصلان الدراسيان", "الفصل الدراسي الثاني", "بلا فترة محددة",
+  ]);
 });
 
 test("groupByPeriod also sorts the actions inside one group chronologically by periodStart (then periodEnd), not by their original order in the file", async () => {

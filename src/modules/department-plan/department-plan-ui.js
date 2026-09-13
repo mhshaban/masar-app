@@ -13,8 +13,8 @@ import {
   searchActions,
   getProject,
 } from "./department-plan-service.js";
-import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js";
-import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js";
+import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
+import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js?v=2026-09-13-period-order-fix-1";
 import { saveProgress } from "../execution/execution-service.js";
 import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";

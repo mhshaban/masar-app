@@ -1,5 +1,5 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js";
+import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js?v=2026-09-13-period-order-fix-1";
 import { saveProgress, addAttachmentLink, removeAttachment } from "../execution/execution-service.js?v=2026-09-06-onedrive-links-1";
 import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";

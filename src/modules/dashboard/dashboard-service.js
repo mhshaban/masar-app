@@ -1,4 +1,4 @@
-import { getAgendaProgressSummary } from "../agenda/agenda-service.js";
+import { getAgendaProgressSummary } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
 import { listStudentsNeedingAttention } from "./followup-needs-service.js?v=2026-09-07-academic-fix-1";
 import { listStaleOpenCases } from "../cases/guidance-service.js";
 import { listOverdueActions } from "../support/support-service.js";
