@@ -40,13 +40,9 @@ const DEPARTMENT_FORM_FIELD_ORDER = {
 function departmentFormWorkflow(item) {
   if (item.kind === "section_change") return `<div class="document-approval"><strong>القرار والتوثيق</strong><p>☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</p><table><tr><td>مدير المدرسة/من ينوب عنه: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>`;
   if (item.kind === "consent") {
-    // الطلب لسا بانتظار رد ولي الأمر — لا قيمة حقيقية بعد لأي من حقول
-    // الإقرار (الاسم/الرقم الشخصي/التاريخ/التوقيع)، فطباعتها فارغة أصلًا
-    // تشوّش الاستمارة بدل ما تفيد؛ تُطبَع فقط بعد أن يصل رد فعلي. عنصر
-    // فارغ (لا نص فاضٍ) لأن buildWordDocumentHtml يحقن كتلة "الإجراء
-    // والتوثيق" العامة تلقائيًا لأي استمارة بلا `class="document-approval"`
-    // إطلاقًا — كنا سنُعيد بالضبط نفس حقول التوقيع اللي طُلِب حذفها، بعنوان مختلف فقط.
-    if (item.status === "pending") return '<div class="document-approval" style="display:none"></div>';
+    // هذه هي بطاقة الموافقة الكتابية نفسها: تُطبَع دائمًا، بانتظار الرد أو
+    // بعده — فالغرض من تصدير الاستمارة أصلًا هو تسليمها لولي الأمر ليعبّئها
+    // ويوقّعها بخط يده؛ الحقول الفارغة تظهر كخطوط منقّطة جاهزة للتعبئة.
     const response = item.fields?.guardianResponse;
     return `<div class="document-approval"><strong>إقرار ولي الأمر</strong><p>${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</p><table><tr><th>الاسم</th><td>${esc(item.fields?.guardianName || "................................")}</td><th>الرقم الشخصي</th><td>${esc(item.fields?.guardianPersonalNo || "................................")}</td></tr><tr><th>التاريخ</th><td>${esc(item.fields?.responseDate || "........ / ........ / ................")}</td><th>التوقيع</th><td>${esc(item.fields?.signature || "................................")}</td></tr></table></div>`;
   }
