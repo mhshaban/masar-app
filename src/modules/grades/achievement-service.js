@@ -27,16 +27,25 @@ export const TIER_LABELS = { high: "متفوقون", medium: "متوسطو ال�
 // Cowork outside Masar — see grade-flags-service.js for the full data-flow
 // note). This classification screen only applies the counselor's own
 // rating scale to those precomputed numbers; it never sees a raw score row.
+//
+// The student's overall average here is finalCumulativeAverage first —
+// the cumulative average printed on the student's own official transcript
+// — falling back to overallPct (a plain mean across whatever subject rows
+// were captured) only when it's missing. overallPct alone is unreliable
+// whenever a student's certificate only had a handful of subject rows
+// matched (an incomplete scan, a missing term): a couple of low subjects
+// there skew the mean far below the real, officially printed average.
 export async function computeStudentAchievement() {
   const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
   const studentById = new Map(students.map((s) => [String(s.id), s]));
 
   const rows = [];
   for (const f of flags) {
-    if (!f.studentId || f.overallPct == null) continue;
+    const overallSource = f.finalCumulativeAverage ?? f.overallPct;
+    if (!f.studentId || overallSource == null) continue;
     const student = studentById.get(String(f.studentId));
     if (!student) continue;
-    const avgPct = Math.round(Number(f.overallPct));
+    const avgPct = Math.round(Number(overallSource));
     const subjects = f.subjects || [];
     const weakSubjects = subjects
       .filter((s) => s.pct != null && Math.round(Number(s.pct)) < 50)
@@ -57,7 +66,7 @@ export async function computeStudentAchievement() {
     });
   }
 
-  return rows.sort((a, b) => a.avgPct - b.avgPct);
+  return rows.sort((a, b) => b.avgPct - a.avgPct);
 }
 
 // Same classification, but per SUBJECT rather than overall average — a

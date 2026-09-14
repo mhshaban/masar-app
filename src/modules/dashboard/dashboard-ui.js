@@ -1,7 +1,7 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
-import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-07-academic-fix-1";
-import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-13-period-order-fix-1";
+import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";

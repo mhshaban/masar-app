@@ -17,6 +17,12 @@ const FAIL_THRESHOLD_PCT = 50;
 // Students with no academicFlags row yet, or with nothing below threshold,
 // are simply absent from the result — this is a suggestion list, not a
 // roster.
+//
+// The overall average used below is finalCumulativeAverage (the official
+// transcript-printed cumulative average) first, falling back to overallPct
+// only when it's missing — see the same note in achievement-service.js for
+// why overallPct alone can be badly skewed for a student whose certificate
+// only had a handful of subject rows matched.
 export async function computeStudentGradeSummaries() {
   const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
   const currentStudentIds = new Set(students.map((student) => String(student.id)));
@@ -25,7 +31,8 @@ export async function computeStudentGradeSummaries() {
   for (const f of flags) {
     if (!f.studentId) continue;
     if (!currentStudentIds.has(String(f.studentId))) continue;
-    const overallPct = f.overallPct == null ? null : Number(f.overallPct);
+    const overallSource = f.finalCumulativeAverage ?? f.overallPct;
+    const overallPct = overallSource == null ? null : Number(overallSource);
     const failingSubjects = (f.subjects || []).filter((s) => s.pct != null && Math.round(Number(s.pct)) < FAIL_THRESHOLD_PCT);
     const barredCount = Number(f.barredCount) || 0;
     const absentCount = Number(f.absentCount) || 0;

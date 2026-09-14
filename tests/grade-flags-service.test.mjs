@@ -61,3 +61,15 @@ test("computeStudentGradeSummaries ignores a stale academic record outside the c
   await bulkPut("academicFlags", [{ id: "old", studentId: "old", overallPct: 30, subjects: [] }]);
   assert.deepEqual(await computeStudentGradeSummaries(), []);
 });
+
+test("computeStudentGradeSummaries prefers finalCumulativeAverage (the official transcript average) over overallPct when both are present", async () => {
+  // overallPct هنا منحرف جدًا (شهادة التُقطت لها مادة واحدة فقط، ونجاحها فيها
+  // 68% أعلى من حد الرسوب) بينما finalCumulativeAverage هو الرقم الرسمي
+  // المطبوع بالشهادة — يجب اعتماده بدل overallPct المنحرف.
+  await bulkPut("students", [{ id: "s5", name: "طالب خامس" }]);
+  await bulkPut("academicFlags", [
+    { id: "s5", studentId: "s5", overallPct: 5, finalCumulativeAverage: 68, subjects: [{ subject: "الثقافة المرورية", pct: 68 }], absentCount: 0, barredCount: 0 },
+  ]);
+  const summaries = await computeStudentGradeSummaries();
+  assert.equal(summaries.length, 0, "68% is above the failing threshold, so the student should not be flagged");
+});
