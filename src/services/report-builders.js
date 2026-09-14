@@ -40,8 +40,15 @@ const DEPARTMENT_FORM_FIELD_ORDER = {
 function departmentFormWorkflow(item) {
   if (item.kind === "section_change") return `<div class="document-approval"><strong>القرار والتوثيق</strong><p>☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</p><table><tr><td>مدير المدرسة/من ينوب عنه: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>`;
   if (item.kind === "consent") {
+    // الطلب لسا بانتظار رد ولي الأمر — لا قيمة حقيقية بعد لأي من حقول
+    // الإقرار (الاسم/الرقم الشخصي/التاريخ/التوقيع)، فطباعتها فارغة أصلًا
+    // تشوّش الاستمارة بدل ما تفيد؛ تُطبَع فقط بعد أن يصل رد فعلي. عنصر
+    // فارغ (لا نص فاضٍ) لأن buildWordDocumentHtml يحقن كتلة "الإجراء
+    // والتوثيق" العامة تلقائيًا لأي استمارة بلا `class="document-approval"`
+    // إطلاقًا — كنا سنُعيد بالضبط نفس حقول التوقيع اللي طُلِب حذفها، بعنوان مختلف فقط.
+    if (item.status === "pending") return '<div class="document-approval" style="display:none"></div>';
     const response = item.fields?.guardianResponse;
-    return `<div class="document-approval"><strong>إقرار ولي الأمر</strong><p>${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</p><table><tr><td>الاسم: ${esc(item.fields?.guardianName || "................................")}</td><td>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</td><td>التاريخ والتوقيع: ${esc(item.fields?.responseDate || "........ / ........ / ................")} &nbsp; ${esc(item.fields?.signature || "................................")}</td></tr></table></div>`;
+    return `<div class="document-approval"><strong>إقرار ولي الأمر</strong><p>${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</p><table><tr><th>الاسم</th><td>${esc(item.fields?.guardianName || "................................")}</td><th>الرقم الشخصي</th><td>${esc(item.fields?.guardianPersonalNo || "................................")}</td></tr><tr><th>التاريخ</th><td>${esc(item.fields?.responseDate || "........ / ........ / ................")}</td><th>التوقيع</th><td>${esc(item.fields?.signature || "................................")}</td></tr></table></div>`;
   }
   return `<div class="document-approval"><strong>استلام ومتابعة الجهة المحال إليها</strong><p>☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</p><table><tr><td>اسم المستلم: ................................</td><td>التاريخ: ........ / ........ / ................</td><td>التوقيع: ................................</td></tr></table></div>`;
 }
@@ -68,21 +75,28 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
     if (item.kind === "section_change" && key === "finalDecision") return "قرار إدارة المدرسة النهائي";
     return labels[key] || key;
   };
-  const requiredKeys = DEPARTMENT_FORM_FIELD_ORDER[item.kind] || [];
-  const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
+  const isConsent = item.kind === "consent";
+  // الطلب بانتظار رد ولي الأمر بعد — لا تُطبَع سوى موضوع الطلب ونصّه (ما
+  // يُطلَب من ولي الأمر فعليًا)، لا أي حقل من حقول رده (اسمه، عنوانه،
+  // رقمه الشخصي، تواصله، تاريخ رده) لأنها ببساطة لا قيمة حقيقية لها بعد.
+  const consentPending = isConsent && item.status === "pending";
+  const requiredKeys = consentPending ? ["subject", "consentText"] : DEPARTMENT_FORM_FIELD_ORDER[item.kind] || [];
+  // بانتظار الرد: لا نعرض حتى أي حقل إضافي غير معروف مخزَّن بالاستمارة —
+  // القيد هنا ليس "الحقول المطلوبة فقط" بل "لا شيء غير الموضوع والنص".
+  const extraKeys = consentPending ? [] : Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
   const rows = [...requiredKeys, ...extraKeys].map((key) => {
     const value = values[fields[key]] || fields[key] || "";
     return `<tr><th>${esc(fieldLabel(key))}</th><td class="${value ? "" : "blank-value"}">${value ? esc(value) : "&nbsp;"}</td></tr>`;
   }).join("");
   return `
     <h1>${esc(item.title || "استمارة القسم")}</h1>
-    <p class="meta">تاريخ الطلب: ${esc(item.createdDate || "—")} — تاريخ التصدير: ${esc(exportedAt)}</p>
+    <p class="meta">${isConsent ? "" : `تاريخ الطلب: ${esc(item.createdDate || "—")} — `}تاريخ التصدير: ${esc(exportedAt)}</p>
     <h2>بيانات الطالب</h2>
     <table>
       <tr><th>اسم الطالب</th><td>${esc(student.name)}</td><th>الرقم الأكاديمي</th><td>${esc(student.academicId || "—")}</td></tr>
       <tr><th>الرقم الشخصي</th><td>${esc(student.civilId || "—")}</td><th>المستوى والشعبة</th><td>${esc(student.level || "—")} / ${esc(student.section || "—")}</td></tr>
       <tr><th>المسار/التخصص</th><td colspan="3">${esc(student.track || student.specialization || "—")}</td></tr>
-      <tr><th>رغبة التخصص</th><td>${esc(student.specializationPreference ?? "") || "—"}</td><th>الحد الأدنى للتخصص</th><td>${esc(student.minSpecializationThreshold ?? "") || "—"}</td></tr>
+      ${isConsent ? "" : `<tr><th>رغبة التخصص</th><td>${esc(student.specializationPreference ?? "") || "—"}</td><th>الحد الأدنى للتخصص</th><td>${esc(student.minSpecializationThreshold ?? "") || "—"}</td></tr>`}
       <tr><th>المعدل التراكمي النهائي</th><td colspan="3">${student.finalCumulativeAverage == null ? "—" : `${esc(student.finalCumulativeAverage)}٪`}</td></tr>
     </table>
     <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>

@@ -24,6 +24,41 @@ test("buildDepartmentFormReportHtml exports student data, form content, and feed
   assert.match(html, /مدير تجريبي/);
 });
 
+test("buildDepartmentFormReportHtml prints a completed guardian-consent form without the request date or specialization fields, with the acknowledgment laid out as proper label/value rows", () => {
+  const html = buildDepartmentFormReportHtml({
+    title: "موافقة على مشاركة", kind: "consent", createdDate: "2026-09-01", status: "completed",
+    student: { name: "طالب تجريبي", academicId: "2026001", specializationPreference: "علمي", minSpecializationThreshold: 80 },
+    fields: {
+      guardianName: "ولي الأمر", address: "المنامة", subject: "زيارة ميدانية", consentText: "نص الموافقة",
+      guardianResponse: "approved", guardianPersonalNo: "999", guardianPhone: "3600", responseDate: "2026-09-02", signature: "توقيع",
+    },
+  }, "2026-09-03");
+  assert.doesNotMatch(html, /تاريخ الطلب/);
+  assert.doesNotMatch(html, /رغبة التخصص/);
+  assert.doesNotMatch(html, /الحد الأدنى للتخصص/);
+  assert.match(html, /<th>الاسم<\/th><td>ولي الأمر<\/td><th>الرقم الشخصي<\/th><td>999<\/td>/);
+  assert.match(html, /<th>التاريخ<\/th><td>2026-09-02<\/td><th>التوقيع<\/th><td>توقيع<\/td>/);
+});
+
+test("buildDepartmentFormReportHtml prints only the subject and consent text for a guardian-consent form still pending the guardian's response — none of the guardian's own fields or the acknowledgment block, since none of them have a real value yet", () => {
+  const html = buildDepartmentFormReportHtml({
+    title: "موافقة على مشاركة", kind: "consent", createdDate: "2026-09-01", status: "pending",
+    student: { name: "طالب تجريبي" },
+    fields: { guardianName: "ولي الأمر", address: "المنامة", subject: "زيارة ميدانية", consentText: "نص الموافقة", guardianPersonalNo: "999", guardianPhone: "3600" },
+  }, "2026-09-03");
+  assert.match(html, /زيارة ميدانية/);
+  assert.match(html, /نص الموافقة/);
+  assert.doesNotMatch(html, /ولي الأمر/);
+  assert.doesNotMatch(html, /المنامة/);
+  assert.doesNotMatch(html, /999/);
+  assert.doesNotMatch(html, /3600/);
+  assert.doesNotMatch(html, /إقرار ولي الأمر/);
+  // علامة فارغة لا نص فاضٍ — word-export.js يحقن كتلة "الإجراء والتوثيق"
+  // العامة تلقائيًا لأي استمارة بلا class="document-approval" إطلاقًا،
+  // وهذا كان سيُعيد بالضبط حقول التوقيع نفسها اللي يُفترَض إخفاؤها هنا.
+  assert.match(html, /class="document-approval"/);
+});
+
 test("buildDepartmentFormReportHtml attributes legacy forms to the department", () => {
   const html = buildDepartmentFormReportHtml({
     title: "استمارة قديمة", createdDate: "2026-08-01", kind: "referral",
