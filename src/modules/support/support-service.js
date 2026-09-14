@@ -1,5 +1,5 @@
 import { list as listAll, listWhere, get, save, remove } from "../../services/cloud-runtime.js";
-import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
+import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js?v=2026-09-14-cumulative-average-fix-1";
 
 const NEXT_STATUS = { not_started: "ongoing", ongoing: "done", done: "not_started" };
 

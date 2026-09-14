@@ -2,7 +2,7 @@ import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polis
 import {
   CASE_CATEGORIES, listCases, getCase, createCase, closeCase, reopenCase, removeCase,
   listSessions, addSession, removeSession, listCandidates,
-} from "./guidance-service.js";
+} from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
 import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-approval-card-1";

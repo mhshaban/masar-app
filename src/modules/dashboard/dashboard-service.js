@@ -1,10 +1,10 @@
 import { getAgendaProgressSummary } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
-import { listStudentsNeedingAttention } from "./followup-needs-service.js?v=2026-09-07-academic-fix-1";
-import { listStaleOpenCases } from "../cases/guidance-service.js";
-import { listOverdueActions } from "../support/support-service.js";
+import { listStudentsNeedingAttention } from "./followup-needs-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { listStaleOpenCases } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { listOverdueActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { rpc, list, listActionProgressStatuses } from "../../services/cloud-runtime.js?v=2026-08-31-priorities-3";
 import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
-import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js";
+import { computeStudentGradeSummaries } from "../grades/grade-flags-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listStudentsWithPendingSubjects } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { getStudent } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 

@@ -1,6 +1,6 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js";
-import { computeStudentGradeSummaries } from "./grade-flags-service.js";
+import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 
 function esc(str) {
@@ -16,9 +16,13 @@ async function getAcademicStats() {
   const [allFlags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
   const currentStudentIds = new Set(students.map((student) => String(student.id)));
   const flags = allFlags.filter((flag) => currentStudentIds.has(String(flag.studentId)));
-  const withOverall = flags.filter((f) => f.overallPct != null);
-  const overallAvg = withOverall.length
-    ? Math.round(withOverall.reduce((sum, f) => sum + Number(f.overallPct), 0) / withOverall.length)
+  // finalCumulativeAverage (المعدل التراكمي الرسمي المطبوع بالشهادة) أولًا،
+  // ثم overallPct كبديل فقط عند غيابه — نفس السبب الموثَّق بـ
+  // achievement-service.js: overallPct وحده منحرف كثيرًا لأي طالب لم تُلتقَط
+  // له سوى مواد قليلة من شهادته.
+  const overallValues = flags.map((f) => f.finalCumulativeAverage ?? f.overallPct).filter((v) => v != null);
+  const overallAvg = overallValues.length
+    ? Math.round(overallValues.reduce((sum, v) => sum + Number(v), 0) / overallValues.length)
     : 0;
 
   const bySubject = new Map();

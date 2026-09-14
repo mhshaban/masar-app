@@ -49,6 +49,34 @@ test("computeStudentAchievement skips a student with no academicFlags row (no ov
   assert.equal(rows.length, 0);
 });
 
+test("computeStudentAchievement prefers finalCumulativeAverage (the official transcript average) over overallPct when both are present", async () => {
+  // overallPct هنا منحرف جدًا (شهادة التُقطت لها مادة واحدة فقط) بينما
+  // finalCumulativeAverage هو الرقم الرسمي المطبوع بالشهادة — يجب اعتماده.
+  await bulkPut("students", [{ id: "s1", name: "طالب أول" }]);
+  await bulkPut("academicFlags", [
+    { id: "s1", studentId: "s1", overallPct: 5, finalCumulativeAverage: 82, subjects: [{ subject: "الثقافة المرورية", pct: 5 }], absentCount: 0, barredCount: 0 },
+  ]);
+  const rows = await computeStudentAchievement();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].avgPct, 82);
+  assert.equal(rows[0].tier, "medium");
+});
+
+test("computeStudentAchievement sorts students from the highest overall average to the lowest", async () => {
+  await bulkPut("students", [
+    { id: "s1", name: "طالب أول" },
+    { id: "s2", name: "طالب ثاني" },
+    { id: "s3", name: "طالب ثالث" },
+  ]);
+  await bulkPut("academicFlags", [
+    { id: "s1", studentId: "s1", overallPct: 60, subjects: [], absentCount: 0, barredCount: 0 },
+    { id: "s2", studentId: "s2", overallPct: 95, subjects: [], absentCount: 0, barredCount: 0 },
+    { id: "s3", studentId: "s3", overallPct: 40, subjects: [], absentCount: 0, barredCount: 0 },
+  ]);
+  const rows = await computeStudentAchievement();
+  assert.deepEqual(rows.map((r) => r.studentName), ["طالب ثاني", "طالب أول", "طالب ثالث"]);
+});
+
 test("achievement views ignore an academic record for a student no longer in the current roster", async () => {
   await bulkPut("academicFlags", [{ id: "old", studentId: "old", overallPct: 45, subjects: [{ subject: "الرياضيات", pct: 40 }] }]);
   assert.deepEqual(await computeStudentAchievement(), []);

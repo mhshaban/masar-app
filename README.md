@@ -160,7 +160,7 @@ OneDrive) شبه محدَّثة بعد تعديلات تتم من داخل ال�
 
 ## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
 
-267 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+270 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
 
 ```bash
 cd masar-app

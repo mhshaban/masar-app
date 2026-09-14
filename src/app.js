@@ -12,13 +12,13 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-13-period-order-fix-1")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-14-consent-approval-card-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-14-consent-approval-card-1")).mountAgendaView,
-  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-14-consent-approval-card-1")).mountStudentsView,
-  grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-07-review-1")).mountGradesView,
-  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-14-consent-approval-card-1")).mountCasesView,
-  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-14-consent-approval-card-1")).mountSupportView,
+  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountStudentsView,
+  grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountGradesView,
+  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountCasesView,
+  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js?v=2026-09-14-multi-select-consent-1")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-07-review-1")).mountPromotedView,
   forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-14-consent-approval-card-1")).mountFormsView,
