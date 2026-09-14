@@ -5,7 +5,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-form-print-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-approval-card-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -259,10 +259,9 @@ function detailFields(item) {
 function workflowBlock(item) {
   if (item.kind === "section_change") return `<div class="print-approval form-workflow"><strong>القرار والتوثيق</strong><div class="workflow-options">☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</div><div class="workflow-signatures"><span>مدير المدرسة/من ينوب عنه: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
   if (item.kind === "consent") {
-    // بانتظار رد ولي الأمر بعد — لا شيء حقيقي يُعرَض هنا أصلًا (لا اسم، لا
-    // رقم شخصي، لا تاريخ، لا توقيع)، وهذه الكتلة أصلًا مخصَّصة للطباعة فقط
-    // (مخفية دائمًا عن الشاشة عبر print-approval)، فلا داعي لعرضها فارغة.
-    if (item.status === "pending") return "";
+    // هذه هي بطاقة الموافقة الكتابية نفسها: تُطبَع دائمًا، بانتظار الرد أو
+    // بعده — فالغرض من طباعة الاستمارة أصلًا هو تسليمها لولي الأمر ليعبّئها
+    // ويوقّعها بخط يده؛ الحقول الفارغة تظهر كخطوط منقّطة جاهزة للتعبئة.
     const response = item.fields?.guardianResponse;
     return `<div class="print-approval form-workflow"><strong>إقرار ولي الأمر</strong><div class="workflow-options">${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</div><div class="workflow-signatures workflow-signatures-4"><span>الاسم: ${esc(item.fields?.guardianName || "................................")}</span><span>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</span><span>التاريخ: ${esc(item.fields?.responseDate || "........ / ........ / ................")}</span><span>التوقيع: ${esc(item.fields?.signature || "................................")}</span></div></div>`;
   }

@@ -40,23 +40,20 @@ test("buildDepartmentFormReportHtml prints a completed guardian-consent form wit
   assert.match(html, /<th>التاريخ<\/th><td>2026-09-02<\/td><th>التوقيع<\/th><td>توقيع<\/td>/);
 });
 
-test("buildDepartmentFormReportHtml prints only the subject and consent text for a guardian-consent form still pending the guardian's response — none of the guardian's own fields or the acknowledgment block, since none of them have a real value yet", () => {
+test("buildDepartmentFormReportHtml prints only the subject and consent text in the form-data section for a guardian-consent form still pending the guardian's response, but still prints a blank writable acknowledgment card for the guardian to fill and sign by hand", () => {
   const html = buildDepartmentFormReportHtml({
     title: "موافقة على مشاركة", kind: "consent", createdDate: "2026-09-01", status: "pending",
     student: { name: "طالب تجريبي" },
-    fields: { guardianName: "ولي الأمر", address: "المنامة", subject: "زيارة ميدانية", consentText: "نص الموافقة", guardianPersonalNo: "999", guardianPhone: "3600" },
+    fields: { subject: "زيارة ميدانية", consentText: "نص الموافقة" },
   }, "2026-09-03");
   assert.match(html, /زيارة ميدانية/);
   assert.match(html, /نص الموافقة/);
-  assert.doesNotMatch(html, /ولي الأمر/);
-  assert.doesNotMatch(html, /المنامة/);
-  assert.doesNotMatch(html, /999/);
-  assert.doesNotMatch(html, /3600/);
-  assert.doesNotMatch(html, /إقرار ولي الأمر/);
-  // علامة فارغة لا نص فاضٍ — word-export.js يحقن كتلة "الإجراء والتوثيق"
-  // العامة تلقائيًا لأي استمارة بلا class="document-approval" إطلاقًا،
-  // وهذا كان سيُعيد بالضبط حقول التوقيع نفسها اللي يُفترَض إخفاؤها هنا.
-  assert.match(html, /class="document-approval"/);
+  // بطاقة الإقرار نفسها موجودة دومًا — هي الغرض من طباعة/تصدير الاستمارة
+  // أصلًا (تسليمها لولي الأمر ليعبّئها بخط يده)، بحقول فارغة بانتظار الرد.
+  assert.match(html, /إقرار ولي الأمر/);
+  assert.match(html, /☐ موافق/);
+  assert.match(html, /☐ غير موافق/);
+  assert.match(html, /<th>الاسم<\/th><td>\.+<\/td><th>الرقم الشخصي<\/th><td>\.+<\/td>/);
 });
 
 test("buildDepartmentFormReportHtml attributes legacy forms to the department", () => {
