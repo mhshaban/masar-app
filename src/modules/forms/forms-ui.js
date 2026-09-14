@@ -1,11 +1,11 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountStudentPicker } from "../shared/student-picker.js";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
+import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-form-print-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -90,10 +90,11 @@ async function exportFormsExcel(forms) {
   await logAuditEvent("export_excel", { tableName: "departmentForms", count: forms.length });
 }
 
-function studentCard(student) {
+function studentCard(student, hideSpecializationOnPrint = false) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
   const average = student.finalCumulativeAverage;
-  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span><span>رغبة التخصص: ${esc(student.specializationPreference ?? "") || "—"}</span><span>الحد الأدنى للتخصص: ${esc(student.minSpecializationThreshold ?? "") || "—"}</span><span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
+  const specializationSpans = `<span${hideSpecializationOnPrint ? ' class="print-hide"' : ""}>رغبة التخصص: ${esc(student.specializationPreference ?? "") || "—"}</span><span${hideSpecializationOnPrint ? ' class="print-hide"' : ""}>الحد الأدنى للتخصص: ${esc(student.minSpecializationThreshold ?? "") || "—"}</span>`;
+  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span>${specializationSpans}<span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
 function typeFields(type, values = {}) {
@@ -128,20 +129,61 @@ function typeFields(type, values = {}) {
 
 async function renderCreate(root, rerender) {
   let selectedStudent = null;
-  root.innerHTML = `<div class="card forms-card"><h2>استمارة جديدة</h2><p class="hint">اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.</p>
+  let selectedStudents = [];
+  root.innerHTML = `<div class="card forms-card"><h2>استمارة جديدة</h2><p class="hint" id="form-create-hint">اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.</p>
     <div class="forms-grid"><label class="forms-field forms-wide"><span>نوع الاستمارة *</span><select id="form-type">${Object.entries(FORM_TYPES).map(([key, v]) => `<option value="${key}">${esc(v.label)}</option>`).join("")}</select></label></div>
     <div id="form-student-picker"></div><div id="form-selected-student">${studentCard(null)}</div>
     <form id="department-form" class="forms-grid"><div id="form-dynamic" class="forms-grid forms-wide">${typeFields("school_admin")}</div>
       ${field("تاريخ الطلب", "createdDate", "date", true, today())}
       <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ الاستمارة</button></div>
     </form></div>`;
-  mountStudentPicker(root.querySelector("#form-student-picker"), { onSelect(student) { selectedStudent = student; root.querySelector("#form-selected-student").innerHTML = studentCard(student); } });
+  const pickerRoot = root.querySelector("#form-student-picker");
+  const cardRoot = root.querySelector("#form-selected-student");
+  const hint = root.querySelector("#form-create-hint");
+
+  // استمارة موافقة ولي الأمر تُصدَر لعدّة طلاب دفعة واحدة (نفس الموضوع/نص
+  // الموافقة، استمارة مستقلة بحالتها الخاصة لكل طالب) — بقية أنواع
+  // الاستمارات (تحويل، تغيير شعبة) تبقى لطالب واحد كما هي، لأنها بطبيعتها
+  // خاصة بحالة فردية.
+  const mountPickerForType = (typeKey) => {
+    const isMulti = FORM_TYPES[typeKey]?.kind === "consent";
+    selectedStudent = null;
+    selectedStudents = [];
+    if (isMulti) {
+      hint.textContent = "اختر نوع الاستمارة، ثم أضف كل الطلبة المطلوب إرسال طلب الموافقة لهم — استمارة مستقلة بحالتها الخاصة لكل طالب.";
+      cardRoot.innerHTML = "";
+      mountStudentPicker(pickerRoot, {
+        multi: true,
+        placeholder: "أضف طالبًا... ابحث بالاسم أو الرقم الأكاديمي",
+        onChange(students) { selectedStudents = students; },
+      });
+    } else {
+      hint.textContent = "اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.";
+      cardRoot.innerHTML = studentCard(null);
+      mountStudentPicker(pickerRoot, { onSelect(student) { selectedStudent = student; cardRoot.innerHTML = studentCard(student); } });
+    }
+  };
+  mountPickerForType("school_admin");
+
   const type = root.querySelector("#form-type");
-  type.addEventListener("change", () => { root.querySelector("#form-dynamic").innerHTML = typeFields(type.value); });
+  type.addEventListener("change", () => {
+    root.querySelector("#form-dynamic").innerHTML = typeFields(type.value);
+    mountPickerForType(type.value);
+  });
   root.querySelector("#department-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!selectedStudent) return notify("اختر الطالب أولًا");
+    const isMulti = FORM_TYPES[type.value]?.kind === "consent";
     const values = Object.fromEntries(new FormData(event.target).entries());
+    if (isMulti) {
+      if (!selectedStudents.length) return notify("أضف طالبًا واحدًا على الأقل");
+      try {
+        for (const student of selectedStudents) await createDepartmentForm(type.value, student, values);
+        notify(`تم حفظ الاستمارة لـ ${selectedStudents.length} ${selectedStudents.length === 1 ? "طالب" : "طلبة"}`);
+        await rerender("log");
+      } catch (error) { notify(error.message); }
+      return;
+    }
+    if (!selectedStudent) return notify("اختر الطالب أولًا");
     try { await createDepartmentForm(type.value, selectedStudent, values); notify("تم حفظ الاستمارة في السجل"); await rerender("log"); }
     catch (error) { notify(error.message); }
   });
@@ -196,29 +238,41 @@ async function renderEdit(root, id, back, openDetail) {
   });
 }
 
+// طلب موافقة لسا بانتظار رد ولي الأمر — لا قيمة حقيقية بعد لأي من حقوله
+// (اسمه، عنوانه، رقمه الشخصي، تواصله، رده، تاريخ رده)، فطباعتها فارغة أصلًا
+// تشوّش الاستمارة المطبوعة بدل ما تفيد؛ تبقى ظاهرة على الشاشة نفسها (مفيدة
+// للمرشد أثناء المتابعة)، تُخفى فقط عن النسخة المطبوعة تحديدًا.
+const CONSENT_PENDING_PRINT_HIDDEN_KEYS = new Set(["guardianName", "address", "guardianResponse", "guardianPersonalNo", "guardianPhone", "responseDate", "signature"]);
+
 function detailFields(item) {
   const fields = item.fields || {};
   const requiredKeys = FORM_FIELD_ORDER[item.kind] || [];
   const extraKeys = Object.keys(fields).filter((key) => key !== "createdDate" && !requiredKeys.includes(key));
+  const consentPending = item.kind === "consent" && item.status === "pending";
   return [...requiredKeys, ...extraKeys].map((key) => {
     const value = FORM_VALUE_LABELS[fields[key]] || fields[key] || "";
-    return `<div class="forms-detail-row${value ? "" : " forms-detail-empty"}"><span>${esc(formFieldLabel(item, key))}</span><strong>${value ? esc(value) : '<i class="forms-empty-screen">لم يُعبّأ</i><i class="forms-empty-print" aria-hidden="true">&nbsp;</i>'}</strong></div>`;
+    const printHide = consentPending && CONSENT_PENDING_PRINT_HIDDEN_KEYS.has(key) ? " print-hide" : "";
+    return `<div class="forms-detail-row${value ? "" : " forms-detail-empty"}${printHide}"><span>${esc(formFieldLabel(item, key))}</span><strong>${value ? esc(value) : '<i class="forms-empty-screen">لم يُعبّأ</i><i class="forms-empty-print" aria-hidden="true">&nbsp;</i>'}</strong></div>`;
   }).join("");
 }
 
 function workflowBlock(item) {
   if (item.kind === "section_change") return `<div class="print-approval form-workflow"><strong>القرار والتوثيق</strong><div class="workflow-options">☐ موافق &nbsp;&nbsp; ☐ غير موافق &nbsp;&nbsp; ☐ مؤجل لاستكمال البيانات</div><div class="workflow-signatures"><span>مدير المدرسة/من ينوب عنه: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
   if (item.kind === "consent") {
+    // بانتظار رد ولي الأمر بعد — لا شيء حقيقي يُعرَض هنا أصلًا (لا اسم، لا
+    // رقم شخصي، لا تاريخ، لا توقيع)، وهذه الكتلة أصلًا مخصَّصة للطباعة فقط
+    // (مخفية دائمًا عن الشاشة عبر print-approval)، فلا داعي لعرضها فارغة.
+    if (item.status === "pending") return "";
     const response = item.fields?.guardianResponse;
-    return `<div class="print-approval form-workflow"><strong>إقرار ولي الأمر</strong><div class="workflow-options">${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</div><div class="workflow-signatures"><span>الاسم: ${esc(item.fields?.guardianName || "................................")}</span><span>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</span><span>التاريخ والتوقيع: ${esc(item.fields?.responseDate || "........ / ........ / ................")} &nbsp; ${esc(item.fields?.signature || "................................")}</span></div></div>`;
+    return `<div class="print-approval form-workflow"><strong>إقرار ولي الأمر</strong><div class="workflow-options">${response === "approved" ? "☑" : "☐"} موافق &nbsp;&nbsp; ${response === "declined" ? "☑" : "☐"} غير موافق</div><div class="workflow-signatures workflow-signatures-4"><span>الاسم: ${esc(item.fields?.guardianName || "................................")}</span><span>الرقم الشخصي: ${esc(item.fields?.guardianPersonalNo || "................................")}</span><span>التاريخ: ${esc(item.fields?.responseDate || "........ / ........ / ................")}</span><span>التوقيع: ${esc(item.fields?.signature || "................................")}</span></div></div>`;
   }
   return `<div class="print-approval form-workflow"><strong>استلام ومتابعة الجهة المحال إليها</strong><div class="workflow-options">☐ تم الاستلام &nbsp;&nbsp; ☐ تمت المراجعة &nbsp;&nbsp; ☐ تم اتخاذ الإجراء &nbsp;&nbsp; ☐ أُعيدت التغذية الراجعة</div><div class="workflow-signatures"><span>اسم المستلم: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div>`;
 }
 
 export function formDetailMarkup(item) {
   return `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><div class="forms-print" id="form-printable">
-    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
-    <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student)}</div>
+    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub${item.kind === "consent" ? " print-hide" : ""}">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
+    <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student, item.kind === "consent")}</div>
     <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
     <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
       <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>

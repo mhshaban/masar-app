@@ -4,8 +4,8 @@ import {
   listActions, addAction, cycleActionStatus, removeAction, listCandidates,
 } from "./support-service.js";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js";
-import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-13-agenda-report-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
+import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-form-print-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {

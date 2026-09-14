@@ -160,7 +160,7 @@ OneDrive) شبه محدَّثة بعد تعديلات تتم من داخل ال�
 
 ## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
 
-265 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+267 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
 
 ```bash
 cd masar-app
@@ -222,7 +222,7 @@ src/
                  support/: خطط الدعم الفردية (supportPlans + supportPlanActions)
                  career/: التوجيه المهني (careerSessions) — مرشَّحة حسب مستوى الطالب لا الدرجات
                  promoted/: الطلاب المرفعين (promotedSubjects + promotedImportBatches) — استيراد شيت "المرفعين" من ملف كشف الطلاب
-                 shared/: student-picker.js — بحث واختيار طالب واحد، يستخدمه cases/ وsupport/ وcareer/
+                 shared/: student-picker.js — بحث واختيار طالب، يستخدمه cases/ وsupport/ وcareer/ وforms/؛ وضع multi (شارات قابلة للإزالة) لاختيار عدة طلاب دفعة واحدة — تستخدمه استمارات موافقة ولي الأمر لإصدار استمارة مستقلة لكل طالب مختار
                  backup/: شاشة تصدير النسخة الاحتياطية فقط (الاستيراد/الاستعادة انتقل لـimports/)
                  users/: users-ui.js — إدارة الحسابات والأدوار (admin/counselor/read_only)، للإدمن فقط
                  imports/: imports-ui.js — شاشة استيراد موحَّدة للإدمن فقط (سجل الطلبة/الطلاب المرفعين/النسخ الاحتياطي)؛ المكتبات الثقيلة تُحمَّل عند فتح تبويبها
