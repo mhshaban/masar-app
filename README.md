@@ -222,7 +222,7 @@ src/
                  support/: خطط الدعم الفردية (supportPlans + supportPlanActions)
                  career/: التوجيه المهني (careerSessions) — مرشَّحة حسب مستوى الطالب لا الدرجات
                  promoted/: الطلاب المرفعين (promotedSubjects + promotedImportBatches) — استيراد شيت "المرفعين" من ملف كشف الطلاب
-                 shared/: student-picker.js — بحث واختيار طالب واحد، يستخدمه cases/ وsupport/ وcareer/
+                 shared/: student-picker.js — بحث واختيار طالب، يستخدمه cases/ وsupport/ وcareer/ وforms/؛ وضع multi (شارات قابلة للإزالة) لاختيار عدة طلاب دفعة واحدة — تستخدمه استمارات موافقة ولي الأمر لإصدار استمارة مستقلة لكل طالب مختار
                  backup/: شاشة تصدير النسخة الاحتياطية فقط (الاستيراد/الاستعادة انتقل لـimports/)
                  users/: users-ui.js — إدارة الحسابات والأدوار (admin/counselor/read_only)، للإدمن فقط
                  imports/: imports-ui.js — شاشة استيراد موحَّدة للإدمن فقط (سجل الطلبة/الطلاب المرفعين/النسخ الاحتياطي)؛ المكتبات الثقيلة تُحمَّل عند فتح تبويبها

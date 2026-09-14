@@ -4,7 +4,7 @@ import {
   listSessions, addSession, removeSession, listCandidates,
 } from "./guidance-service.js";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
 import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-form-print-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 

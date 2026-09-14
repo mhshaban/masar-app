@@ -1,5 +1,5 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountStudentPicker } from "../shared/student-picker.js";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
@@ -129,20 +129,61 @@ function typeFields(type, values = {}) {
 
 async function renderCreate(root, rerender) {
   let selectedStudent = null;
-  root.innerHTML = `<div class="card forms-card"><h2>استمارة جديدة</h2><p class="hint">اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.</p>
+  let selectedStudents = [];
+  root.innerHTML = `<div class="card forms-card"><h2>استمارة جديدة</h2><p class="hint" id="form-create-hint">اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.</p>
     <div class="forms-grid"><label class="forms-field forms-wide"><span>نوع الاستمارة *</span><select id="form-type">${Object.entries(FORM_TYPES).map(([key, v]) => `<option value="${key}">${esc(v.label)}</option>`).join("")}</select></label></div>
     <div id="form-student-picker"></div><div id="form-selected-student">${studentCard(null)}</div>
     <form id="department-form" class="forms-grid"><div id="form-dynamic" class="forms-grid forms-wide">${typeFields("school_admin")}</div>
       ${field("تاريخ الطلب", "createdDate", "date", true, today())}
       <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ الاستمارة</button></div>
     </form></div>`;
-  mountStudentPicker(root.querySelector("#form-student-picker"), { onSelect(student) { selectedStudent = student; root.querySelector("#form-selected-student").innerHTML = studentCard(student); } });
+  const pickerRoot = root.querySelector("#form-student-picker");
+  const cardRoot = root.querySelector("#form-selected-student");
+  const hint = root.querySelector("#form-create-hint");
+
+  // استمارة موافقة ولي الأمر تُصدَر لعدّة طلاب دفعة واحدة (نفس الموضوع/نص
+  // الموافقة، استمارة مستقلة بحالتها الخاصة لكل طالب) — بقية أنواع
+  // الاستمارات (تحويل، تغيير شعبة) تبقى لطالب واحد كما هي، لأنها بطبيعتها
+  // خاصة بحالة فردية.
+  const mountPickerForType = (typeKey) => {
+    const isMulti = FORM_TYPES[typeKey]?.kind === "consent";
+    selectedStudent = null;
+    selectedStudents = [];
+    if (isMulti) {
+      hint.textContent = "اختر نوع الاستمارة، ثم أضف كل الطلبة المطلوب إرسال طلب الموافقة لهم — استمارة مستقلة بحالتها الخاصة لكل طالب.";
+      cardRoot.innerHTML = "";
+      mountStudentPicker(pickerRoot, {
+        multi: true,
+        placeholder: "أضف طالبًا... ابحث بالاسم أو الرقم الأكاديمي",
+        onChange(students) { selectedStudents = students; },
+      });
+    } else {
+      hint.textContent = "اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.";
+      cardRoot.innerHTML = studentCard(null);
+      mountStudentPicker(pickerRoot, { onSelect(student) { selectedStudent = student; cardRoot.innerHTML = studentCard(student); } });
+    }
+  };
+  mountPickerForType("school_admin");
+
   const type = root.querySelector("#form-type");
-  type.addEventListener("change", () => { root.querySelector("#form-dynamic").innerHTML = typeFields(type.value); });
+  type.addEventListener("change", () => {
+    root.querySelector("#form-dynamic").innerHTML = typeFields(type.value);
+    mountPickerForType(type.value);
+  });
   root.querySelector("#department-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!selectedStudent) return notify("اختر الطالب أولًا");
+    const isMulti = FORM_TYPES[type.value]?.kind === "consent";
     const values = Object.fromEntries(new FormData(event.target).entries());
+    if (isMulti) {
+      if (!selectedStudents.length) return notify("أضف طالبًا واحدًا على الأقل");
+      try {
+        for (const student of selectedStudents) await createDepartmentForm(type.value, student, values);
+        notify(`تم حفظ الاستمارة لـ ${selectedStudents.length} ${selectedStudents.length === 1 ? "طالب" : "طلبة"}`);
+        await rerender("log");
+      } catch (error) { notify(error.message); }
+      return;
+    }
+    if (!selectedStudent) return notify("اختر الطالب أولًا");
     try { await createDepartmentForm(type.value, selectedStudent, values); notify("تم حفظ الاستمارة في السجل"); await rerender("log"); }
     catch (error) { notify(error.message); }
   });
