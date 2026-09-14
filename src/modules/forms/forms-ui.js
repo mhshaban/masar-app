@@ -1,5 +1,6 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
+import { getFilterOptions } from "../students/students-service.js";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
@@ -14,6 +15,22 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const today = () => new Date().toISOString().slice(0, 10);
 const field = (label, name, type = "text", required = false, value = "") => `<label class="forms-field"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
 const area = (label, name, required = false, value = "") => `<label class="forms-field forms-wide"><span>${label}${required ? " *" : ""}</span><textarea name="${name}" rows="3" ${required ? "required" : ""}>${esc(value)}</textarea></label>`;
+const selectField = (label, name, options, value = "") => `<label class="forms-field"><span>${label}</span><select name="${name}"><option value="">اختر</option>${options.map((o) => `<option value="${esc(o)}" ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
+
+// حقلا الشعبة/التخصص الحالي والمطلوب: قائمة منسدلة لشعب المدرسة عند
+// "تغيير شعبة"، أو لتخصصاتها (department بسجل الطالب) عند "تحويل تخصص" —
+// قبل اختيار نوع الطلب يبقيان حقل نص عادي. حقل "الحالي" فقط يُعبَّأ تلقائيًا
+// بشعبة/تخصص الطالب المختار فعليًا؛ "المطلوب" يُترك للمرشد ليختاره.
+function placementFields(requestKind, options, values, student) {
+  if (requestKind !== "section" && requestKind !== "specialization") {
+    return `${field("الشعبة/التخصص الحالي", "currentPlacement", "text", false, values.currentPlacement || "")}
+    ${field("الشعبة/التخصص المطلوب", "requestedPlacement", "text", false, values.requestedPlacement || "")}`;
+  }
+  const list = requestKind === "section" ? options.sections : options.departments;
+  const studentDefault = (requestKind === "section" ? student?.section : student?.department) || "";
+  return `${selectField("الشعبة/التخصص الحالي", "currentPlacement", list, values.currentPlacement || studentDefault)}
+    ${selectField("الشعبة/التخصص المطلوب", "requestedPlacement", list, values.requestedPlacement || "")}`;
+}
 
 const FORM_FIELD_LABELS = { reason: "السبب", requestedAction: "الإجراء المطلوب", notes: "ملاحظات الاستمارة", requestKind: "نوع الطلب", guardianName: "اسم ولي الأمر", guardianPersonalNo: "الرقم الشخصي لولي الأمر", guardianPhone: "رقم تواصل ولي الأمر", currentPlacement: "الشعبة/التخصص الحالي", requestedPlacement: "الشعبة/التخصص المطلوب", guidanceOpinion: "رأي الإرشاد الأكاديمي والتوجيه المهني", socialOpinion: "رأي الإرشاد الاجتماعي", registrationOpinion: "رأي التسجيل", finalDecision: "قرار إدارة المدرسة", address: "العنوان", subject: "الموضوع/الفعالية", consentText: "نص طلب الموافقة", guardianResponse: "رد ولي الأمر", responseDate: "تاريخ رد ولي الأمر", signature: "التوقيع/الإقرار" };
 const FORM_VALUE_LABELS = { section: "تغيير شعبة", specialization: "تحويل تخصص", pending: "بانتظار الرد", approved: "موافق", declined: "غير موافق" };
@@ -97,7 +114,7 @@ function studentCard(student, hideSpecializationOnPrint = false) {
   return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span>${specializationSpans}<span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
 }
 
-function typeFields(type, values = {}) {
+function typeFields(type, values = {}, student = null, options = { sections: [], departments: [] }) {
   const def = FORM_TYPES[type];
   if (def.kind === "referral") return `
     ${area("سبب التحويل وملخص الحالة", "reason", true, values.reason || "")}
@@ -108,8 +125,7 @@ function typeFields(type, values = {}) {
     ${field("اسم ولي الأمر (مقدم الطلب)", "guardianName", "text", true, values.guardianName || "")}
     ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo", "text", false, values.guardianPersonalNo || "")}
     ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || "")}
-    ${field("الشعبة/التخصص الحالي", "currentPlacement", "text", false, values.currentPlacement || "")}
-    ${field("الشعبة/التخصص المطلوب", "requestedPlacement", "text", false, values.requestedPlacement || "")}
+    ${placementFields(values.requestKind, options, values, student)}
     ${area("سبب الطلب", "reason", true, values.reason || "")}
     ${area("رأي قسم الإرشاد الأكاديمي والتوجيه المهني", "guidanceOpinion", false, values.guidanceOpinion || "")}
     ${area("رأي قسم الإرشاد الاجتماعي (للحالات الخاصة والمرضية)", "socialOpinion", false, values.socialOpinion || "")}
@@ -130,6 +146,7 @@ function typeFields(type, values = {}) {
 async function renderCreate(root, rerender) {
   let selectedStudent = null;
   let selectedStudents = [];
+  const schoolOptions = await getFilterOptions();
   root.innerHTML = `<div class="card forms-card"><h2>استمارة جديدة</h2><p class="hint" id="form-create-hint">اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.</p>
     <div class="forms-grid"><label class="forms-field forms-wide"><span>نوع الاستمارة *</span><select id="form-type">${Object.entries(FORM_TYPES).map(([key, v]) => `<option value="${key}">${esc(v.label)}</option>`).join("")}</select></label></div>
     <div id="form-student-picker"></div><div id="form-selected-student">${studentCard(null)}</div>
@@ -140,6 +157,21 @@ async function renderCreate(root, rerender) {
   const pickerRoot = root.querySelector("#form-student-picker");
   const cardRoot = root.querySelector("#form-selected-student");
   const hint = root.querySelector("#form-create-hint");
+  const dynamicRoot = root.querySelector("#form-dynamic");
+
+  // إعادة رسم حقول النوع مع الحفاظ على ما كتبه المرشد فعلًا بباقي الحقول —
+  // تتغيّر فقط حقول الشعبة/التخصص (نص ↔ قائمة منسدلة) حسب نوع طلب تغيير
+  // الشعبة، وقيمتها الافتراضية حسب الطالب المختار حاليًا إن وُجد.
+  const renderDynamicFields = (typeKey) => {
+    const values = Object.fromEntries(new FormData(root.querySelector("#department-form")).entries());
+    // الشعبة والتخصص قائمتان مختلفتان تمامًا (شعب مقابل تخصصات) — أي قيمة
+    // سابقة لهما (من نوع طلب سابق أو طالب سابق) لا معنى لها بالقائمة
+    // الجديدة، فتُعاد للافتراضي بدل تسريبها كأنها اختيار المرشد الفعلي.
+    delete values.currentPlacement;
+    delete values.requestedPlacement;
+    dynamicRoot.innerHTML = typeFields(typeKey, values, selectedStudent, schoolOptions);
+    dynamicRoot.querySelector('[name="requestKind"]')?.addEventListener("change", () => renderDynamicFields(typeKey));
+  };
 
   // استمارة موافقة ولي الأمر تُصدَر لعدّة طلاب دفعة واحدة (نفس الموضوع/نص
   // الموافقة، استمارة مستقلة بحالتها الخاصة لكل طالب) — بقية أنواع
@@ -160,15 +192,17 @@ async function renderCreate(root, rerender) {
     } else {
       hint.textContent = "اختر نوع الاستمارة والطالب. تُحفظ بيانات الطالب الحالية كاملة داخل السجل.";
       cardRoot.innerHTML = studentCard(null);
-      mountStudentPicker(pickerRoot, { onSelect(student) { selectedStudent = student; cardRoot.innerHTML = studentCard(student); } });
+      mountStudentPicker(pickerRoot, {
+        onSelect(student) { selectedStudent = student; cardRoot.innerHTML = studentCard(student); renderDynamicFields(typeKey); },
+      });
     }
   };
   mountPickerForType("school_admin");
 
   const type = root.querySelector("#form-type");
   type.addEventListener("change", () => {
-    root.querySelector("#form-dynamic").innerHTML = typeFields(type.value);
     mountPickerForType(type.value);
+    renderDynamicFields(type.value);
   });
   root.querySelector("#department-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -214,15 +248,29 @@ async function renderLog(root, openDetail, openEdit) {
 
 async function renderEdit(root, id, back, openDetail) {
   const item = await getDepartmentForm(id); if (!item) return back();
+  const schoolOptions = await getFilterOptions();
   root.innerHTML = `<button class="backlink" id="forms-edit-back">رجوع لسجل الاستمارات</button>
     <div class="card forms-card"><div class="topbar"><div><h1>تعديل الاستمارة</h1><div class="sub">${esc(item.title)} — ${esc(item.student?.name || "")}</div></div></div>
       <div>${studentCard(item.student)}</div>
       <form id="department-form-edit" class="forms-grid">
-        <div class="forms-grid forms-wide">${typeFields(item.type, item.fields || {})}</div>
+        <div id="form-edit-dynamic" class="forms-grid forms-wide">${typeFields(item.type, item.fields || {}, item.student, schoolOptions)}</div>
         ${field("تاريخ الطلب", "createdDate", "date", true, item.createdDate || today())}
         <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ التعديلات</button><button class="btn btn-ghost" type="button" id="forms-edit-cancel">إلغاء</button></div>
       </form>
     </div>`;
+  const editDynamicRoot = root.querySelector("#form-edit-dynamic");
+  const wireRequestKindReactivity = () => {
+    editDynamicRoot.querySelector('[name="requestKind"]')?.addEventListener("change", () => {
+      const values = Object.fromEntries(new FormData(root.querySelector("#department-form-edit")).entries());
+      // نفس السبب بـrenderCreate: الشعبة والتخصص قائمتان مختلفتان تمامًا،
+      // فقيمة الحقل من نوع الطلب السابق لا معنى لها بالقائمة الجديدة.
+      delete values.currentPlacement;
+      delete values.requestedPlacement;
+      editDynamicRoot.innerHTML = typeFields(item.type, values, item.student, schoolOptions);
+      wireRequestKindReactivity();
+    });
+  };
+  wireRequestKindReactivity();
   const cancel = () => back();
   root.querySelector("#forms-edit-back").addEventListener("click", cancel);
   root.querySelector("#forms-edit-cancel").addEventListener("click", cancel);
