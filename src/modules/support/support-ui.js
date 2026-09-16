@@ -46,6 +46,27 @@ async function exportPlansExcel(plans) {
   await logAuditEvent("export_excel", { tableName: "supportPlans", count: plans.length });
 }
 
+async function exportCandidatesExcel(candidates) {
+  if (!candidates.length) throw new Error("لا يوجد طلاب مرشَّحون لتصديرهم");
+  const XLSX = await ensureXlsx();
+  const enriched = await Promise.all(candidates.map(async (c) => ({ ...c, student: await getStudent(c.studentId) })));
+  const rows = enriched.map((c) => ({
+    "اسم الطالب": c.student?.name || c.studentId || "",
+    "الرقم الأكاديمي": c.student?.academicId || c.studentId || "",
+    "المستوى": c.student?.level || "",
+    "الشعبة": c.student?.section || "",
+    "المعدل العام": c.avgPct ?? "",
+    "أسباب الترشيح": c.reasons.join(" · "),
+  }));
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  sheet["!cols"] = Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] || "").length + 2))) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "مرشحون من الدرجات");
+  workbook.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(workbook, `مرشحون-من-الدرجات-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+  await logAuditEvent("export_excel", { tableName: "supportCandidates", count: candidates.length });
+}
+
 async function renderCandidates(root, onOpenNewPlan) {
   const candidates = await listCandidates();
   if (!candidates.length) {
@@ -55,7 +76,10 @@ async function renderCandidates(root, onOpenNewPlan) {
   const enriched = await Promise.all(candidates.slice(0, 15).map(async (c) => ({ ...c, student: await getStudent(c.studentId) })));
   root.innerHTML = `
     <div class="card">
-      <h2>مرشحون من الدرجات (${candidates.length})</h2>
+      <div class="card-head">
+        <h2>مرشحون من الدرجات (${candidates.length})</h2>
+        <button class="btn btn-ghost" id="candidates-export-excel-btn" type="button">تصدير Excel</button>
+      </div>
       <p class="hint">طلاب معدلهم العام أو إحدى موادهم أقل من الحد الأدنى، وليس لديهم خطة دعم نشطة بعد.</p>
       <ul class="plain">
         ${enriched.map((c) => `
@@ -75,6 +99,20 @@ async function renderCandidates(root, onOpenNewPlan) {
       const c = enriched.find((c) => c.studentId === btn.dataset.openPlan);
       onOpenNewPlan(c.student, c.reasons.join(" · "));
     });
+  });
+  root.querySelector("#candidates-export-excel-btn").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "جارٍ إعداد الملف…";
+    try {
+      await exportCandidatesExcel(candidates);
+    } catch (error) {
+      notify(error.message || "تعذر تصدير ملف Excel");
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
   });
 }
 
