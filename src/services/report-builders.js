@@ -253,6 +253,15 @@ export function buildStudentProfileReportHtml(data, exportedAt) {
       <tr><th>ملاحظات الطالب</th><td colspan="3">${esc(student.notes) || "—"}</td></tr>
     </table>
 
+    ${student.prepSchoolResults ? `
+    <h2>نتائج المرحلة الإعدادية</h2>
+    <table>
+      <tr><th>المدرسة الإعدادية</th><td colspan="3">${esc(student.prepSchoolResults.school) || "—"}</td></tr>
+      <tr><th>العلوم</th><td>${esc(student.prepSchoolResults.science ?? "") || "—"}</td><th>الرياضيات</th><td>${esc(student.prepSchoolResults.math ?? "") || "—"}</td></tr>
+      <tr><th>اللغة العربية</th><td>${esc(student.prepSchoolResults.arabic ?? "") || "—"}</td><th>اللغة الإنجليزية</th><td>${esc(student.prepSchoolResults.english ?? "") || "—"}</td></tr>
+      <tr><th>المعدل</th><td colspan="3">${student.prepSchoolResults.average == null ? "—" : `${esc(student.prepSchoolResults.average)}٪`}</td></tr>
+    </table>` : ""}
+
     <h2>المسار الأكاديمي</h2>
     <table><tr><th>المعدل التراكمي النهائي</th><td>${academicSummary.finalCumulativeAverage == null ? "—" : `${esc(academicSummary.finalCumulativeAverage)}٪`}</td></tr></table>
     ${termTimeline.length ? `

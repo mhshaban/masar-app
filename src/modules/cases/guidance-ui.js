@@ -5,8 +5,10 @@ import {
 } from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
-import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-approval-card-1";
+import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-16-prep-school-results-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -18,6 +20,32 @@ function statusPill(status) {
   if (status === "closed") return '<span class="pill pill-neutral">مُغلقة</span>';
   if (status === "monitoring") return '<span class="pill pill-warning">قيد المتابعة</span>';
   return '<span class="pill pill-critical">مفتوحة</span>';
+}
+
+const CASE_STATUS_LABELS = { open: "مفتوحة", monitoring: "قيد المتابعة", closed: "مُغلقة" };
+const CASE_SOURCE_LABELS = { "grades-flag": "ترشيح من الدرجات", manual: "يدوي" };
+
+async function exportCasesExcel(cases) {
+  if (!cases.length) throw new Error("لا توجد حالات إرشادية لتصديرها");
+  const XLSX = await ensureXlsx();
+  const rows = cases.map((c) => ({
+    "اسم الطالب": c.studentName || c.studentId || "",
+    "الرقم الأكاديمي": c.studentId || "",
+    "الفئة": c.category || "",
+    "العنوان": c.title || "",
+    "الحالة": CASE_STATUS_LABELS[c.status] || c.status || "",
+    "تاريخ الفتح": c.openedDate || "",
+    "تاريخ الإغلاق": c.closedDate || "",
+    "المصدر": CASE_SOURCE_LABELS[c.source] || c.source || "",
+    "ملاحظات": c.notes || "",
+  }));
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  sheet["!cols"] = Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] || "").length + 2))) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "الحالات الإرشادية");
+  workbook.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(workbook, `الحالات-الإرشادية-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+  await logAuditEvent("export_excel", { tableName: "guidanceCases", count: cases.length });
 }
 
 async function renderCandidates(root, onOpenNewCase) {
@@ -232,8 +260,8 @@ async function renderCaseDetail(container, id, onBack) {
 export async function mountCasesView(container) {
   container.innerHTML = `
     <div class="topbar">
-      <div><h1>المتابعات والحالات الإرشادية</h1></div>
-      <button class="btn btn-ghost" id="cases-export-btn">تصدير Word</button>
+      <div><h1>الجلسات والمقابلات الإرشادية</h1></div>
+      <div class="forms-actions"><button class="btn btn-ghost" id="cases-export-excel-btn">تصدير Excel</button><button class="btn btn-ghost" id="cases-export-btn">تصدير Word</button></div>
     </div>
     <div id="cases-new-form" style="margin-bottom:16px;"></div>
     <div id="cases-table" style="margin-bottom:16px;"></div>
@@ -258,5 +286,20 @@ export async function mountCasesView(container) {
     const withSessions = await Promise.all(cases.map(async (c) => ({ ...c, sessions: await listSessions(c.id) })));
     const html = buildGuidanceCasesReportHtml(withSessions, new Date().toLocaleString("ar-BH"));
     downloadAsWordDoc("تقرير الحالات الإرشادية", html, `تقرير-الحالات-الارشادية-${new Date().toISOString().slice(0, 10)}`);
+  });
+
+  container.querySelector("#cases-export-excel-btn").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "جارٍ إعداد الملف…";
+    try {
+      await exportCasesExcel(await listCases());
+    } catch (error) {
+      notify(error.message || "تعذر تصدير ملف Excel");
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
   });
 }
