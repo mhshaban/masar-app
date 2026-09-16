@@ -7,6 +7,8 @@ import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
 import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-16-prep-school-results-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -18,6 +20,30 @@ function planStatusPill(status) {
   if (status === "completed") return '<span class="pill pill-success">مكتملة</span>';
   if (status === "cancelled") return '<span class="pill pill-neutral">مُلغاة</span>';
   return '<span class="pill pill-warning">نشطة</span>';
+}
+
+const PLAN_STATUS_LABELS = { active: "نشطة", completed: "مكتملة", cancelled: "مُلغاة" };
+
+async function exportPlansExcel(plans) {
+  if (!plans.length) throw new Error("لا توجد خطط دعم لتصديرها");
+  const XLSX = await ensureXlsx();
+  const rows = plans.map((p) => ({
+    "اسم الطالب": p.studentName || p.studentId || "",
+    "الرقم الأكاديمي": p.studentId || "",
+    "المجال": p.domain || "",
+    "الهدف": p.goal || "",
+    "الحالة": PLAN_STATUS_LABELS[p.status] || p.status || "",
+    "تاريخ البدء": p.startDate || "",
+    "تاريخ الإكمال": p.completedDate || "",
+    "ملاحظات": p.notes || "",
+  }));
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  sheet["!cols"] = Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] || "").length + 2))) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "خطط الدعم");
+  workbook.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(workbook, `خطط-الدعم-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+  await logAuditEvent("export_excel", { tableName: "supportPlans", count: plans.length });
 }
 
 async function renderCandidates(root, onOpenNewPlan) {
@@ -223,7 +249,7 @@ export async function mountSupportView(container) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>خطط الدعم الفردية</h1><div class="sub">خطة تدخل للطالب مع إجراءات متابَعة كقائمة مهام</div></div>
-      <button class="btn btn-ghost" id="support-export-btn">تصدير Word</button>
+      <div class="forms-actions"><button class="btn btn-ghost" id="support-export-excel-btn">تصدير Excel</button><button class="btn btn-ghost" id="support-export-btn">تصدير Word</button></div>
     </div>
     <div id="support-new-form" style="margin-bottom:16px;"></div>
     <div id="support-table" style="margin-bottom:16px;"></div>
@@ -248,5 +274,20 @@ export async function mountSupportView(container) {
     const withActions = await Promise.all(plans.map(async (p) => ({ ...p, actions: await listActions(p.id) })));
     const html = buildSupportPlansReportHtml(withActions, new Date().toLocaleString("ar-BH"));
     downloadAsWordDoc("تقرير خطط الدعم الفردية", html, `تقرير-خطط-الدعم-${new Date().toISOString().slice(0, 10)}`);
+  });
+
+  container.querySelector("#support-export-excel-btn").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "جارٍ إعداد الملف…";
+    try {
+      await exportPlansExcel(await listPlans());
+    } catch (error) {
+      notify(error.message || "تعذر تصدير ملف Excel");
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
   });
 }
