@@ -1,7 +1,7 @@
 import "./helpers/fake-cloud-backend.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rowToStudent, commitStudentsImport } from "../src/services/students-import-service.js";
+import { rowToStudent, parsePrepResultsRows, commitStudentsImport } from "../src/services/students-import-service.js";
 import { list as listAll, count } from "../src/services/cloud-runtime.js";
 import { ensureStudentsSeeded } from "../src/services/students-source.js";
 import { updateStudent } from "../src/modules/students/students-service.js";
@@ -57,7 +57,34 @@ test("rowToStudent maps a real كشف الطلاب row to exactly the shape the 
     minSpecializationThreshold: null,
     seatNumber: "15",
     committee: "002-2",
+    prepSchoolResults: null,
   });
+});
+
+test("parsePrepResultsRows maps a real نتائج الاعدادي row to the shape merged onto the student record", () => {
+  const rows = [
+    ["الرقم الشخصي", "الرقم الاكاديمي", "الاسم", "المدرسة الإعدادية", "العلوم", "الرياضيات", "اللغة العربية", "اللغة الإنجليزية", "المعدل"],
+    ["110301455", "20260001", " احمد عبدالله احمد البنخليل", "مدرسة الرفاع الإعدادية للبنين", 100, 100, 99, 99, 99.85],
+  ];
+  const byAcademicId = parsePrepResultsRows(rows);
+  assert.equal(byAcademicId.size, 1);
+  assert.deepEqual(byAcademicId.get("20260001"), {
+    school: "مدرسة الرفاع الإعدادية للبنين",
+    science: 100, math: 100, arabic: 99, english: 99, average: 99.85,
+  });
+});
+
+test("parsePrepResultsRows skips a row with no academic id and returns an empty map for a missing sheet or header", () => {
+  assert.equal(parsePrepResultsRows([]).size, 0);
+  assert.equal(parsePrepResultsRows([["عمود غير معروف"]]).size, 0);
+  const rows = [
+    ["الرقم الاكاديمي", "المعدل"],
+    [null, 95],
+    ["20260002", 88],
+  ];
+  const byAcademicId = parsePrepResultsRows(rows);
+  assert.equal(byAcademicId.size, 1);
+  assert.equal(byAcademicId.get("20260002").average, 88);
 });
 
 test("rowToStudent falls back to civilId, then a positional id, when academicId is missing", () => {

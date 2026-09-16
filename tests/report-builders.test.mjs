@@ -161,6 +161,7 @@ test("buildStudentProfileReportHtml includes every section with real data", () =
       name: "أحمد سالم", academicId: "2026001", civilId: "123456", level: "الثالث", section: "أ١",
       department: "الحاسب", track: "الصناعي", phones: ["36000000"], email: "a@x.com", transport: "حافلة",
       counselor: { name: "مرشد الشعبة", phone: "36111111" }, notes: "طالب متعاون",
+      prepSchoolResults: { school: "مدرسة الرفاع الإعدادية للبنين", science: 100, math: 95, arabic: 90, english: 92, average: 94.25 },
     },
     academicSummary: { finalCumulativeAverage: 88.5, subjects: [{ subject: "الرياضيات", pct: 75 }] },
     termTimeline: [{ term: "الفصل الأول", averagePct: 82, rating: "جيد جدًا" }],
@@ -174,6 +175,8 @@ test("buildStudentProfileReportHtml includes every section with real data", () =
 
   assert.match(html, /أحمد سالم/);
   assert.match(html, /2026001/);
+  assert.match(html, /مدرسة الرفاع الإعدادية للبنين/);
+  assert.match(html, /94\.25٪/);
   assert.match(html, /88\.5٪/);
   assert.match(html, /جيد جدًا/);
   assert.match(html, /متابعة معدل/);

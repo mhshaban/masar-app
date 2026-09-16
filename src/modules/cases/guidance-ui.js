@@ -5,7 +5,7 @@ import {
 } from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
-import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-14-consent-approval-card-1";
+import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-16-prep-school-results-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {
