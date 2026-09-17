@@ -314,6 +314,31 @@ export function buildStudentProfileReportHtml(data, exportedAt) {
   `;
 }
 
+// كشف حضور فعالية: طلاب مختارون يدويًا من شعب مختلفة، أو شعبة كاملة
+// دفعة واحدة — كلاهما ينتهي لنفس شكل `students` هنا (لا فرق بمصدر
+// الاختيار وقت البناء). عمود الشعبة يبقى مفيدًا حتى في وضع "شعبة كاملة"
+// (كل الصفوف بنفس القيمة) للحفاظ على شكل جدول واحد بالحالتين.
+export function buildAttendanceSheetReportHtml(data, exportedAt) {
+  const { title, day, date, teachers = [], students = [] } = data;
+  const teacherNames = teachers.filter((t) => String(t || "").trim());
+  return `
+    <h1>${esc(title || "كشف حضور فعالية")}</h1>
+    <p class="meta">تاريخ التصدير: ${esc(exportedAt)}</p>
+    <table>
+      <tr><th>اليوم</th><td>${esc(day) || "—"}</td><th>التاريخ</th><td>${esc(date) || "—"}</td></tr>
+      <tr><th>عدد الطلبة المشاركين</th><td colspan="3">${students.length}</td></tr>
+      <tr><th>المعلمون المرافقون</th><td colspan="3">${teacherNames.length ? teacherNames.map(esc).join("، ") : "—"}</td></tr>
+    </table>
+    <h2>قائمة الطلبة المشاركين</h2>
+    <table>
+      <tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr>
+      ${students.length
+        ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
+        : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}
+    </table>
+  `;
+}
+
 // `plans` each carry their own `.actions` array, assembled by the caller.
 export function buildSupportPlansReportHtml(plans, exportedAt) {
   const planStatusLabel = { active: "نشطة", completed: "مكتملة", cancelled: "مُلغاة" };
