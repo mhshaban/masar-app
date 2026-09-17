@@ -21,7 +21,7 @@ const VIEW_LOADERS = {
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-17-attendance-checkbox-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js?v=2026-09-17-attendance-checkbox-1")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-07-review-1")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-17-attendance-layout-1")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-17-attendance-one-page-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-09-import-fix-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,

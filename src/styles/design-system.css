@@ -576,6 +576,12 @@
     .forms-print .forms-entry-footer { display: block; margin-top: 2mm; padding-top: 1.5mm; border-top: .2mm solid #ddd; color: #666 !important; font-size: 7.2pt; line-height: 1.35; break-inside: avoid-page; }
     .forms-print .forms-entry-footer span { color: #666 !important; }
     .forms-print .print-hide { display: none !important; }
+    /* كشف حضور فعالية: قد يصل لـ٣٠-٤٠ طالبًا بصف واحد لكل طالب — أضيق من
+       بقية استمارات forms-print (سطر واحد أو سطرين لكل استمارة) فيحتاج
+       تباعدًا أدق كي يبقى بصفحة A4 واحدة. قيست القيم فعليًا لا تخمينًا. */
+    .attendance-print .card { padding: 2.5mm 3.5mm; margin: 0 0 2.5mm; }
+    .attendance-print table { font-size: 8pt; }
+    .attendance-print th, .attendance-print td { padding: 1mm 2mm; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
