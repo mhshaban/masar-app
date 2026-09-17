@@ -16,7 +16,7 @@ import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
-const field = (label, name, type = "text", required = false, value = "") => `<label class="forms-field"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
+const field = (label, name, type = "text", required = false, value = "", wide = false) => `<label class="forms-field${wide ? " forms-wide" : ""}"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
 const area = (label, name, required = false, value = "") => `<label class="forms-field forms-wide"><span>${label}${required ? " *" : ""}</span><textarea name="${name}" rows="3" ${required ? "required" : ""}>${esc(value)}</textarea></label>`;
 const selectField = (label, name, options, value = "") => `<label class="forms-field"><span>${label}</span><select name="${name}"><option value="">اختر</option>${options.map((o) => `<option value="${esc(o)}" ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
 
@@ -461,17 +461,21 @@ function attendanceTimeRange({ startTime, endTime }) {
   return start || end || "";
 }
 
+// بطاقة بيانات الفعالية بجدول مضغوط (زوجان لكل صف) بدل صف كامل لكل حقل —
+// وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
+// وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
+// واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
 function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, students }) {
-  return `<div class="forms-print" id="attendance-printable">
+  const timeRange = attendanceTimeRange({ startTime, endTime });
+  return `<div class="forms-print attendance-print" id="attendance-printable">
     <div class="topbar"><div><h1>${esc(title) || "كشف حضور فعالية"}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
     <div class="card"><h2>بيانات الفعالية</h2>
-      <div class="forms-detail-row"><span>مكان الفعالية</span><strong>${esc(location) || "—"}</strong></div>
-      <div class="forms-detail-row"><span>اليوم</span><strong>${esc(day) || "—"}</strong></div>
-      <div class="forms-detail-row"><span>التاريخ</span><strong>${esc(date) || "—"}</strong></div>
-      <div class="forms-detail-row"><span>الفترة</span><strong>${esc(attendanceTimeRange({ startTime, endTime })) || "—"}</strong></div>
-      <div class="forms-detail-row"><span>عدد الطلبة المشاركين</span><strong>${students.length}</strong></div>
-      <div class="forms-detail-row"><span>المعلم المرافق الأول</span><strong>${esc(teachers[0]) || "—"}</strong></div>
-      <div class="forms-detail-row"><span>المعلم المرافق الثاني</span><strong>${esc(teachers[1]) || "—"}</strong></div>
+      <div class="tablewrap"><table>
+        <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
+        <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
+        <tr><th>عدد الطلبة المشاركين</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
+        <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
+      </table></div>
     </div>
     <div class="card"><h2>قائمة الطلبة المشاركين</h2>
       <div class="tablewrap"><table>
@@ -559,7 +563,7 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
     </div>
     <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word.</p>
     <form id="attendance-form" class="forms-grid">
-      ${field("عنوان الفعالية", "title", "text", true, existing?.title || "")}
+      ${field("عنوان الفعالية", "title", "text", true, existing?.title || "", true)}
       ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
       ${field("التاريخ", "date", "date", true, existing?.date || today())}
       ${field("من الساعة", "startTime", "time", false, existing?.startTime || "")}
