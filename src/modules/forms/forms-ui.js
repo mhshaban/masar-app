@@ -16,7 +16,7 @@ import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
-const field = (label, name, type = "text", required = false, value = "") => `<label class="forms-field"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
+const field = (label, name, type = "text", required = false, value = "", wide = false) => `<label class="forms-field${wide ? " forms-wide" : ""}"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" ${required ? "required" : ""} value="${esc(value)}"></label>`;
 const area = (label, name, required = false, value = "") => `<label class="forms-field forms-wide"><span>${label}${required ? " *" : ""}</span><textarea name="${name}" rows="3" ${required ? "required" : ""}>${esc(value)}</textarea></label>`;
 const selectField = (label, name, options, value = "") => `<label class="forms-field"><span>${label}</span><select name="${name}"><option value="">اختر</option>${options.map((o) => `<option value="${esc(o)}" ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
 
@@ -559,7 +559,7 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
     </div>
     <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word.</p>
     <form id="attendance-form" class="forms-grid">
-      ${field("عنوان الفعالية", "title", "text", true, existing?.title || "")}
+      ${field("عنوان الفعالية", "title", "text", true, existing?.title || "", true)}
       ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
       ${field("التاريخ", "date", "date", true, existing?.date || today())}
       ${field("من الساعة", "startTime", "time", false, existing?.startTime || "")}
