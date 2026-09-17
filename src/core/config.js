@@ -24,4 +24,5 @@ export const COLLECTIONS = [
   "promotedImportBatches",
   "departmentForms",
   "schoolTeachers",
+  "attendanceSheets",
 ];

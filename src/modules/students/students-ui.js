@@ -12,7 +12,7 @@ import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
 import { listFormsForStudent } from "../forms/forms-service.js?v=2026-09-08-form-fields-1";
-import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-sheet-1";
+import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {

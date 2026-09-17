@@ -207,11 +207,14 @@ test("buildStudentProfileReportHtml shows a clear placeholder for every empty se
   assert.match(html, /لا توجد استمارات مرتبطة بهذا الطالب/);
 });
 
-test("buildAttendanceSheetReportHtml lists event info and every selected student regardless of section", () => {
+test("buildAttendanceSheetReportHtml lists event info (including location and time range) and every selected student regardless of section", () => {
   const html = buildAttendanceSheetReportHtml({
     title: "زيارة ميدانية لمعرض التعليم العالي",
+    location: "قاعة عيسى بن سلمان الثقافية",
     day: "الخميس",
     date: "2026-09-17",
+    startTime: "09:00",
+    endTime: "11:30",
     teachers: ["محمد أحمد", "سارة خالد"],
     students: [
       { academicId: "2026001", name: "طالب أول", section: "١تلم١" },
@@ -220,8 +223,10 @@ test("buildAttendanceSheetReportHtml lists event info and every selected student
   }, "2026-09-17 10:00");
 
   assert.match(html, /زيارة ميدانية لمعرض التعليم العالي/);
+  assert.match(html, /قاعة عيسى بن سلمان الثقافية/);
   assert.match(html, /الخميس/);
   assert.match(html, /2026-09-17/);
+  assert.match(html, /09:00 ص — 11:30 ص/);
   assert.match(html, /محمد أحمد، سارة خالد/);
   assert.match(html, />2</); // عدد الطلبة المشاركين
   assert.match(html, /طالب أول/);
@@ -230,9 +235,18 @@ test("buildAttendanceSheetReportHtml lists event info and every selected student
   assert.match(html, /٥كهر٢/);
 });
 
-test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers or students", () => {
+test("buildAttendanceSheetReportHtml formats a PM time and a single-sided range correctly", () => {
+  const withBoth = buildAttendanceSheetReportHtml({ title: "ندوة", date: "2026-09-17", startTime: "13:15", endTime: "14:00", students: [] }, "2026-09-17");
+  assert.match(withBoth, /01:15 م — 02:00 م/);
+
+  const startOnly = buildAttendanceSheetReportHtml({ title: "ندوة", date: "2026-09-17", startTime: "13:15", students: [] }, "2026-09-17");
+  assert.match(startOnly, /<th>الفترة<\/th><td>01:15 م<\/td>/);
+});
+
+test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers, location, time, or students", () => {
   const html = buildAttendanceSheetReportHtml({ title: "", day: "", date: "", teachers: ["", ""], students: [] }, "2026-09-17");
   assert.match(html, /كشف حضور فعالية/);
   assert.match(html, /لا يوجد طلبة مختارون/);
   assert.match(html, /<th>المعلمون المرافقون<\/th><td colspan="3">—<\/td>/);
+  assert.match(html, /<th>مكان الفعالية<\/th><td>—<\/td><th>الفترة<\/th><td>—<\/td>/);
 });

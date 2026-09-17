@@ -4,8 +4,8 @@ import {
   listSessions, addSession, removeSession, listCandidates,
 } from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
-import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-sheet-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
+import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";

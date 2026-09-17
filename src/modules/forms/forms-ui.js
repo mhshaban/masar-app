@@ -1,12 +1,15 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
 import { getFilterOptions, listStudentsForSection } from "../students/students-service.js";
+import {
+  createAttendanceSheet, updateAttendanceSheet, listAttendanceSheets, getAttendanceSheet, removeAttendanceSheet,
+} from "./attendance-service.js";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-sheet-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -443,12 +446,29 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null, 
 // نفس شكل formDetailMarkup (forms-print) لضمان تطابق الطباعة المباشرة مع
 // باقي الاستمارات تمامًا — خط Cairo وألوان القسم نفسها — لكن بلا نموذج
 // حفظ لأن كشف الحضور مستند لحظي يُبنى ويُطبع فورًا، بلا سجل بقاعدة البيانات.
-function attendanceSheetMarkup({ title, day, date, teachers, students }) {
+function attendanceTimeRange({ startTime, endTime }) {
+  const fmt = (t) => {
+    if (!t) return "";
+    const [h, m] = String(t).split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return t;
+    const period = h < 12 ? "ص" : "م";
+    const hour12 = h % 12 || 12;
+    return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+  };
+  const start = fmt(startTime);
+  const end = fmt(endTime);
+  if (start && end) return `${start} — ${end}`;
+  return start || end || "";
+}
+
+function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, students }) {
   return `<div class="forms-print" id="attendance-printable">
     <div class="topbar"><div><h1>${esc(title) || "كشف حضور فعالية"}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
     <div class="card"><h2>بيانات الفعالية</h2>
+      <div class="forms-detail-row"><span>مكان الفعالية</span><strong>${esc(location) || "—"}</strong></div>
       <div class="forms-detail-row"><span>اليوم</span><strong>${esc(day) || "—"}</strong></div>
       <div class="forms-detail-row"><span>التاريخ</span><strong>${esc(date) || "—"}</strong></div>
+      <div class="forms-detail-row"><span>الفترة</span><strong>${esc(attendanceTimeRange({ startTime, endTime })) || "—"}</strong></div>
       <div class="forms-detail-row"><span>عدد الطلبة المشاركين</span><strong>${students.length}</strong></div>
       <div class="forms-detail-row"><span>المعلم المرافق الأول</span><strong>${esc(teachers[0]) || "—"}</strong></div>
       <div class="forms-detail-row"><span>المعلم المرافق الثاني</span><strong>${esc(teachers[1]) || "—"}</strong></div>
@@ -491,52 +511,138 @@ async function printAttendanceSheetDirect(data) {
   } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الكشف."); }
 }
 
-async function renderAttendanceSheet(root) {
-  const [schoolOptions, teachers] = await Promise.all([getFilterOptions(), listTeachers()]);
+async function renderAttendanceLog(root, onNew, onEdit) {
+  const sheets = await listAttendanceSheets();
+  root.innerHTML = `<div class="card">
+    <div class="card-head">
+      <h2>كشوف الحضور المحفوظة (${sheets.length})</h2>
+      <button class="btn btn-primary" id="attendance-new-btn" type="button">+ كشف حضور جديد</button>
+    </div>
+    ${sheets.length ? `<div class="tablewrap"><table>
+        <thead><tr><th>العنوان</th><th>التاريخ</th><th>المكان</th><th>عدد المشاركين</th><th></th></tr></thead>
+        <tbody>${sheets.map((s) => `
+          <tr>
+            <td>${esc(s.title)}</td>
+            <td class="num">${esc(s.date) || "—"}</td>
+            <td>${esc(s.location) || "—"}</td>
+            <td class="num">${(s.students || []).length}</td>
+            <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(s.id)}" type="button">تعديل</button><button class="btn btn-ghost forms-danger" data-remove="${esc(s.id)}" type="button">حذف</button></div></td>
+          </tr>
+        `).join("")}</tbody>
+      </table></div>` : '<div class="empty">لا توجد كشوف حضور محفوظة بعد</div>'}
+  </div>`;
+  root.querySelector("#attendance-new-btn").addEventListener("click", onNew);
+  root.querySelectorAll("[data-edit]").forEach((btn) => btn.addEventListener("click", () => onEdit(btn.dataset.edit)));
+  root.querySelectorAll("[data-remove]").forEach((btn) => btn.addEventListener("click", async () => {
+    if (!await confirmDialog("حذف كشف الحضور هذا نهائيًا؟")) return;
+    await removeAttendanceSheet(btn.dataset.remove);
+    await renderAttendanceLog(root, onNew, onEdit);
+  }));
+}
+
+async function renderAttendanceEditor(root, sheetId, onDone) {
+  const [schoolOptions, teachers, existing] = await Promise.all([
+    getFilterOptions(), listTeachers(), sheetId ? getAttendanceSheet(sheetId) : Promise.resolve(null),
+  ]);
+  if (sheetId && !existing) { notify("كشف الحضور غير موجود"); await onDone(); return; }
   const teacherNames = teachers.map((t) => t.name).filter(Boolean);
+
   let mode = "section";
-  let sectionStudents = [];
-  let customStudents = [];
+  let sectionRoster = [];
+  let sectionSelectedIds = new Set();
+  let customStudents = existing?.students ? [...existing.students] : [];
 
   root.innerHTML = `<div class="card forms-card">
-    <h2>كشف حضور فعالية</h2>
-    <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم اطبع الكشف أو صدّره Word.</p>
+    <div class="card-head">
+      <h2>${sheetId ? "تعديل كشف الحضور" : "كشف حضور فعالية جديد"}</h2>
+      <button class="btn btn-ghost" type="button" id="attendance-back">رجوع للسجل</button>
+    </div>
+    <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word.</p>
     <form id="attendance-form" class="forms-grid">
-      ${field("عنوان الفعالية", "title", "text", true, "")}
-      ${field("التاريخ", "date", "date", true, today())}
-      <label class="forms-field"><span>المعلم المرافق الأول</span><input name="teacher1" list="attendance-teachers-list" autocomplete="off"></label>
-      <label class="forms-field"><span>المعلم المرافق الثاني</span><input name="teacher2" list="attendance-teachers-list" autocomplete="off"></label>
+      ${field("عنوان الفعالية", "title", "text", true, existing?.title || "")}
+      ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
+      ${field("التاريخ", "date", "date", true, existing?.date || today())}
+      ${field("من الساعة", "startTime", "time", false, existing?.startTime || "")}
+      ${field("إلى الساعة", "endTime", "time", false, existing?.endTime || "")}
+      <label class="forms-field"><span>المعلم المرافق الأول</span><input name="teacher1" list="attendance-teachers-list" autocomplete="off" value="${esc(existing?.teachers?.[0] || "")}"></label>
+      <label class="forms-field"><span>المعلم المرافق الثاني</span><input name="teacher2" list="attendance-teachers-list" autocomplete="off" value="${esc(existing?.teachers?.[1] || "")}"></label>
       <datalist id="attendance-teachers-list">${teacherNames.map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>
       <div class="forms-field forms-wide">
         <span>اختيار الطلبة</span>
         <div class="chip-row" id="attendance-mode-chips">
-          <div class="chip on" data-mode="section">شعبة كاملة</div>
-          <div class="chip" data-mode="custom">طلاب من شعب مختلفة</div>
+          <div class="chip${mode === "section" ? " on" : ""}" data-mode="section">شعبة كاملة</div>
+          <div class="chip${mode === "custom" ? " on" : ""}" data-mode="custom">طلاب من شعب مختلفة</div>
         </div>
       </div>
       <div id="attendance-picker" class="forms-wide"></div>
       <div id="attendance-students-preview" class="forms-wide"></div>
       <div class="forms-actions forms-wide">
+        <button class="btn btn-primary" type="button" id="attendance-save">حفظ الكشف</button>
         <button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
-        <button class="btn btn-primary" type="button" id="attendance-word">تصدير Word</button>
+        <button class="btn btn-ghost" type="button" id="attendance-word">تصدير Word</button>
       </div>
     </form>
   </div>`;
 
+  root.querySelector("#attendance-back").addEventListener("click", onDone);
+
   const pickerRoot = root.querySelector("#attendance-picker");
   const previewRoot = root.querySelector("#attendance-students-preview");
 
+  const currentStudents = () => (mode === "section" ? sectionRoster.filter((s) => sectionSelectedIds.has(s.id)) : customStudents);
+
   const renderPreview = () => {
-    const list = mode === "section" ? sectionStudents : customStudents;
+    const list = currentStudents();
     previewRoot.innerHTML = list.length
       ? `<p class="hint">عدد الطلبة المشاركين: ${list.length}</p><div class="tablewrap"><table><thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>الاسم</th><th>الشعبة</th></tr></thead><tbody>${list.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td></tr>`).join("")}</tbody></table></div>`
       : '<div class="empty">لم يتم اختيار طلبة بعد</div>';
   };
 
+  // بطاقات checkbox لكل طالب بالشعبة — كلهم محدَّدون افتراضيًا (كل الشعبة)،
+  // ويقدر المرشد يلغي تحديد من يبي استبعادهم بدل اضطراره لأخذ الشعبة كاملة.
+  const renderSectionRoster = () => {
+    const rosterRoot = pickerRoot.querySelector("#attendance-section-roster");
+    if (!rosterRoot) return;
+    rosterRoot.innerHTML = sectionRoster.length ? `
+      <div class="forms-actions" style="margin:8px 0;">
+        <button type="button" class="btn btn-ghost" id="attendance-select-all">تحديد الكل</button>
+        <button type="button" class="btn btn-ghost" id="attendance-select-none">إلغاء تحديد الكل</button>
+      </div>
+      <ul class="plain">
+        ${sectionRoster.map((s) => `
+          <li class="row-item">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
+              <input type="checkbox" class="attendance-roster-checkbox" data-id="${esc(s.id)}" ${sectionSelectedIds.has(s.id) ? "checked" : ""}>
+              <span>${esc(s.name)} <span class="hint">(${esc(s.academicId || s.id)})</span></span>
+            </label>
+          </li>
+        `).join("")}
+      </ul>
+    ` : "";
+    rosterRoot.querySelectorAll(".attendance-roster-checkbox").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) sectionSelectedIds.add(checkbox.dataset.id); else sectionSelectedIds.delete(checkbox.dataset.id);
+        renderPreview();
+      });
+    });
+    rosterRoot.querySelector("#attendance-select-all")?.addEventListener("click", () => {
+      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
+      renderSectionRoster();
+      renderPreview();
+    });
+    rosterRoot.querySelector("#attendance-select-none")?.addEventListener("click", () => {
+      sectionSelectedIds = new Set();
+      renderSectionRoster();
+      renderPreview();
+    });
+  };
+
   const mountSectionPicker = () => {
-    pickerRoot.innerHTML = `<label class="forms-field forms-wide"><span>الشعبة</span><select id="attendance-section-select"><option value="">اختر الشعبة</option>${schoolOptions.sections.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>`;
+    pickerRoot.innerHTML = `<label class="forms-field forms-wide"><span>الشعبة</span><select id="attendance-section-select"><option value="">اختر الشعبة</option>${schoolOptions.sections.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label><div id="attendance-section-roster" class="forms-wide"></div>`;
     pickerRoot.querySelector("#attendance-section-select").addEventListener("change", async (event) => {
-      sectionStudents = event.target.value ? await listStudentsForSection(event.target.value) : [];
+      sectionRoster = event.target.value ? await listStudentsForSection(event.target.value) : [];
+      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
+      renderSectionRoster();
       renderPreview();
     });
   };
@@ -545,6 +651,7 @@ async function renderAttendanceSheet(root) {
     mountStudentPicker(pickerRoot.querySelector("#attendance-custom-picker"), {
       multi: true,
       placeholder: "أضف طالبًا... ابحث بالاسم أو الرقم الأكاديمي",
+      initial: customStudents,
       onChange(students) { customStudents = students; renderPreview(); },
     });
   };
@@ -555,7 +662,10 @@ async function renderAttendanceSheet(root) {
     if (mode === "section") mountSectionPicker(); else mountCustomPicker();
     renderPreview();
   };
-  setMode("section");
+  // تعديل كشف محفوظ سلفًا يبدأ بوضع "طلاب من شعب مختلفة" مع تحميل نفس
+  // قائمته المحفوظة كشارات جاهزة — بغض النظر عن الوضع الأصلي وقت الإنشاء،
+  // فالقائمة النهائية المحفوظة هي نفسها بكل الأحوال.
+  setMode(existing ? "custom" : "section");
 
   root.querySelectorAll("#attendance-mode-chips .chip").forEach((chip) => {
     chip.addEventListener("click", () => setMode(chip.dataset.mode));
@@ -563,9 +673,18 @@ async function renderAttendanceSheet(root) {
 
   const buildData = () => {
     const values = Object.fromEntries(new FormData(root.querySelector("#attendance-form")).entries());
-    const students = mode === "section" ? sectionStudents : customStudents;
+    const students = currentStudents();
     const day = values.date ? new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(new Date(values.date)) : "";
-    return { title: (values.title || "").trim(), date: values.date || "", day, teachers: [values.teacher1 || "", values.teacher2 || ""], students };
+    return {
+      title: (values.title || "").trim(),
+      location: (values.location || "").trim(),
+      date: values.date || "",
+      day,
+      startTime: values.startTime || "",
+      endTime: values.endTime || "",
+      teachers: [values.teacher1 || "", values.teacher2 || ""],
+      students,
+    };
   };
 
   const validate = (data) => {
@@ -573,6 +692,18 @@ async function renderAttendanceSheet(root) {
     if (!data.students.length) { notify("اختر الطلبة المشاركين أولًا"); return false; }
     return true;
   };
+
+  root.querySelector("#attendance-save").addEventListener("click", async (event) => {
+    const data = buildData();
+    if (!validate(data)) return;
+    const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ الحفظ…";
+    try {
+      if (sheetId) { await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
+      else { await createAttendanceSheet(data); notify("تم حفظ كشف الحضور"); }
+      await onDone();
+    } catch (error) { notify(error.message || "تعذر حفظ الكشف"); }
+    finally { button.disabled = false; button.textContent = original; }
+  });
 
   root.querySelector("#attendance-word").addEventListener("click", () => {
     const data = buildData();
@@ -586,6 +717,12 @@ async function renderAttendanceSheet(root) {
     if (!validate(data)) return;
     await printAttendanceSheetDirect(data);
   });
+}
+
+async function renderAttendanceSheet(root) {
+  const showLog = () => renderAttendanceLog(root, () => showEditor(null), (id) => showEditor(id));
+  const showEditor = (id) => renderAttendanceEditor(root, id, showLog);
+  await showLog();
 }
 
 export async function mountFormsView(container) {
