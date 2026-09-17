@@ -477,7 +477,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
         <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
       </table></div>
     </div>
-    <div class="card"><h2>قائمة الطلبة المشاركين</h2>
+    <div class="card attendance-roster"><h2>قائمة الطلبة المشاركين</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr></thead>
         <tbody>${students.length ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("") : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}</tbody>
