@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
-  buildDepartmentFormReportHtml, buildStudentProfileReportHtml,
+  buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml,
 } from "../src/services/report-builders.js";
 
 test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
@@ -205,4 +205,34 @@ test("buildStudentProfileReportHtml shows a clear placeholder for every empty se
   assert.match(html, /لا توجد جلسات توجيه مهني/);
   assert.match(html, /لا توجد مقررات معلَّقة/);
   assert.match(html, /لا توجد استمارات مرتبطة بهذا الطالب/);
+});
+
+test("buildAttendanceSheetReportHtml lists event info and every selected student regardless of section", () => {
+  const html = buildAttendanceSheetReportHtml({
+    title: "زيارة ميدانية لمعرض التعليم العالي",
+    day: "الخميس",
+    date: "2026-09-17",
+    teachers: ["محمد أحمد", "سارة خالد"],
+    students: [
+      { academicId: "2026001", name: "طالب أول", section: "١تلم١" },
+      { academicId: "2026002", name: "طالب ثاني", section: "٥كهر٢" },
+    ],
+  }, "2026-09-17 10:00");
+
+  assert.match(html, /زيارة ميدانية لمعرض التعليم العالي/);
+  assert.match(html, /الخميس/);
+  assert.match(html, /2026-09-17/);
+  assert.match(html, /محمد أحمد، سارة خالد/);
+  assert.match(html, />2</); // عدد الطلبة المشاركين
+  assert.match(html, /طالب أول/);
+  assert.match(html, /١تلم١/);
+  assert.match(html, /طالب ثاني/);
+  assert.match(html, /٥كهر٢/);
+});
+
+test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers or students", () => {
+  const html = buildAttendanceSheetReportHtml({ title: "", day: "", date: "", teachers: ["", ""], students: [] }, "2026-09-17");
+  assert.match(html, /كشف حضور فعالية/);
+  assert.match(html, /لا يوجد طلبة مختارون/);
+  assert.match(html, /<th>المعلمون المرافقون<\/th><td colspan="3">—<\/td>/);
 });

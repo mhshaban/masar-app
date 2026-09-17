@@ -16,7 +16,7 @@ import {
 import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
 import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js?v=2026-09-13-period-order-fix-1";
 import { saveProgress } from "../execution/execution-service.js";
-import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-16-prep-school-results-1";
+import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-sheet-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {

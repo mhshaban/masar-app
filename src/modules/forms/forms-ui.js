@@ -1,12 +1,12 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
-import { getFilterOptions } from "../students/students-service.js";
+import { getFilterOptions, listStudentsForSection } from "../students/students-service.js";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
-  updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
+  updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml } from "../../services/report-builders.js?v=2026-09-16-prep-school-results-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-sheet-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -440,8 +440,156 @@ async function renderTeachers(root, { query = "", page = 0, editTeacher = null, 
   await loadPhotos();
 }
 
+// نفس شكل formDetailMarkup (forms-print) لضمان تطابق الطباعة المباشرة مع
+// باقي الاستمارات تمامًا — خط Cairo وألوان القسم نفسها — لكن بلا نموذج
+// حفظ لأن كشف الحضور مستند لحظي يُبنى ويُطبع فورًا، بلا سجل بقاعدة البيانات.
+function attendanceSheetMarkup({ title, day, date, teachers, students }) {
+  return `<div class="forms-print" id="attendance-printable">
+    <div class="topbar"><div><h1>${esc(title) || "كشف حضور فعالية"}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
+    <div class="card"><h2>بيانات الفعالية</h2>
+      <div class="forms-detail-row"><span>اليوم</span><strong>${esc(day) || "—"}</strong></div>
+      <div class="forms-detail-row"><span>التاريخ</span><strong>${esc(date) || "—"}</strong></div>
+      <div class="forms-detail-row"><span>عدد الطلبة المشاركين</span><strong>${students.length}</strong></div>
+      <div class="forms-detail-row"><span>المعلم المرافق الأول</span><strong>${esc(teachers[0]) || "—"}</strong></div>
+      <div class="forms-detail-row"><span>المعلم المرافق الثاني</span><strong>${esc(teachers[1]) || "—"}</strong></div>
+    </div>
+    <div class="card"><h2>قائمة الطلبة المشاركين</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr></thead>
+        <tbody>${students.length ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("") : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+async function printAttendanceSheetDirect(data) {
+  const popup = window.open("", "_blank");
+  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
+  popup.document.body.textContent = "جارٍ تجهيز الكشف للطباعة…";
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(data.title) || "كشف حضور فعالية"}</title></head><body><main id="attendance-root"></main></body></html>`);
+    popup.document.close();
+    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
+    const root = popup.document.getElementById("attendance-root");
+    root.innerHTML = attendanceSheetMarkup(data);
+    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map((source) => new Promise((resolve, reject) => {
+      const link = popup.document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = source.href;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
+      popup.document.head.appendChild(link);
+    }));
+    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
+    await Promise.all(styles);
+    if (popup.closed) return;
+    await Promise.all([400, 600, 700, 800].map((weight) => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
+    await popup.document.fonts.ready;
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
+  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الكشف."); }
+}
+
+async function renderAttendanceSheet(root) {
+  const [schoolOptions, teachers] = await Promise.all([getFilterOptions(), listTeachers()]);
+  const teacherNames = teachers.map((t) => t.name).filter(Boolean);
+  let mode = "section";
+  let sectionStudents = [];
+  let customStudents = [];
+
+  root.innerHTML = `<div class="card forms-card">
+    <h2>كشف حضور فعالية</h2>
+    <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم اطبع الكشف أو صدّره Word.</p>
+    <form id="attendance-form" class="forms-grid">
+      ${field("عنوان الفعالية", "title", "text", true, "")}
+      ${field("التاريخ", "date", "date", true, today())}
+      <label class="forms-field"><span>المعلم المرافق الأول</span><input name="teacher1" list="attendance-teachers-list" autocomplete="off"></label>
+      <label class="forms-field"><span>المعلم المرافق الثاني</span><input name="teacher2" list="attendance-teachers-list" autocomplete="off"></label>
+      <datalist id="attendance-teachers-list">${teacherNames.map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>
+      <div class="forms-field forms-wide">
+        <span>اختيار الطلبة</span>
+        <div class="chip-row" id="attendance-mode-chips">
+          <div class="chip on" data-mode="section">شعبة كاملة</div>
+          <div class="chip" data-mode="custom">طلاب من شعب مختلفة</div>
+        </div>
+      </div>
+      <div id="attendance-picker" class="forms-wide"></div>
+      <div id="attendance-students-preview" class="forms-wide"></div>
+      <div class="forms-actions forms-wide">
+        <button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
+        <button class="btn btn-primary" type="button" id="attendance-word">تصدير Word</button>
+      </div>
+    </form>
+  </div>`;
+
+  const pickerRoot = root.querySelector("#attendance-picker");
+  const previewRoot = root.querySelector("#attendance-students-preview");
+
+  const renderPreview = () => {
+    const list = mode === "section" ? sectionStudents : customStudents;
+    previewRoot.innerHTML = list.length
+      ? `<p class="hint">عدد الطلبة المشاركين: ${list.length}</p><div class="tablewrap"><table><thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>الاسم</th><th>الشعبة</th></tr></thead><tbody>${list.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td></tr>`).join("")}</tbody></table></div>`
+      : '<div class="empty">لم يتم اختيار طلبة بعد</div>';
+  };
+
+  const mountSectionPicker = () => {
+    pickerRoot.innerHTML = `<label class="forms-field forms-wide"><span>الشعبة</span><select id="attendance-section-select"><option value="">اختر الشعبة</option>${schoolOptions.sections.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>`;
+    pickerRoot.querySelector("#attendance-section-select").addEventListener("change", async (event) => {
+      sectionStudents = event.target.value ? await listStudentsForSection(event.target.value) : [];
+      renderPreview();
+    });
+  };
+  const mountCustomPicker = () => {
+    pickerRoot.innerHTML = `<div id="attendance-custom-picker"></div>`;
+    mountStudentPicker(pickerRoot.querySelector("#attendance-custom-picker"), {
+      multi: true,
+      placeholder: "أضف طالبًا... ابحث بالاسم أو الرقم الأكاديمي",
+      onChange(students) { customStudents = students; renderPreview(); },
+    });
+  };
+
+  const setMode = (newMode) => {
+    mode = newMode;
+    root.querySelectorAll("#attendance-mode-chips .chip").forEach((chip) => chip.classList.toggle("on", chip.dataset.mode === mode));
+    if (mode === "section") mountSectionPicker(); else mountCustomPicker();
+    renderPreview();
+  };
+  setMode("section");
+
+  root.querySelectorAll("#attendance-mode-chips .chip").forEach((chip) => {
+    chip.addEventListener("click", () => setMode(chip.dataset.mode));
+  });
+
+  const buildData = () => {
+    const values = Object.fromEntries(new FormData(root.querySelector("#attendance-form")).entries());
+    const students = mode === "section" ? sectionStudents : customStudents;
+    const day = values.date ? new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(new Date(values.date)) : "";
+    return { title: (values.title || "").trim(), date: values.date || "", day, teachers: [values.teacher1 || "", values.teacher2 || ""], students };
+  };
+
+  const validate = (data) => {
+    if (!data.title) { notify("اكتب عنوان الفعالية أولًا"); return false; }
+    if (!data.students.length) { notify("اختر الطلبة المشاركين أولًا"); return false; }
+    return true;
+  };
+
+  root.querySelector("#attendance-word").addEventListener("click", () => {
+    const data = buildData();
+    if (!validate(data)) return;
+    const html = buildAttendanceSheetReportHtml(data, new Date().toLocaleString("ar-BH"));
+    downloadAsWordDoc(data.title, html, `كشف-حضور-${data.title}-${data.date || today()}`.replace(/[\\/:*?"<>|]/g, "-"));
+  });
+
+  root.querySelector("#attendance-print").addEventListener("click", async () => {
+    const data = buildData();
+    if (!validate(data)) return;
+    await printAttendanceSheetDirect(data);
+  });
+}
+
 export async function mountFormsView(container) {
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -454,6 +602,7 @@ export async function mountFormsView(container) {
         const openEdit = (id) => renderEdit(content, id, back, openDetail);
         await renderLog(content, openDetail, openEdit);
       }
+      else if (tab === "attendance") await renderAttendanceSheet(content);
       else await renderTeachers(content);
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);
