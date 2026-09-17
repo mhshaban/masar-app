@@ -578,10 +578,16 @@
     .forms-print .print-hide { display: none !important; }
     /* كشف حضور فعالية: قد يصل لـ٣٠-٤٠ طالبًا بصف واحد لكل طالب — أضيق من
        بقية استمارات forms-print (سطر واحد أو سطرين لكل استمارة) فيحتاج
-       تباعدًا أدق كي يبقى بصفحة A4 واحدة. قيست القيم فعليًا لا تخمينًا. */
+       تباعدًا أدق كي يبقى بصفحة A4 واحدة. قيست القيم فعليًا لا تخمينًا،
+       مع هامش أمان إضافي لاختلاف هوامش الطباعة الفعلية بين المتصفحات
+       ومحرّكات "طباعة كـPDF" (لا تلتزم كلّها بـ@page{margin:0} بدقة). */
     .attendance-print .card { padding: 2.5mm 3.5mm; margin: 0 0 2.5mm; }
-    .attendance-print table { font-size: 8pt; }
-    .attendance-print th, .attendance-print td { padding: 1mm 2mm; }
+    .attendance-print table { font-size: 7.5pt; line-height: 1.15; }
+    .attendance-print th, .attendance-print td { padding: .8mm 1.6mm; }
+    /* بطاقة قائمة الطلبة تحديدًا لا تُمنع من الانقسام بين الصفحات (خلافًا
+       لبقية بطاقات forms-print): لو تجاوزت المساحة المتبقية بأي طارئ، يفيض
+       صفّان أو ثلاثة لصفحة تالية بدل دفع الجدول كاملًا لصفحة شبه فارغة. */
+    .attendance-print .attendance-roster { break-inside: auto; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
