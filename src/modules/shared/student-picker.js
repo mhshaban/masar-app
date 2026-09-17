@@ -11,8 +11,8 @@ function esc(str) {
 // full ~1400-student roster into one <select>. Pass `multi: true` (guardian
 // consent forms, issued to a whole group of students at once) to instead
 // accumulate a removable list of students — see mountMultiStudentPicker.
-export function mountStudentPicker(root, { placeholder = "ابحث بالاسم أو الرقم الأكاديمي...", onSelect, multi = false, onChange } = {}) {
-  if (multi) return mountMultiStudentPicker(root, { placeholder, onSelect, onChange });
+export function mountStudentPicker(root, { placeholder = "ابحث بالاسم أو الرقم الأكاديمي...", onSelect, multi = false, onChange, initial } = {}) {
+  if (multi) return mountMultiStudentPicker(root, { placeholder, onSelect, onChange, initial });
 
   root.innerHTML = `
     <div class="search" style="max-width:none;">
@@ -55,7 +55,7 @@ export function mountStudentPicker(root, { placeholder = "ابحث بالاسم 
 // للإزالة) بدل استبدال الاختيار السابق — لطلب موافقة ولي الأمر لعدّة طلاب
 // دفعة واحدة (استمارة مستقلة لكل طالب، بنفس نص الموضوع/الموافقة). الطالب
 // المختار أصلًا يُستبعَد من نتائج البحث التالية لتفادي تكراره بالقائمة.
-function mountMultiStudentPicker(root, { placeholder, onSelect, onChange }) {
+function mountMultiStudentPicker(root, { placeholder, onSelect, onChange, initial }) {
   root.innerHTML = `
     <div class="search" style="max-width:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -67,7 +67,9 @@ function mountMultiStudentPicker(root, { placeholder, onSelect, onChange }) {
   const input = root.querySelector("#picker-q");
   const results = root.querySelector("#picker-results");
   const selectedRoot = root.querySelector("#picker-selected");
-  const selected = new Map();
+  // يُملأ عند فتح سجل محفوظ سلفًا للتعديل — نفس شارات الاختيار العادية،
+  // لكن جاهزة من البداية بدل ما يعيد المرشد البحث عن كل طالب من جديد.
+  const selected = new Map((initial || []).filter((s) => s?.id).map((s) => [s.id, s]));
 
   const renderSelected = () => {
     const list = [...selected.values()];
@@ -111,4 +113,6 @@ function mountMultiStudentPicker(root, { placeholder, onSelect, onChange }) {
       });
     });
   });
+
+  if (selected.size) renderSelected();
 }

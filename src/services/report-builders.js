@@ -318,14 +318,34 @@ export function buildStudentProfileReportHtml(data, exportedAt) {
 // دفعة واحدة — كلاهما ينتهي لنفس شكل `students` هنا (لا فرق بمصدر
 // الاختيار وقت البناء). عمود الشعبة يبقى مفيدًا حتى في وضع "شعبة كاملة"
 // (كل الصفوف بنفس القيمة) للحفاظ على شكل جدول واحد بالحالتين.
+// "09:00" -> "09:00 ص" (تنسيق ١٢ ساعة بالعربي، أوضح على مستند مطبوع من
+// قيمة <input type="time"> الخام). قيمة واحدة فقط (بداية أو نهاية بلا
+// الأخرى) تُعرض بمفردها بدل شرطة بينهما توحي بفترة كاملة غير موجودة.
+function formatTimeRange(startTime, endTime) {
+  const fmt = (t) => {
+    if (!t) return "";
+    const [h, m] = String(t).split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return t;
+    const period = h < 12 ? "ص" : "م";
+    const hour12 = h % 12 || 12;
+    return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+  };
+  const start = fmt(startTime);
+  const end = fmt(endTime);
+  if (start && end) return `${start} — ${end}`;
+  return start || end || "";
+}
+
 export function buildAttendanceSheetReportHtml(data, exportedAt) {
-  const { title, day, date, teachers = [], students = [] } = data;
+  const { title, location, day, date, startTime, endTime, teachers = [], students = [] } = data;
   const teacherNames = teachers.filter((t) => String(t || "").trim());
+  const timeRange = formatTimeRange(startTime, endTime);
   return `
     <h1>${esc(title || "كشف حضور فعالية")}</h1>
     <p class="meta">تاريخ التصدير: ${esc(exportedAt)}</p>
     <table>
       <tr><th>اليوم</th><td>${esc(day) || "—"}</td><th>التاريخ</th><td>${esc(date) || "—"}</td></tr>
+      <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
       <tr><th>عدد الطلبة المشاركين</th><td colspan="3">${students.length}</td></tr>
       <tr><th>المعلمون المرافقون</th><td colspan="3">${teacherNames.length ? teacherNames.map(esc).join("، ") : "—"}</td></tr>
     </table>

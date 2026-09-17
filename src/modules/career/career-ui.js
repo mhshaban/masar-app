@@ -1,6 +1,6 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { SESSION_TOPICS, listStudentsWithSessions, getStudentSessions, addSession, removeSession, listCandidates } from "./career-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-14-multi-select-consent-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
