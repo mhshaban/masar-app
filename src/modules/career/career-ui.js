@@ -122,6 +122,49 @@ async function renderStudentsTable(root, onOpen) {
   });
 }
 
+// طباعة سجل جلسات التوجيه المهني لطالب واحد — نفس تقنية الطباعة المباشرة
+// المعتمدة بالاستمارات وكشف حضور الفعالية (forms-ui.js).
+function careerSessionsPrintMarkup(studentName, sessions) {
+  return `<div class="forms-print" id="career-printable">
+    <div class="topbar"><div><h1>${esc(studentName) || "جلسات التوجيه المهني"}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div></div>
+    <div class="card"><h2>سجل الجلسات</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>التاريخ</th><th>الموضوع</th><th>الملاحظات</th><th>التوصية</th></tr></thead>
+        <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.topic)}</td><td>${esc(s.notes) || "—"}</td><td>${esc(s.recommendation) || "—"}</td></tr>`).join("") : '<tr><td colspan="4">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+async function printCareerSessionsDirect(studentName, sessions) {
+  const popup = window.open("", "_blank");
+  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
+  popup.document.body.textContent = "جارٍ تجهيز السجل للطباعة…";
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(studentName) || "جلسات التوجيه المهني"}</title></head><body><main id="career-print-root"></main></body></html>`);
+    popup.document.close();
+    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
+    const root = popup.document.getElementById("career-print-root");
+    root.innerHTML = careerSessionsPrintMarkup(studentName, sessions);
+    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map((source) => new Promise((resolve, reject) => {
+      const link = popup.document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = source.href;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
+      popup.document.head.appendChild(link);
+    }));
+    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
+    await Promise.all(styles);
+    if (popup.closed) return;
+    await Promise.all([400, 600, 700, 800].map((weight) => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
+    await popup.document.fonts.ready;
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
+  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة السجل."); }
+}
+
 async function renderStudentDetail(container, studentId, onBack, onGoto) {
   const refresh = () => renderStudentDetail(container, studentId, onBack, onGoto);
   const [sessions, student, flagsMap] = await Promise.all([
@@ -136,6 +179,7 @@ async function renderStudentDetail(container, studentId, onBack, onGoto) {
     </button>
     <div class="topbar">
       <div><h1>${esc(studentName)}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div>
+      <div class="forms-actions"><button class="btn btn-ghost" id="career-print">طباعة</button></div>
     </div>
     ${student ? studentQuickCard(student, studentQuickInfo(student, flagsMap)) : ""}
     ${student && onGoto ? '<div style="margin:-8px 0 16px;"><button class="link-btn" id="career-open-profile">فتح ملف الطالب</button></div>' : ""}
@@ -173,6 +217,7 @@ async function renderStudentDetail(container, studentId, onBack, onGoto) {
   container.querySelector("#career-back").addEventListener("click", onBack);
   const profileBtn = container.querySelector("#career-open-profile");
   if (profileBtn) profileBtn.addEventListener("click", () => onGoto("students", { studentId: student.id }));
+  container.querySelector("#career-print").addEventListener("click", () => printCareerSessionsDirect(studentName, sessions));
   container.querySelector("#session-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = e.target;

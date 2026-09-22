@@ -238,6 +238,59 @@ async function renderActions(root, planId, refreshDetail) {
   });
 }
 
+const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قيد التنفيذ", done: "منجز" };
+
+// طباعة خطة دعم واحدة (بياناتها + إجراءاتها) — نفس تقنية الطباعة المباشرة
+// المعتمدة بالاستمارات وكشف حضور الفعالية (forms-ui.js).
+function planDetailPrintMarkup(plan, actions) {
+  return `<div class="forms-print" id="plan-printable">
+    <div class="topbar"><div><h1>${esc(plan.domain) || "خطة دعم فردية"}</h1><div class="sub">${esc(plan.studentName) || esc(plan.studentId)}</div></div></div>
+    <div class="card"><h2>بيانات الخطة</h2>
+      <div class="tablewrap"><table>
+        <tr><th>الطالب</th><td>${esc(plan.studentName) || esc(plan.studentId)}</td><th>المجال</th><td>${esc(plan.domain) || "—"}</td></tr>
+        <tr><th>الحالة</th><td>${esc(PLAN_STATUS_LABELS[plan.status] || plan.status)}</td><th>تاريخ البدء</th><td>${esc(plan.startDate) || "—"}</td></tr>
+        ${plan.completedDate ? `<tr><th>تاريخ الإكمال</th><td colspan="3">${esc(plan.completedDate)}</td></tr>` : ""}
+      </table></div>
+    </div>
+    ${plan.goal ? `<div class="card"><h2>الهدف</h2><p>${esc(plan.goal)}</p></div>` : ""}
+    <div class="card"><h2>إجراءات الخطة</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>الإجراء</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
+        <tbody>${actions.length ? actions.map((a) => `<tr><td>${esc(a.action)}</td><td>${esc(a.dueDate) || "—"}</td><td>${esc(PLAN_ACTION_STATUS_LABELS[a.status] || a.status)}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد إجراءات مسجَّلة</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+async function printPlanDirect(plan, actions) {
+  const popup = window.open("", "_blank");
+  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
+  popup.document.body.textContent = "جارٍ تجهيز الخطة للطباعة…";
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(plan.domain) || "خطة دعم فردية"}</title></head><body><main id="plan-print-root"></main></body></html>`);
+    popup.document.close();
+    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
+    const root = popup.document.getElementById("plan-print-root");
+    root.innerHTML = planDetailPrintMarkup(plan, actions);
+    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map((source) => new Promise((resolve, reject) => {
+      const link = popup.document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = source.href;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
+      popup.document.head.appendChild(link);
+    }));
+    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
+    await Promise.all(styles);
+    if (popup.closed) return;
+    await Promise.all([400, 600, 700, 800].map((weight) => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
+    await popup.document.fonts.ready;
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
+  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الخطة."); }
+}
+
 async function renderPlanDetail(container, id, onBack, onGoto) {
   const refresh = () => renderPlanDetail(container, id, onBack, onGoto);
   const plan = await getPlan(id);
@@ -263,6 +316,7 @@ async function renderPlanDetail(container, id, onBack, onGoto) {
           <button class="btn btn-ghost" id="plan-complete">إنهاء كمكتملة</button>
           <button class="btn btn-ghost" id="plan-cancel">إلغاء</button>
         ` : '<button class="btn btn-ghost" id="plan-reactivate">إعادة تفعيل</button>'}
+        <button class="btn btn-ghost" id="plan-print">طباعة</button>
         <button class="btn btn-ghost" id="plan-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
@@ -281,6 +335,10 @@ async function renderPlanDetail(container, id, onBack, onGoto) {
   if (cancelBtn) cancelBtn.addEventListener("click", async () => { await cancelPlan(id); await refresh(); });
   const reactivateBtn = container.querySelector("#plan-reactivate");
   if (reactivateBtn) reactivateBtn.addEventListener("click", async () => { await reactivatePlan(id); await refresh(); });
+  container.querySelector("#plan-print").addEventListener("click", async () => {
+    const actions = await listActions(id);
+    await printPlanDirect(plan, actions);
+  });
   container.querySelector("#plan-delete").addEventListener("click", async () => {
     if (!await confirmDialog("حذف هذه الخطة وكل إجراءاتها نهائيًا؟")) return;
     await removePlan(id);
