@@ -4,7 +4,8 @@ import {
   listSessions, addSession, removeSession, listCandidates,
 } from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js";
 import { buildGuidanceCasesReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
@@ -118,13 +119,14 @@ async function renderCandidates(root, onOpenNewCase) {
   });
 }
 
-function renderNewCaseForm(root, prefill, onCreated) {
+async function renderNewCaseForm(root, prefill, onCreated) {
+  const flagsMap = await loadAcademicFlagsMap();
   root.innerHTML = `
     <div class="card">
       <h2>حالة إرشادية جديدة</h2>
       <div id="new-case-picker"></div>
       <input type="hidden" id="new-case-student-id" value="${esc(prefill?.student?.id) || ""}">
-      <div id="new-case-selected" class="hint">${prefill?.student ? `الطالب المحدد: ${esc(prefill.student.name)} (${esc(prefill.student.academicId)})` : ""}</div>
+      <div id="new-case-selected">${studentQuickCard(prefill?.student || null, prefill?.student ? studentQuickInfo(prefill.student, flagsMap) : null)}</div>
       <form id="new-case-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <select name="category" aria-label="فئة الحالة" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -143,7 +145,7 @@ function renderNewCaseForm(root, prefill, onCreated) {
     onSelect: (student) => {
       selected = student;
       root.querySelector("#new-case-student-id").value = student.id;
-      root.querySelector("#new-case-selected").textContent = `الطالب المحدد: ${student.name} (${student.academicId || student.id})`;
+      root.querySelector("#new-case-selected").innerHTML = studentQuickCard(student, studentQuickInfo(student, flagsMap));
     },
   });
 
@@ -251,13 +253,14 @@ async function renderSessions(root, caseId, refreshDetail) {
   });
 }
 
-async function renderCaseDetail(container, id, onBack) {
-  const refresh = () => renderCaseDetail(container, id, onBack);
+async function renderCaseDetail(container, id, onBack, onGoto) {
+  const refresh = () => renderCaseDetail(container, id, onBack, onGoto);
   const item = await getCase(id);
   if (!item) {
     container.innerHTML = '<div class="card"><div class="empty">تعذّر إيجاد هذه الحالة</div></div>';
     return;
   }
+  const [student, flagsMap] = await Promise.all([getStudent(item.studentId), loadAcademicFlagsMap()]);
 
   container.innerHTML = `
     <button class="backlink" id="case-back">
@@ -277,11 +280,15 @@ async function renderCaseDetail(container, id, onBack) {
         <button class="btn btn-ghost" id="case-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
+    ${student ? studentQuickCard(student, studentQuickInfo(student, flagsMap)) : ""}
+    ${student && onGoto ? '<div style="margin:-8px 0 16px;"><button class="link-btn" id="case-open-profile">فتح ملف الطالب</button></div>' : ""}
     ${item.notes ? `<div class="card" style="margin-bottom:16px;"><h2>ملاحظات</h2><p class="hint" style="margin:0;">${esc(item.notes)}</p></div>` : ""}
     <div id="case-sessions"></div>
   `;
 
   container.querySelector("#case-back").addEventListener("click", onBack);
+  const profileBtn = container.querySelector("#case-open-profile");
+  if (profileBtn) profileBtn.addEventListener("click", () => onGoto("students", { studentId: student.id }));
   const closeBtn = container.querySelector("#case-close");
   if (closeBtn) closeBtn.addEventListener("click", async () => { await closeCase(id); await refresh(); });
   const reopenBtn = container.querySelector("#case-reopen");
@@ -295,7 +302,24 @@ async function renderCaseDetail(container, id, onBack) {
   await renderSessions(container.querySelector("#case-sessions"), id, refresh);
 }
 
-export async function mountCasesView(container) {
+// options.caseId يفتح حالة محدَّدة مباشرة (قادم من رابط "فتح" بلوحة اليوم أو
+// ملف الطالب). options.studentId يبحث عن حالة مفتوحة لهذا الطالب ويفتحها،
+// أو يعبّئ نموذج "حالة جديدة" مسبقًا به إن لم توجد — بدل هبوط المرشد على
+// قائمة الحالات العامة ليعيد البحث عن نفس الطالب من جديد في الحالتين.
+export async function mountCasesView(container, options = {}) {
+  const onGoto = options.onGoto;
+  const openDetail = (id) => renderCaseDetail(container, id, () => mountCasesView(container, { onGoto }), onGoto);
+
+  if (options.caseId) { await openDetail(options.caseId); return; }
+
+  let prefillStudent = null;
+  if (options.studentId) {
+    const cases = await listCases();
+    const existing = cases.find((c) => String(c.studentId) === String(options.studentId) && c.status !== "closed");
+    if (existing) { await openDetail(existing.id); return; }
+    prefillStudent = await getStudent(options.studentId);
+  }
+
   container.innerHTML = `
     <div class="topbar">
       <div><h1>الجلسات والمقابلات الإرشادية</h1></div>
@@ -306,16 +330,14 @@ export async function mountCasesView(container) {
     <div id="cases-candidates"></div>
   `;
 
-  const openDetail = (id) => renderCaseDetail(container, id, () => mountCasesView(container));
-
   const showNewForm = (student, reason) => {
     renderNewCaseForm(container.querySelector("#cases-new-form"), student ? { student, reason } : null, async () => {
-      await mountCasesView(container);
+      await mountCasesView(container, { onGoto });
     });
     if (student) container.querySelector("#cases-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  showNewForm(null, null);
+  showNewForm(prefillStudent, null);
   await renderCasesTable(container.querySelector("#cases-table"), openDetail);
   await renderCandidates(container.querySelector("#cases-candidates"), showNewForm);
 

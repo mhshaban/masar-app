@@ -12,26 +12,35 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-22-student-context-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-17-attendance-checkbox-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-17-attendance-checkbox-1")).mountAgendaView,
-  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-17-attendance-checkbox-1")).mountStudentsView,
+  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-22-student-context-1")).mountStudentsView,
   grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-14-cumulative-average-fix-1")).mountGradesView,
-  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-17-attendance-checkbox-1")).mountCasesView,
-  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-17-attendance-checkbox-1")).mountSupportView,
-  career: async () => (await import("./modules/career/career-ui.js?v=2026-09-17-attendance-checkbox-1")).mountCareerView,
+  cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-22-student-context-1")).mountCasesView,
+  support: async () => (await import("./modules/support/support-ui.js?v=2026-09-22-student-context-1")).mountSupportView,
+  career: async () => (await import("./modules/career/career-ui.js?v=2026-09-22-student-context-1")).mountCareerView,
   promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-07-review-1")).mountPromotedView,
-  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-17-attendance-one-page-2")).mountFormsView,
+  forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-22-student-context-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-09-import-fix-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,
   imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-16-prep-school-results-1")).mountImportsView,
 };
+// كل شاشة تحتاج تُقفز إليها مباشرة بمعلومة سياق (طالب/سجل محدَّد) تُسجَّل
+// هنا بـonGoto — renderView يدمج معه أي params ممرَّرة فعليًا (studentId،
+// caseId، planId، formId...) فتفتح الشاشة الهدف على السجل المطلوب مباشرة
+// بدل قائمتها العامة (راجع mountCasesView/mountSupportView/mountCareerView
+// وrenderDetail بـstudents-ui.js وmountFormsView).
 const VIEW_OPTIONS = {
   dashboard: () => ({ onGoto: renderView }),
   students: () => ({ onGoto: renderView }),
   grades: () => ({ onGoto: renderView }),
   promoted: () => ({ onGoto: renderView }),
+  cases: () => ({ onGoto: renderView }),
+  support: () => ({ onGoto: renderView }),
+  career: () => ({ onGoto: renderView }),
+  forms: () => ({ onGoto: renderView }),
 };
 const ADMIN_VIEWS = new Set(["imports", "backup", "users", "audit"]);
 const loadedViews = new Map();
@@ -273,7 +282,7 @@ if (navToggleBtn) {
 // يحفظ الصفحة الحالية بـ location.hash (replaceState، بلا تراكم سجلّ تصفّح
 // لكل ضغطة تنقّل داخلية) — فقط عشان تبقى نفس الصفحة لو المستخدم عمل
 // تحديث (F5) للمتصفح، بدون بناء نظام توجيه كامل جديد غير موجود أصلًا.
-async function renderView(viewName) {
+async function renderView(viewName, params = {}) {
   if (!VIEW_LOADERS[viewName]) viewName = "dashboard";
   if (ADMIN_VIEWS.has(viewName) && !isAdmin(currentProfile)) viewName = "dashboard";
   navButtons.forEach((b) => {
@@ -290,7 +299,8 @@ async function renderView(viewName) {
 
   try {
     const mount = await loadView(viewName);
-    await mount(main, VIEW_OPTIONS[viewName]?.() || undefined);
+    const options = { ...(VIEW_OPTIONS[viewName]?.() || {}), ...params };
+    await mount(main, Object.keys(options).length ? options : undefined);
     if (currentProfile?.role === "read_only") {
       main.insertAdjacentHTML("afterbegin", '<div class="readonly-banner" role="status">أنت في وضع القراءة فقط — عمليات التعديل محمية من قاعدة البيانات.</div>');
     }

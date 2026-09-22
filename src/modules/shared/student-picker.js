@@ -1,4 +1,5 @@
 import { searchStudents } from "../students/students-service.js";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickInfoLine } from "./student-quick-info.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -23,6 +24,7 @@ export function mountStudentPicker(root, { placeholder = "ابحث بالاسم 
   `;
   const input = root.querySelector("#picker-q");
   const results = root.querySelector("#picker-results");
+  const flagsMapPromise = loadAcademicFlagsMap();
 
   input.addEventListener("input", async () => {
     const query = input.value.trim();
@@ -30,16 +32,22 @@ export function mountStudentPicker(root, { placeholder = "ابحث بالاسم 
       results.innerHTML = "";
       return;
     }
-    const matches = (await searchStudents({ query })).slice(0, 8);
+    const [matches, flagsMap] = await Promise.all([
+      searchStudents({ query }).then((rows) => rows.slice(0, 8)),
+      flagsMapPromise,
+    ]);
     if (!matches.length) {
       results.innerHTML = '<p class="hint">لا نتائج</p>';
       return;
     }
-    results.innerHTML = `<ul class="plain">${matches.map((s) => `
+    results.innerHTML = `<ul class="plain">${matches.map((s) => {
+      const extra = studentQuickInfoLine(studentQuickInfo(s, flagsMap));
+      return `
       <li class="row-item" data-id="${esc(s.id)}" style="cursor:pointer;">
-        <div class="body"><div class="title">${esc(s.name) || "—"}</div><div class="meta">${esc(s.academicId) || "—"} · ${esc(s.level) || "—"} ${esc(s.section) || ""}</div></div>
+        <div class="body"><div class="title">${esc(s.name) || "—"}</div><div class="meta">${esc(s.academicId) || "—"} · ${esc(s.level) || "—"} ${esc(s.section) || ""}${extra ? ` · ${esc(extra)}` : ""}</div></div>
       </li>
-    `).join("")}</ul>`;
+    `;
+    }).join("")}</ul>`;
     results.querySelectorAll("[data-id]").forEach((li) => {
       li.addEventListener("click", () => {
         const student = matches.find((s) => s.id === li.dataset.id);
@@ -67,6 +75,7 @@ function mountMultiStudentPicker(root, { placeholder, onSelect, onChange, initia
   const input = root.querySelector("#picker-q");
   const results = root.querySelector("#picker-results");
   const selectedRoot = root.querySelector("#picker-selected");
+  const flagsMapPromise = loadAcademicFlagsMap();
   // يُملأ عند فتح سجل محفوظ سلفًا للتعديل — نفس شارات الاختيار العادية،
   // لكن جاهزة من البداية بدل ما يعيد المرشد البحث عن كل طالب من جديد.
   const selected = new Map((initial || []).filter((s) => s?.id).map((s) => [s.id, s]));
@@ -91,16 +100,20 @@ function mountMultiStudentPicker(root, { placeholder, onSelect, onChange, initia
       results.innerHTML = "";
       return;
     }
-    const matches = (await searchStudents({ query })).filter((s) => !selected.has(s.id)).slice(0, 8);
+    const [allMatches, flagsMap] = await Promise.all([searchStudents({ query }), flagsMapPromise]);
+    const matches = allMatches.filter((s) => !selected.has(s.id)).slice(0, 8);
     if (!matches.length) {
       results.innerHTML = '<p class="hint">لا نتائج</p>';
       return;
     }
-    results.innerHTML = `<ul class="plain">${matches.map((s) => `
+    results.innerHTML = `<ul class="plain">${matches.map((s) => {
+      const extra = studentQuickInfoLine(studentQuickInfo(s, flagsMap));
+      return `
       <li class="row-item" data-id="${esc(s.id)}" style="cursor:pointer;">
-        <div class="body"><div class="title">${esc(s.name) || "—"}</div><div class="meta">${esc(s.academicId) || "—"} · ${esc(s.level) || "—"} ${esc(s.section) || ""}</div></div>
+        <div class="body"><div class="title">${esc(s.name) || "—"}</div><div class="meta">${esc(s.academicId) || "—"} · ${esc(s.level) || "—"} ${esc(s.section) || ""}${extra ? ` · ${esc(extra)}` : ""}</div></div>
       </li>
-    `).join("")}</ul>`;
+    `;
+    }).join("")}</ul>`;
     results.querySelectorAll("[data-id]").forEach((li) => {
       li.addEventListener("click", () => {
         const student = matches.find((s) => s.id === li.dataset.id);

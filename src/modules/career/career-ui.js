@@ -1,6 +1,8 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { SESSION_TOPICS, listStudentsWithSessions, getStudentSessions, addSession, removeSession, listCandidates } from "./career-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
+import { getStudent } from "../students/students-service.js";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -44,12 +46,13 @@ async function renderCandidates(root, onOpenNewSession) {
   });
 }
 
-function renderNewSessionForm(root, prefill, onCreated) {
+async function renderNewSessionForm(root, prefill, onCreated) {
+  const flagsMap = await loadAcademicFlagsMap();
   root.innerHTML = `
     <div class="card">
       <h2>جلسة توجيه مهني جديدة</h2>
       <div id="new-session-picker"></div>
-      <div id="new-session-selected" class="hint">${prefill ? `الطالب المحدد: ${esc(prefill.name)} (${esc(prefill.academicId)})` : ""}</div>
+      <div id="new-session-selected">${studentQuickCard(prefill || null, prefill ? studentQuickInfo(prefill, flagsMap) : null)}</div>
       <form id="new-session-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <input name="topic" list="career-topics" required placeholder="موضوع الجلسة" style="flex:1; min-width:220px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -67,7 +70,7 @@ function renderNewSessionForm(root, prefill, onCreated) {
   mountStudentPicker(root.querySelector("#new-session-picker"), {
     onSelect: (student) => {
       selected = student;
-      root.querySelector("#new-session-selected").textContent = `الطالب المحدد: ${student.name} (${student.academicId || student.id})`;
+      root.querySelector("#new-session-selected").innerHTML = studentQuickCard(student, studentQuickInfo(student, flagsMap));
     },
   });
 
@@ -119,10 +122,12 @@ async function renderStudentsTable(root, onOpen) {
   });
 }
 
-async function renderStudentDetail(container, studentId, onBack) {
-  const refresh = () => renderStudentDetail(container, studentId, onBack);
-  const sessions = await getStudentSessions(studentId);
-  const studentName = sessions[0]?.studentName || studentId;
+async function renderStudentDetail(container, studentId, onBack, onGoto) {
+  const refresh = () => renderStudentDetail(container, studentId, onBack, onGoto);
+  const [sessions, student, flagsMap] = await Promise.all([
+    getStudentSessions(studentId), getStudent(studentId), loadAcademicFlagsMap(),
+  ]);
+  const studentName = student?.name || sessions[0]?.studentName || studentId;
 
   container.innerHTML = `
     <button class="backlink" id="career-back">
@@ -132,6 +137,8 @@ async function renderStudentDetail(container, studentId, onBack) {
     <div class="topbar">
       <div><h1>${esc(studentName)}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div>
     </div>
+    ${student ? studentQuickCard(student, studentQuickInfo(student, flagsMap)) : ""}
+    ${student && onGoto ? '<div style="margin:-8px 0 16px;"><button class="link-btn" id="career-open-profile">فتح ملف الطالب</button></div>' : ""}
     <div class="card" style="margin-bottom:16px;">
       <h2>جلسة جديدة لهذا الطالب</h2>
       <form id="session-form" style="display:flex; flex-direction:column; gap:10px;">
@@ -164,6 +171,8 @@ async function renderStudentDetail(container, studentId, onBack) {
   `;
 
   container.querySelector("#career-back").addEventListener("click", onBack);
+  const profileBtn = container.querySelector("#career-open-profile");
+  if (profileBtn) profileBtn.addEventListener("click", () => onGoto("students", { studentId: student.id }));
   container.querySelector("#session-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -190,7 +199,19 @@ async function renderStudentDetail(container, studentId, onBack) {
   });
 }
 
-export async function mountCareerView(container) {
+// options.studentId: نفس منطق deep-link بوحدة الحالات الإرشادية — إن وُجدت
+// جلسات سابقة للطالب يفتح سجله مباشرة، وإلا يعبّئ نموذج جلسة جديدة به.
+export async function mountCareerView(container, options = {}) {
+  const onGoto = options.onGoto;
+  const openDetail = (studentId) => renderStudentDetail(container, studentId, () => mountCareerView(container, { onGoto }), onGoto);
+
+  let prefillStudent = null;
+  if (options.studentId) {
+    const rows = await listStudentsWithSessions();
+    if (rows.some((r) => String(r.studentId) === String(options.studentId))) { await openDetail(options.studentId); return; }
+    prefillStudent = await getStudent(options.studentId);
+  }
+
   container.innerHTML = `
     <div class="topbar">
       <div><h1>التوجيه المهني</h1><div class="sub">جلسات وتوصيات التوجيه الجامعي والمهني</div></div>
@@ -200,16 +221,14 @@ export async function mountCareerView(container) {
     <div id="career-candidates"></div>
   `;
 
-  const openDetail = (studentId) => renderStudentDetail(container, studentId, () => mountCareerView(container));
-
   const showNewForm = (student) => {
     renderNewSessionForm(container.querySelector("#career-new-form"), student || null, async () => {
-      await mountCareerView(container);
+      await mountCareerView(container, { onGoto });
     });
     if (student) container.querySelector("#career-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  showNewForm(null);
+  showNewForm(prefillStudent);
   await renderStudentsTable(container.querySelector("#career-table"), openDetail);
   await renderCandidates(container.querySelector("#career-candidates"), showNewForm);
 }

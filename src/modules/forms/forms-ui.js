@@ -1,5 +1,5 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
 import { getFilterOptions, listStudentsForSection } from "../students/students-service.js";
 import {
   createAttendanceSheet, updateAttendanceSheet, listAttendanceSheets, getAttendanceSheet, removeAttendanceSheet,
@@ -127,7 +127,7 @@ function typeFields(type, values = {}, student = null, options = { sections: [],
     <label class="forms-field"><span>نوع الطلب *</span><select name="requestKind" required><option value="">اختر</option><option value="section" ${values.requestKind === "section" ? "selected" : ""}>تغيير شعبة</option><option value="specialization" ${values.requestKind === "specialization" ? "selected" : ""}>تحويل تخصص</option></select></label>
     ${field("اسم ولي الأمر (مقدم الطلب)", "guardianName", "text", true, values.guardianName || "")}
     ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo", "text", false, values.guardianPersonalNo || "")}
-    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || "")}
+    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || (student?.phones || [])[0] || "")}
     ${placementFields(values.requestKind, options, values, student)}
     ${area("سبب الطلب", "reason", true, values.reason || "")}
     ${area("رأي قسم الإرشاد الأكاديمي والتوجيه المهني", "guidanceOpinion", false, values.guidanceOpinion || "")}
@@ -141,7 +141,7 @@ function typeFields(type, values = {}, student = null, options = { sections: [],
     ${area("نص طلب الموافقة", "consentText", true, values.consentText || "نرجو من حضرتكم موافاتنا بموافقتكم على مشاركة ابنكم في هذه الفعالية.")}
     <label class="forms-field"><span>رد ولي الأمر</span><select name="guardianResponse"><option value="pending" ${!values.guardianResponse || values.guardianResponse === "pending" ? "selected" : ""}>بانتظار الرد</option><option value="approved" ${values.guardianResponse === "approved" ? "selected" : ""}>موافق</option><option value="declined" ${values.guardianResponse === "declined" ? "selected" : ""}>غير موافق</option></select></label>
     ${field("الرقم الشخصي لولي الأمر", "guardianPersonalNo", "text", false, values.guardianPersonalNo || "")}
-    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || "")}
+    ${field("رقم التواصل", "guardianPhone", "tel", false, values.guardianPhone || (student?.phones || [])[0] || "")}
     ${field("التاريخ", "responseDate", "date", false, values.responseDate || "")}
     ${field("التوقيع / اسم ولي الأمر المقرّ", "signature", "text", false, values.signature || "")}`;
 }
@@ -165,14 +165,14 @@ async function renderCreate(root, rerender) {
   // إعادة رسم حقول النوع مع الحفاظ على ما كتبه المرشد فعلًا بباقي الحقول —
   // تتغيّر فقط حقول الشعبة/التخصص (نص ↔ قائمة منسدلة) حسب نوع طلب تغيير
   // الشعبة، وقيمتها الافتراضية حسب الطالب المختار حاليًا إن وُجد.
-  const renderDynamicFields = (typeKey) => {
+  const renderDynamicFields = (typeKey, studentForDefaults = selectedStudent) => {
     const values = Object.fromEntries(new FormData(root.querySelector("#department-form")).entries());
     // الشعبة والتخصص قائمتان مختلفتان تمامًا (شعب مقابل تخصصات) — أي قيمة
     // سابقة لهما (من نوع طلب سابق أو طالب سابق) لا معنى لها بالقائمة
     // الجديدة، فتُعاد للافتراضي بدل تسريبها كأنها اختيار المرشد الفعلي.
     delete values.currentPlacement;
     delete values.requestedPlacement;
-    dynamicRoot.innerHTML = typeFields(typeKey, values, selectedStudent, schoolOptions);
+    dynamicRoot.innerHTML = typeFields(typeKey, values, studentForDefaults, schoolOptions);
     dynamicRoot.querySelector('[name="requestKind"]')?.addEventListener("change", () => renderDynamicFields(typeKey));
   };
 
@@ -190,6 +190,9 @@ async function renderCreate(root, rerender) {
       mountStudentPicker(pickerRoot, {
         multi: true,
         placeholder: "أضف طالبًا... ابحث بالاسم أو الرقم الأكاديمي",
+        // رقم تواصل ولي الأمر يُعبَّأ تلقائيًا (قابل للتعديل) من آخر طالب
+        // أُضيف — تقريب معقول عند اختيار عدة طلبة دفعة واحدة لنفس الموافقة.
+        onSelect(student) { renderDynamicFields(typeKey, student); },
         onChange(students) { selectedStudents = students; },
       });
     } else {
@@ -327,7 +330,7 @@ export function formDetailMarkup(item) {
     <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
       <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
       ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
-      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button><button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
+      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button>${item.student?.id ? '<button class="btn btn-ghost" type="button" id="forms-open-profile">فتح ملف الطالب</button>' : ""}<button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
     </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
 }
 
@@ -366,12 +369,14 @@ async function printFormDirect(id) {
   } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الاستمارة."); }
 }
 
-async function renderDetail(root, id, back) {
+async function renderDetail(root, id, back, onGoto) {
   const item = await getDepartmentForm(id); if (!item) return back();
   root.innerHTML = formDetailMarkup(item);
   root.querySelector("[name=status]").value = item.status || "pending";
   root.querySelector("#forms-back").addEventListener("click", back);
-  root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); notify("تم حفظ المتابعة"); await renderDetail(root, id, back); });
+  const profileBtn = root.querySelector("#forms-open-profile");
+  if (profileBtn && onGoto) profileBtn.addEventListener("click", () => onGoto("students", { studentId: item.student.id }));
+  root.querySelector("#feedback-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target).entries()); await updateDepartmentForm(id, data); notify("تم حفظ المتابعة"); await renderDetail(root, id, back, onGoto); });
   root.querySelector("#forms-print").addEventListener("click", () => window.print());
   root.querySelector("#forms-word").addEventListener("click", () => {
     const report = buildDepartmentFormReportHtml(item, new Date().toLocaleString("ar-BH"));
@@ -729,7 +734,11 @@ async function renderAttendanceSheet(root) {
   await showLog();
 }
 
-export async function mountFormsView(container) {
+// options.formId يفتح استمارة محدَّدة مباشرة من سجل الاستمارات (قادم من
+// رابط "فتح ملف الطالب" المعاكس بملف الطالب) بدل هبوط المرشد على تبويب
+// "استمارة جديدة" ليتنقل بنفسه لسجل الاستمارات ويبحث عن نفس الاستمارة.
+export async function mountFormsView(container, options = {}) {
+  const onGoto = options.onGoto;
   container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
@@ -739,7 +748,7 @@ export async function mountFormsView(container) {
       if (tab === "new") await renderCreate(content, show);
       else if (tab === "log") {
         const back = () => show("log");
-        const openDetail = (id) => renderDetail(content, id, back);
+        const openDetail = (id) => renderDetail(content, id, back, onGoto);
         const openEdit = (id) => renderEdit(content, id, back, openDetail);
         await renderLog(content, openDetail, openEdit);
       }
@@ -751,5 +760,12 @@ export async function mountFormsView(container) {
       content.querySelector("#forms-retry")?.addEventListener("click", () => show(tab));
     }
   }
-  container.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => show(button.dataset.tab))); await show("new");
+  container.querySelectorAll(".tab").forEach((button) => button.addEventListener("click", () => show(button.dataset.tab)));
+  if (options.formId) {
+    container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === "log"));
+    content.innerHTML = '<div class="empty" role="status">جارٍ تحميل البيانات…</div>';
+    await renderDetail(content, options.formId, () => show("log"), onGoto);
+  } else {
+    await show("new");
+  }
 }

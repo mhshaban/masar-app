@@ -276,7 +276,11 @@ function renderTable(root, students, total, onOpen, onLoadMore) {
   if (loadMoreBtn) loadMoreBtn.addEventListener("click", onLoadMore);
 }
 
-async function renderDetail(container, id, onBack) {
+const RELATED_CASE_STATUS_LABELS = { open: "مفتوحة", monitoring: "قيد المتابعة", closed: "مُغلقة" };
+const RELATED_PLAN_STATUS_LABELS = { active: "نشطة", completed: "مكتملة", cancelled: "مُلغاة" };
+const RELATED_FORM_STATUS_LABELS = { pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" };
+
+async function renderDetail(container, id, onBack, onGoto) {
   const s = await getStudent(id);
   if (!s) {
     container.innerHTML = '<div class="card"><div class="empty">تعذّر إيجاد بيانات هذا الطالب</div></div>';
@@ -284,7 +288,13 @@ async function renderDetail(container, id, onBack) {
   }
 
   const hasGuidanceFlags = s.supportNeeded || s.socialGuidance;
-  const promotedSubjects = await getPendingSubjectsForStudent(String(s.academicId || s.id));
+  const [promotedSubjects, relatedCases, relatedPlans, careerSessions, relatedForms] = await Promise.all([
+    getPendingSubjectsForStudent(String(s.academicId || s.id)),
+    listCasesForStudent(s.id),
+    listPlansForStudent(s.id),
+    getCareerSessionsForStudent(s.id),
+    listFormsForStudent(s.id),
+  ]);
   const pendingSubjects = promotedSubjects.filter((r) => !r.cleared);
 
   container.innerHTML = `
@@ -344,6 +354,28 @@ async function renderDetail(container, id, onBack) {
       </div>
     </div>
 
+    <div class="card" style="margin-top:16px;">
+      <h2>السجلات المرتبطة</h2>
+      <div class="grid g2">
+        <div>
+          <div class="card-head"><h3 style="margin:0;font-size:14px;">الحالات الإرشادية (${relatedCases.length})</h3>${onGoto ? `<button class="link-btn" data-related="cases">فتح</button>` : ""}</div>
+          ${relatedCases.length ? `<ul class="plain">${relatedCases.slice(0, 3).map((c) => `<li class="row-item"${onGoto ? ` data-related-case="${esc(c.id)}" style="cursor:pointer;"` : ""}><div class="body"><div class="title">${esc(c.title) || esc(c.category)}</div><div class="meta">${esc(RELATED_CASE_STATUS_LABELS[c.status] || c.status)} · فُتحت ${esc(c.openedDate) || "—"}</div></div></li>`).join("")}</ul>` : '<p class="hint">لا توجد حالات إرشادية.</p>'}
+        </div>
+        <div>
+          <div class="card-head"><h3 style="margin:0;font-size:14px;">خطط الدعم (${relatedPlans.length})</h3>${onGoto ? `<button class="link-btn" data-related="support">فتح</button>` : ""}</div>
+          ${relatedPlans.length ? `<ul class="plain">${relatedPlans.slice(0, 3).map((p) => `<li class="row-item"${onGoto ? ` data-related-plan="${esc(p.id)}" style="cursor:pointer;"` : ""}><div class="body"><div class="title">${esc(p.domain) || "بلا مجال محدد"}</div><div class="meta">${esc(RELATED_PLAN_STATUS_LABELS[p.status] || p.status)} · بدأت ${esc(p.startDate) || "—"}</div></div></li>`).join("")}</ul>` : '<p class="hint">لا توجد خطط دعم.</p>'}
+        </div>
+        <div>
+          <div class="card-head"><h3 style="margin:0;font-size:14px;">التوجيه المهني (${careerSessions.length})</h3>${onGoto ? `<button class="link-btn" data-related="career">فتح</button>` : ""}</div>
+          ${careerSessions.length ? `<p class="hint">آخر جلسة: ${esc(careerSessions[0]?.date) || "—"}${careerSessions[0]?.recommendation ? ` · التوصية: ${esc(careerSessions[0].recommendation)}` : ""}</p>` : '<p class="hint">لا توجد جلسات توجيه مهني.</p>'}
+        </div>
+        <div>
+          <div class="card-head"><h3 style="margin:0;font-size:14px;">الاستمارات (${relatedForms.length})</h3></div>
+          ${relatedForms.length ? `<ul class="plain">${relatedForms.slice(0, 3).map((f) => `<li class="row-item"${onGoto ? ` data-related-form="${esc(f.id)}" style="cursor:pointer;"` : ""}><div class="body"><div class="title">${esc(f.title) || "—"}</div><div class="meta">${esc(RELATED_FORM_STATUS_LABELS[f.status] || f.status) || "—"} · ${esc(f.createdDate) || "—"}</div></div></li>`).join("")}</ul>` : '<p class="hint">لا توجد استمارات.</p>'}
+        </div>
+      </div>
+    </div>
+
     ${s.prepSchoolResults ? `
     <div class="card" style="margin-top:16px;">
       <h2>نتائج المرحلة الإعدادية</h2>
@@ -390,7 +422,13 @@ async function renderDetail(container, id, onBack) {
   `;
 
   container.querySelector("#students-back").addEventListener("click", onBack);
-  container.querySelector("#student-edit").addEventListener("click", () => renderStudentEdit(container, s, () => renderDetail(container, id, onBack), () => renderDetail(container, id, onBack)));
+  container.querySelector("#student-edit").addEventListener("click", () => renderStudentEdit(container, s, () => renderDetail(container, id, onBack, onGoto), () => renderDetail(container, id, onBack, onGoto)));
+  if (onGoto) {
+    container.querySelectorAll("[data-related]").forEach((btn) => btn.addEventListener("click", () => onGoto(btn.dataset.related, { studentId: s.id })));
+    container.querySelectorAll("[data-related-case]").forEach((row) => row.addEventListener("click", () => onGoto("cases", { caseId: row.dataset.relatedCase })));
+    container.querySelectorAll("[data-related-plan]").forEach((row) => row.addEventListener("click", () => onGoto("support", { planId: row.dataset.relatedPlan })));
+    container.querySelectorAll("[data-related-form]").forEach((row) => row.addEventListener("click", () => onGoto("forms", { formId: row.dataset.relatedForm })));
+  }
   container.querySelector("#student-profile-export").addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -472,7 +510,15 @@ async function renderDetail(container, id, onBack) {
   await renderAcademicPath(container.querySelector("#student-academic-path"), s);
 }
 
-export async function mountStudentsView(container, { onGoto } = {}) {
+// options.studentId يفتح ملف طالب محدَّد مباشرة (قادم من رابط "فتح ملف
+// الطالب" بشاشات الحالات/الدعم/التوجيه المهني/الاستمارات) بدل هبوط المرشد
+// على سجل الطلبة كاملًا ليعيد البحث عن نفس الطالب من جديد.
+export async function mountStudentsView(container, { onGoto, studentId } = {}) {
+  if (studentId) {
+    await renderDetail(container, studentId, () => mountStudentsView(container, { onGoto }), onGoto);
+    return;
+  }
+
   const status = await getRosterStatus();
   if (!status.available) {
     const profile = getCurrentProfile();
@@ -513,7 +559,7 @@ export async function mountStudentsView(container, { onGoto } = {}) {
       resultsRoot,
       loadedResults,
       matchingTotal,
-      (id) => renderDetail(container, id, () => mountStudentsView(container)),
+      (id) => renderDetail(container, id, () => mountStudentsView(container, { onGoto }), onGoto),
       async () => {
         const page = await searchStudentsPage({ ...state, offset: loadedResults.length, limit: PAGE_SIZE });
         loadedResults.push(...page.rows);

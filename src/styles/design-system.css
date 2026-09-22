@@ -498,6 +498,7 @@
   .forms-student { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 14px; margin: 8px 0 16px; border-radius: 10px; background: var(--teal-50); border: 1px solid var(--teal-100); font-size: 12.5px; }
   .forms-student strong { width: 100%; color: var(--teal-900); font-size: 14px; }
   .forms-student.empty { display: block; margin-top: 4px; }
+  .forms-student-flag { width: 100%; color: var(--critical); font-weight: 700; }
   .forms-toolbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .forms-toolbar .search { margin: 0; flex: 1; min-width: 230px; }
   .forms-toolbar select { width: auto; min-width: 160px; }
