@@ -2,7 +2,7 @@ import './helpers/fake-cloud-backend.mjs';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { bulkPut, clear, list } from '../src/services/cloud-runtime.js';
-import { buildAcademicAverages, analyzeCertificateFiles, commitAcademicAverages } from '../src/services/academic-averages-import-service.js';
+import { buildAcademicAverages, analyzeCertificateFiles, commitAcademicAverages, downloadAcademicAveragesWorkbook } from '../src/services/academic-averages-import-service.js';
 
 beforeEach(async () => {
   await clear('academicFlags');
@@ -120,4 +120,54 @@ test('commitAcademicAverages replaces stale rows that no longer have a source', 
   assert.deepEqual(flags.map((r) => r.id), ['20241111']);
   const terms = await list('termAverages');
   assert.deepEqual(terms.map((r) => r.id), ['20241111--الفصل الدراسي الأول']);
+});
+
+function fakeXlsx() {
+  const sheets = [];
+  return {
+    sheets,
+    XLSX: {
+      utils: {
+        book_new: () => ({ SheetNames: [], Sheets: {} }),
+        json_to_sheet: (rows) => ({ rows }),
+        book_append_sheet: (wb, sheet, name) => { wb.SheetNames.push(name); wb.Sheets[name] = sheet; sheets.push({ name, rows: sheet.rows }); },
+      },
+      writeFile: () => {},
+    },
+  };
+}
+
+test('downloadAcademicAveragesWorkbook builds one row per student for the summary sheet and one row per student×subject for the detail sheet', async () => {
+  const originalXlsx = globalThis.XLSX;
+  const { XLSX, sheets } = fakeXlsx();
+  globalThis.XLSX = XLSX;
+  try {
+    const academicFlagsRecords = [
+      { studentId: '20241111', overallPct: 87, finalCumulativeAverage: 85, absentCount: 1, barredCount: 0, subjects: [{ subject: 'الرياضيات', pct: 80 }, { subject: 'العلوم', pct: 94 }] },
+    ];
+    const termAveragesRecords = [
+      { studentId: '20241111', term: 'الفصل الدراسي الأول', averagePct: 87, rating: 'جيد جدًا' },
+    ];
+    await downloadAcademicAveragesWorkbook({ academicFlagsRecords, termAveragesRecords, students });
+
+    const summary = sheets.find((s) => s.name === 'ملخص الطلبة');
+    assert.equal(summary.rows.length, 1);
+    assert.equal(summary.rows[0]['اسم الطالب'], 'طالب واحد');
+    assert.equal(summary.rows[0]['المعدل العام'], 87);
+    assert.equal(summary.rows[0]['المعدل التراكمي النهائي'], 85);
+
+    const subjects = sheets.find((s) => s.name === 'تفاصيل المقررات');
+    assert.equal(subjects.rows.length, 2);
+    assert.equal(subjects.rows[0]['المقرر'], 'الرياضيات');
+
+    const terms = sheets.find((s) => s.name === 'المعدلات الفصلية');
+    assert.equal(terms.rows.length, 1);
+    assert.equal(terms.rows[0]['التقدير'], 'جيد جدًا');
+  } finally {
+    globalThis.XLSX = originalXlsx;
+  }
+});
+
+test('downloadAcademicAveragesWorkbook refuses to export when there is nothing to export', async () => {
+  await assert.rejects(() => downloadAcademicAveragesWorkbook({ academicFlagsRecords: [], termAveragesRecords: [], students }));
 });
