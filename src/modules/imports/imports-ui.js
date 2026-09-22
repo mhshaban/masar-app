@@ -11,9 +11,9 @@ import { renderImportSection as renderBackupRestoreImport } from "../backup/back
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-16-prep-school-results-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
-import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages, downloadAcademicAveragesWorkbook } from "../../services/academic-averages-import-service.js?v=2026-09-22-averages-excel-1";
+import { folderScanSupported, scanCertificatesFolder, analyzeCertificateFiles, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
-import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-22-averages-excel-1";
+import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-11-curriculum-gap-1";
 import { list } from "../../services/cloud-runtime.js";
 import { getMasarFolderName, forgetMasarFolder } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 
@@ -202,26 +202,8 @@ async function mountAveragesTab(root) {
           <div class="card stat"><div class="label">معدلات فصلية رسمية</div><div class="value">${termAveragesRecords.length}</div></div>
         </div>
         <p class="hint">جداول حصص تم تجاهلها: ${summary.scheduleSkipped} · ملفات بها خطأ: ${summary.errorsCount} · ملفات مشكوك فيها (عدد مقررات غير منطقي): ${summary.suspiciousCount} · أرقام أكاديمية غير مطابقة لسجل الطلبة: ${summary.unmatchedCount}${summary.termConflictsCount ? ` · ⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة: ${summary.termConflictsCount} (اعتُمد آخر ملف قُرئ)` : ""}</p>
-        <div class="forms-actions">
-          <button class="btn btn-primary" id="averages-commit">تنفيذ التحديث</button>
-          <button class="btn btn-ghost" id="averages-export-excel">تصدير النتائج إلى Excel</button>
-        </div>
-        <div id="averages-commit-status"></div>
-        <div id="averages-export-status"></div>`;
-      preview.querySelector("#averages-export-excel").addEventListener("click", async (event) => {
-        const button = event.currentTarget;
-        const status = preview.querySelector("#averages-export-status");
-        button.disabled = true;
-        status.innerHTML = '<p class="hint">جارٍ إعداد الملف…</p>';
-        try {
-          await downloadAcademicAveragesWorkbook({ academicFlagsRecords, termAveragesRecords, students });
-          status.innerHTML = '<p class="hint" role="status">تم تنزيل الملف.</p>';
-        } catch (error) {
-          status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
-        } finally {
-          button.disabled = false;
-        }
-      });
+        <button class="btn btn-primary" id="averages-commit">تنفيذ التحديث</button>
+        <div id="averages-commit-status"></div>`;
       preview.querySelector("#averages-commit").addEventListener("click", async () => {
         if (!await confirmDialog(`سيُستبدَل كل ما هو محفوظ حاليًا بمعدلات ${academicFlagsRecords.length} طالبًا و${termAveragesRecords.length} معدّلًا فصليًا من الشهادات المقروءة. أي طالب لا شهادة له بهذا المسح ستُحذف معدلاته القديمة. هل تريد التنفيذ؟`)) return;
         const commitButton = preview.querySelector("#averages-commit");

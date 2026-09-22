@@ -14,7 +14,6 @@ import { subjectKeyForGrade } from "../../scripts/lib/subject-groups.mjs";
 import { gradeRowPct } from "../../scripts/lib/score-conventions.mjs";
 import { list, bulkPut, remove } from "./cloud-runtime.js";
 import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-academic-averages-1";
-import { ensureXlsx } from "./vendor-loader.js?v=2026-09-07-academic-fix-1";
 
 export function folderScanSupported() {
   return typeof window !== "undefined" && "showDirectoryPicker" in window;
@@ -219,82 +218,4 @@ export async function commitAcademicAverages({ academicFlagsRecords, termAverage
     removedFlagsCount: staleFlags.length,
     removedTermsCount: staleTerms.length,
   };
-}
-
-function autoCols(rows) {
-  if (!rows.length) return [];
-  return Object.keys(rows[0]).map((key) => ({ wch: Math.min(45, Math.max(12, key.length + 3, ...rows.map((row) => String(row[key] ?? "").length + 2))) }));
-}
-
-// يصدّر نتيجة تحليل الشهادات (قبل أو بعد "تنفيذ التحديث" — نفس البيانات
-// المعروضة بالمعاينة) لملف Excel بثلاث أوراق: ملخص الطلبة (معدل عام،
-// معدل تراكمي، غياب/حرمان)، تفاصيل المقررات (صف لكل طالب×مقرر — تنسيق
-// طويل بدل عمود لكل مقرر لأن مقررات كل طالب تختلف)، والمعدلات الفصلية
-// الرسمية. لا يكتب لقاعدة البيانات ولا يغيّر النتيجة — مجرد تنزيل للمراجعة
-// أو الأرشفة خارج مسار.
-export async function downloadAcademicAveragesWorkbook({ academicFlagsRecords, termAveragesRecords, students }) {
-  if (!academicFlagsRecords.length && !termAveragesRecords.length) throw new Error("لا توجد نتائج تحليل لتصديرها");
-  const XLSX = await ensureXlsx();
-  // academicFlagsRecords.studentId هنا هو الرقم الأكاديمي (cert.academicId)
-  // لا معرّف سجل الطالب الداخلي — نفس الفرق الموثَّق بـgetStudentAcademicSummary
-  // بـterm-progress-service.js، فالخارطة تبحث بكليهما احتياطًا.
-  const byId = new Map();
-  for (const s of students) {
-    if (s.academicId) byId.set(String(s.academicId), s);
-    if (s.id) byId.set(String(s.id), s);
-  }
-  const studentInfo = (studentId) => {
-    const s = byId.get(String(studentId));
-    return { name: s?.name || "", level: s?.level || "", section: s?.section || "" };
-  };
-
-  const summaryRows = academicFlagsRecords.map((f) => {
-    const info = studentInfo(f.studentId);
-    return {
-      "اسم الطالب": info.name,
-      "الرقم الأكاديمي": f.studentId,
-      "المستوى": info.level,
-      "الشعبة": info.section,
-      "المعدل العام": f.overallPct ?? "",
-      "المعدل التراكمي النهائي": f.finalCumulativeAverage ?? "",
-      "عدد مرات الغياب": f.absentCount,
-      "عدد المواد المحروم فيها": f.barredCount,
-    };
-  });
-
-  const subjectRows = academicFlagsRecords.flatMap((f) => {
-    const info = studentInfo(f.studentId);
-    return (f.subjects || []).map((s) => ({
-      "اسم الطالب": info.name,
-      "الرقم الأكاديمي": f.studentId,
-      "المقرر": s.subject,
-      "النسبة": s.pct,
-    }));
-  });
-
-  const termRows = termAveragesRecords.map((t) => {
-    const info = studentInfo(t.studentId);
-    return {
-      "اسم الطالب": info.name,
-      "الرقم الأكاديمي": t.studentId,
-      "الفصل": t.term,
-      "المعدل": t.averagePct,
-      "التقدير": t.rating || "",
-    };
-  });
-
-  const workbook = XLSX.utils.book_new();
-  const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
-  summarySheet["!cols"] = autoCols(summaryRows);
-  XLSX.utils.book_append_sheet(workbook, summarySheet, "ملخص الطلبة");
-  const subjectSheet = XLSX.utils.json_to_sheet(subjectRows);
-  subjectSheet["!cols"] = autoCols(subjectRows);
-  XLSX.utils.book_append_sheet(workbook, subjectSheet, "تفاصيل المقررات");
-  const termSheet = XLSX.utils.json_to_sheet(termRows);
-  termSheet["!cols"] = autoCols(termRows);
-  XLSX.utils.book_append_sheet(workbook, termSheet, "المعدلات الفصلية");
-  workbook.Workbook = { Views: [{ RTL: true }] };
-  XLSX.writeFile(workbook, `تحليل-شهادات-الطلبة-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
-
-  await logAuditEvent("export_excel", { tableName: "academicFlags", count: academicFlagsRecords.length });
 }
