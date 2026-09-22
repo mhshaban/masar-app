@@ -8,6 +8,7 @@ import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-08-academic-1";
+import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-09-22-prep-rating-1";
 import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
@@ -231,18 +232,41 @@ async function hydrateStudentPhotos(root, students, { prompt = false, refresh = 
 
 const PAGE_SIZE = 50;
 
-function renderTable(root, students, total, onOpen, onLoadMore) {
-  if (!students.length) {
+function tierPill(tier) {
+  if (tier === "high") return "pill-success";
+  if (tier === "medium") return "pill-warning";
+  return "pill-critical";
+}
+
+// تقدير معدل المرحلة الإعدادية بنفس سلّم "تصنيف الطلاب" المعتمد (شاشة
+// الدرجات والتحليلات) — الوحيد المتاح فعليًا للمستجدين (المستوى الأول) قبل
+// ما تتوفر لهم درجات مسار خاصة بهم.
+function prepRatingBadge(student) {
+  const average = student.prepSchoolResults?.average;
+  if (average == null) return '<span class="hint">—</span>';
+  const rating = ratingForPct(Number(average));
+  return `<span class="pill ${tierPill(rating.tier)}">${esc(rating.label)}</span>`;
+}
+
+// loadedStudents: كل ما جُلب من الخادم حتى الآن (يحكم زر "تحميل المزيد").
+// displayStudents: الجزء المعروض فعليًا بالجدول بعد تصفية التقدير الاختيارية
+// (تصفية من جانب المتصفح فقط، على المحمَّل حاليًا — لا استعلام خادم جديد).
+function renderTable(root, loadedStudents, displayStudents, total, onOpen, onLoadMore) {
+  if (!loadedStudents.length) {
     root.innerHTML = '<div class="card"><div class="empty">لا يوجد طلاب مطابقون لهذا البحث</div></div>';
     return;
   }
-  const remaining = total - students.length;
+  if (!displayStudents.length) {
+    root.innerHTML = '<div class="card"><div class="empty">لا يوجد طلاب مطابقون لهذا التقدير ضمن المحمَّلين حاليًا — جرّب تحميل المزيد أو تغيير التصفية</div></div>';
+    return;
+  }
+  const remaining = total - loadedStudents.length;
   root.innerHTML = `
     <div class="card">
       <div class="tablewrap"><table>
-        <thead><tr><th>الطالب</th><th>المستوى</th><th>الشعبة</th><th>القسم</th><th>المسار</th><th>المرشد</th></tr></thead>
+        <thead><tr><th>الطالب</th><th>المستوى</th><th>الشعبة</th><th>القسم</th><th>المسار</th><th>المرشد</th><th>تقدير الإعدادية</th></tr></thead>
         <tbody>
-          ${students.map((s) => `
+          ${displayStudents.map((s) => `
             <tr data-id="${esc(s.id)}">
               <td>
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -258,6 +282,7 @@ function renderTable(root, students, total, onOpen, onLoadMore) {
               <td>${esc(s.department) || "—"}</td>
               <td>${esc(s.track) || "—"}</td>
               <td>${esc(s.counselor?.name) || "—"}</td>
+              <td>${prepRatingBadge(s)}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -534,6 +559,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
     </div>
     <div class="grid g4" style="margin-bottom:16px;" id="students-stats"></div>
     <div id="students-filters"></div>
+    <div id="students-rating-chips" style="margin-bottom:16px;"></div>
     <div id="students-results"></div>
   `;
 
@@ -552,12 +578,42 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
   let matchingTotal = 0;
   let requestVersion = 0;
   let searchTimer = null;
+  let ratingFilter = "";
+
+  const ratingChipsRoot = container.querySelector("#students-rating-chips");
+
+  const drawRatingChips = () => {
+    const rated = loadedResults.filter((s) => s.prepSchoolResults?.average != null);
+    if (!rated.length) { ratingChipsRoot.innerHTML = ""; ratingFilter = ""; return; }
+    const counts = {};
+    for (const s of rated) {
+      const label = ratingForPct(Number(s.prepSchoolResults.average)).label;
+      counts[label] = (counts[label] || 0) + 1;
+    }
+    ratingChipsRoot.innerHTML = `
+      <div class="hint" style="margin-bottom:6px;">تصنيف حسب معدل المرحلة الإعدادية (من الطلبة المحمَّلين حاليًا):</div>
+      <div class="chip-row" id="students-rating-chip-row">
+        <div class="chip${!ratingFilter ? " on" : ""}" data-rating="">الكل (${loadedResults.length})</div>
+        ${RATING_LABELS.map((label) => `<div class="chip${ratingFilter === label ? " on" : ""}" data-rating="${esc(label)}">${esc(label)} (${counts[label] || 0})</div>`).join("")}
+      </div>
+    `;
+    ratingChipsRoot.querySelectorAll("[data-rating]").forEach((chip) => {
+      chip.addEventListener("click", () => { ratingFilter = chip.dataset.rating; draw(); });
+    });
+  };
 
   const draw = () => {
-    container.querySelector("#students-count").textContent = `النتيجة: ${matchingTotal} طالبًا من أصل ${stats.total}`;
+    drawRatingChips();
+    const displayResults = ratingFilter
+      ? loadedResults.filter((s) => s.prepSchoolResults?.average != null && ratingForPct(Number(s.prepSchoolResults.average)).label === ratingFilter)
+      : loadedResults;
+    container.querySelector("#students-count").textContent = ratingFilter
+      ? `يعرض ${displayResults.length} من أصل ${loadedResults.length} محمَّلين بهذا التقدير — إجمالي المطابقين للبحث: ${matchingTotal}`
+      : `النتيجة: ${matchingTotal} طالبًا من أصل ${stats.total}`;
     renderTable(
       resultsRoot,
       loadedResults,
+      displayResults,
       matchingTotal,
       (id) => renderDetail(container, id, () => mountStudentsView(container, { onGoto }), onGoto),
       async () => {
@@ -567,7 +623,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
         draw();
       },
     );
-    void hydrateStudentPhotos(resultsRoot, loadedResults, { prompt: false }).catch(() => {});
+    void hydrateStudentPhotos(resultsRoot, displayResults, { prompt: false }).catch(() => {});
   };
 
   const refresh = async () => {

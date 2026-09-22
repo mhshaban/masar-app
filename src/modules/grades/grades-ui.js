@@ -1,5 +1,5 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-09-22-prep-rating-1";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 

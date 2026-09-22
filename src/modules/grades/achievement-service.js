@@ -20,6 +20,11 @@ export function ratingForPct(pct) {
   return RATING_BANDS.find((b) => pct >= b.min) || RATING_BANDS[RATING_BANDS.length - 1];
 }
 
+// الأسماء الستة بترتيب أعلى إلى أدنى — لبناء شرائح تصفية أو قوائم بأي شاشة
+// تحتاج نفس السلّم الرسمي (مثلًا تصنيف معدلات الإعدادية بسجل الطلبة)، بدل
+// تكرار الحدود الرقمية نفسها بمكان ثانٍ.
+export const RATING_LABELS = RATING_BANDS.map((b) => b.label);
+
 export const TIER_LABELS = { high: "متفوقون", medium: "متوسطو التحصيل", low: "متدنو التحصيل" };
 
 // academicFlags holds one aggregate row per student (overallPct + a
