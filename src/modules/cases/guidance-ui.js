@@ -253,6 +253,59 @@ async function renderSessions(root, caseId, refreshDetail) {
   });
 }
 
+// طباعة حالة واحدة (بياناتها + جلسات متابعتها) — نفس تقنية الطباعة المباشرة
+// المعتمدة بالاستمارات وكشف حضور الفعالية (forms-ui.js): نافذة منبثقة،
+// استنساخ أوراق أنماط الصفحة الحالية (بما فيها .forms-print)، انتظار خط
+// Cairo، ثم طباعة — فيخرج بنفس تنسيق وألوان بقية مستندات القسم.
+function caseDetailPrintMarkup(item, sessions) {
+  return `<div class="forms-print" id="case-printable">
+    <div class="topbar"><div><h1>${esc(item.title) || esc(item.category) || "حالة إرشادية"}</h1><div class="sub">${esc(item.studentName) || esc(item.studentId)}${item.category ? ` — ${esc(item.category)}` : ""}</div></div></div>
+    <div class="card"><h2>بيانات الحالة</h2>
+      <div class="tablewrap"><table>
+        <tr><th>الطالب</th><td>${esc(item.studentName) || esc(item.studentId)}</td><th>الفئة</th><td>${esc(item.category) || "—"}</td></tr>
+        <tr><th>الحالة</th><td>${esc(CASE_STATUS_LABELS[item.status] || item.status)}</td><th>تاريخ الفتح</th><td>${esc(item.openedDate) || "—"}</td></tr>
+        ${item.closedDate ? `<tr><th>تاريخ الإغلاق</th><td colspan="3">${esc(item.closedDate)}</td></tr>` : ""}
+      </table></div>
+    </div>
+    ${item.notes ? `<div class="card"><h2>ملاحظات</h2><p>${esc(item.notes)}</p></div>` : ""}
+    <div class="card"><h2>جلسات المتابعة</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>التاريخ</th><th>ملاحظة الجلسة</th><th>الخطوة التالية</th></tr></thead>
+        <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.note)}</td><td>${esc(s.nextStep) || "—"}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+async function printCaseDirect(item, sessions) {
+  const popup = window.open("", "_blank");
+  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
+  popup.document.body.textContent = "جارٍ تجهيز الحالة للطباعة…";
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(item.title) || "حالة إرشادية"}</title></head><body><main id="case-print-root"></main></body></html>`);
+    popup.document.close();
+    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
+    const root = popup.document.getElementById("case-print-root");
+    root.innerHTML = caseDetailPrintMarkup(item, sessions);
+    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map((source) => new Promise((resolve, reject) => {
+      const link = popup.document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = source.href;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
+      popup.document.head.appendChild(link);
+    }));
+    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
+    await Promise.all(styles);
+    if (popup.closed) return;
+    await Promise.all([400, 600, 700, 800].map((weight) => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
+    await popup.document.fonts.ready;
+    if (popup.closed) return;
+    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
+  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الحالة."); }
+}
+
 async function renderCaseDetail(container, id, onBack, onGoto) {
   const refresh = () => renderCaseDetail(container, id, onBack, onGoto);
   const item = await getCase(id);
@@ -277,6 +330,7 @@ async function renderCaseDetail(container, id, onBack, onGoto) {
         ${item.status === "closed"
           ? '<button class="btn btn-ghost" id="case-reopen">إعادة فتح</button>'
           : '<button class="btn btn-ghost" id="case-close">إغلاق الحالة</button>'}
+        <button class="btn btn-ghost" id="case-print">طباعة</button>
         <button class="btn btn-ghost" id="case-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
@@ -293,6 +347,10 @@ async function renderCaseDetail(container, id, onBack, onGoto) {
   if (closeBtn) closeBtn.addEventListener("click", async () => { await closeCase(id); await refresh(); });
   const reopenBtn = container.querySelector("#case-reopen");
   if (reopenBtn) reopenBtn.addEventListener("click", async () => { await reopenCase(id); await refresh(); });
+  container.querySelector("#case-print").addEventListener("click", async () => {
+    const sessions = await listSessions(id);
+    await printCaseDirect(item, sessions);
+  });
   container.querySelector("#case-delete").addEventListener("click", async () => {
     if (!await confirmDialog("حذف هذه الحالة وكل جلساتها نهائيًا؟")) return;
     await removeCase(id);
