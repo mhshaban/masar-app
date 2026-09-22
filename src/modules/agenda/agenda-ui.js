@@ -1,6 +1,5 @@
-import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js?v=2026-09-13-period-order-fix-1";
-import { saveProgress, addAttachmentLink, removeAttachment } from "../execution/execution-service.js?v=2026-09-06-onedrive-links-1";
+import { mountActionEditor } from "../shared/action-editor.js";
 import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
@@ -25,82 +24,6 @@ const STATUS_LABEL = {
 function statusPill(status) {
   const [cls, label] = STATUS_LABEL[status] || STATUS_LABEL.not_started;
   return `<span class="pill dot ${cls}" data-role="status-pill">${label}</span>`;
-}
-
-function formatFileSize(bytes) {
-  if (bytes == null) return "";
-  if (bytes < 1024) return `${bytes} بايت`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ك.ب`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} م.ب`;
-}
-
-function attachmentsListHtml(attachments) {
-  if (!attachments || !attachments.length) return '<p class="hint" style="margin:0;">لا توجد ثبوتيات مرفَقة بعد</p>';
-  return `
-    <ul class="plain">
-      ${attachments.map((a) => `
-        <li class="row-item" data-attachment-id="${esc(a.id)}">
-          <div class="body">
-            <a href="${esc(a.url || a.dataUrl)}" ${a.url ? 'target="_blank" rel="noopener noreferrer"' : `download="${esc(a.name)}"`} class="title" style="color:var(--teal-600);">${esc(a.name)}</a>
-            <div class="meta">${a.url ? "رابط OneDrive أو تخزين سحابي" : formatFileSize(a.size)}</div>
-          </div>
-          <button class="link-btn" data-remove-attachment="${esc(a.id)}" style="color:var(--critical);">حذف</button>
-        </li>
-      `).join("")}
-    </ul>
-  `;
-}
-
-function editForm(entry, followUpOptions) {
-  const p = entry.progress;
-  return `
-    <div class="card" style="margin-top:8px; background:var(--paper-50);">
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-        <div>
-          <label class="hint" for="agenda-edit-status" style="display:block;margin-bottom:4px;">الحالة</label>
-          <select id="agenda-edit-status" data-field="status" style="padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-            <option value="not_started" ${p.status === "not_started" ? "selected" : ""}>لم يبدأ</option>
-            <option value="ongoing" ${p.status === "ongoing" ? "selected" : ""}>قيد الإنجاز</option>
-            <option value="done" ${p.status === "done" ? "selected" : ""}>تم</option>
-          </select>
-        </div>
-        <div>
-          <label class="hint" for="agenda-edit-participants" style="display:block;margin-bottom:4px;">عدد المستفيدين</label>
-          <input id="agenda-edit-participants" data-field="participantsCount" type="number" min="0" value="${p.participantsCount ?? ""}" style="width:110px; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-        </div>
-        <div style="flex:1; min-width:180px;">
-          <label class="hint" for="agenda-edit-proof" style="display:block;margin-bottom:4px;">الثبوتية الفعلية</label>
-          <input id="agenda-edit-proof" data-field="proofNote" type="text" value="${esc(p.proofNote ?? "")}" placeholder="ما الدليل الذي تم توثيقه فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-        </div>
-        <div style="flex:1; min-width:160px;">
-          <label class="hint" for="agenda-edit-obstacles" style="display:block;margin-bottom:4px;">معوقات التنفيذ</label>
-          <input id="agenda-edit-obstacles" data-field="obstacles" type="text" value="${esc(p.obstacles ?? "")}" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-        </div>
-        <div style="flex:1; min-width:200px;">
-          <label class="hint" for="agenda-edit-followup" style="display:block;margin-bottom:4px;">ربط ببند تقرير المتابعة</label>
-          <select id="agenda-edit-followup" data-field="followUpItemId" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-            <option value="">بدون ربط</option>
-            ${followUpOptions.map((o) => `<option value="${esc(o.id)}" ${p.followUpItemId === o.id ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
-          </select>
-        </div>
-        <button class="btn btn-primary" data-action="save-progress" style="padding:8px 16px;">حفظ</button>
-      </div>
-      <div style="margin-top:12px;">
-        <label class="hint" for="agenda-edit-effectiveness" style="display:block;margin-bottom:4px;">تقرير الفعالية</label>
-        <textarea id="agenda-edit-effectiveness" data-field="effectivenessReport" rows="3" placeholder="ما مدى فعالية هذا الإجراء؟ ماذا تحقق فعليًا؟" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; resize:vertical;">${esc(p.effectivenessReport ?? "")}</textarea>
-      </div>
-      <div style="margin-top:12px;">
-        <label class="hint" for="agenda-edit-attachment-url" style="display:block;margin-bottom:4px;">الثبوتيات المرفَقة</label>
-        <div class="attachments-list">${attachmentsListHtml(p.attachments)}</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center;">
-          <input id="agenda-edit-attachment-name" type="text" data-role="attachment-name" placeholder="اسم المرفق" style="min-width:160px; flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit;">
-          <input id="agenda-edit-attachment-url" type="url" data-role="attachment-url" placeholder="الصق رابط مشاركة OneDrive هنا" style="min-width:260px; flex:2; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:12.5px; background:var(--surface); color:inherit; direction:ltr;">
-          <button class="btn btn-ghost" type="button" data-action="add-attachment-link" style="padding:8px 14px;">إضافة الرابط</button>
-        </div>
-        <p class="hint" style="margin:6px 0 0;">ارفع الملف في OneDrive والصق رابط المشاركة؛ مسار يحفظ الرابط فقط لتخفيف البيانات. المرفقات القديمة محفوظة كما هي.</p>
-      </div>
-    </div>
-  `;
 }
 
 async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
@@ -146,40 +69,10 @@ async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
 
     const openEditor = () => {
       const slot = li.querySelector(".edit-slot");
-      slot.innerHTML = editForm(entry, followUpOptions);
-
-      slot.querySelector("[data-action='save-progress']").addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        const patch = {
-          status: slot.querySelector("[data-field='status']").value,
-          participantsCount: slot.querySelector("[data-field='participantsCount']").value || null,
-          proofNote: slot.querySelector("[data-field='proofNote']").value || null,
-          obstacles: slot.querySelector("[data-field='obstacles']").value || null,
-          followUpItemId: slot.querySelector("[data-field='followUpItemId']").value || null,
-          effectivenessReport: slot.querySelector("[data-field='effectivenessReport']").value || null,
-        };
-        await saveProgress(id, patch);
-        await refresh();
-      });
-
-      slot.querySelector("[data-action='add-attachment-link']").addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        try {
-          const url = slot.querySelector("[data-role='attachment-url']").value;
-          const name = slot.querySelector("[data-role='attachment-name']").value;
-          entry.progress = await addAttachmentLink(id, { name, url });
-          openEditor();
-        } catch (err) {
-          notify(err.message);
-        }
-      });
-
-      slot.querySelectorAll("[data-remove-attachment]").forEach((btn) => {
-        btn.addEventListener("click", async (ev) => {
-          ev.stopPropagation();
-          entry.progress = await removeAttachment(id, btn.dataset.removeAttachment);
-          openEditor();
-        });
+      mountActionEditor(slot, entry, followUpOptions, {
+        onSaved: refresh,
+        onDeleted: refresh,
+        onCancel: () => { slot.innerHTML = ""; },
       });
     };
 
@@ -196,11 +89,23 @@ async function mountEntries(root, entries, followUpOptions, refresh, sortMode) {
   });
 }
 
+// نفس حقول بحث خطة القسم بالضبط (searchActions بdepartment-plan-service.js)
+// — نص الإجراء/الفئة المستهدفة/دور المكتب/الأقسام المشاركة — عشان يبحث
+// المرشد عن نفس الإجراء بنفس الطريقة من أي الشاشتين، بلا فرق سلوك بينهما.
+function matchesQuery(entry, q) {
+  const haystack = [entry.action, entry.target, entry.executor, entry.follower].filter(Boolean).join(" ");
+  return haystack.includes(q);
+}
+
 export async function mountAgendaView(container) {
   container.innerHTML = `
     <div class="topbar">
       <div><h1>الأجندة التنفيذية</h1></div>
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <label class="hint" for="agenda-search-input" style="display:block; margin-bottom:6px;">بحث سريع عن إجراء (بنص الإجراء، المستهدف، المنفذ، أو المتابع)</label>
+      <input id="agenda-search-input" type="search" placeholder="ابحث عن إجراء..." style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
     </div>
     <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
       <div class="tab" data-sort="date" role="tab" aria-selected="false">حسب التاريخ</div>
@@ -210,12 +115,19 @@ export async function mountAgendaView(container) {
   `;
 
   const root = container.querySelector("#agenda-groups");
+  const searchInput = container.querySelector("#agenda-search-input");
   let sortMode = "text";
 
   const refresh = async () => {
-    const [entries, followUpOptions] = await Promise.all([listAgendaEntries(), listFollowUpItemOptions()]);
-    if (!entries.length) {
+    const [allEntries, followUpOptions] = await Promise.all([listAgendaEntries(), listFollowUpItemOptions()]);
+    if (!allEntries.length) {
       root.innerHTML = '<div class="card"><div class="empty">لا توجد بيانات أجندة بعد</div></div>';
+      return;
+    }
+    const query = searchInput.value.trim();
+    const entries = query ? allEntries.filter((entry) => matchesQuery(entry, query)) : allEntries;
+    if (!entries.length) {
+      root.innerHTML = '<div class="card"><div class="empty">لا يوجد إجراء مطابق لبحثك</div></div>';
       return;
     }
     await mountEntries(root, entries, followUpOptions, refresh, sortMode);
@@ -231,6 +143,12 @@ export async function mountAgendaView(container) {
       });
       await refresh();
     });
+  });
+
+  let searchTimer = null;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(refresh, 200);
   });
 
   await refresh();
