@@ -4,7 +4,8 @@ import {
   listActions, addAction, cycleActionStatus, removeAction, listCandidates,
 } from "./support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-17-attendance-checkbox-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js";
 import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
@@ -116,12 +117,13 @@ async function renderCandidates(root, onOpenNewPlan) {
   });
 }
 
-function renderNewPlanForm(root, prefill, onCreated) {
+async function renderNewPlanForm(root, prefill, onCreated) {
+  const flagsMap = await loadAcademicFlagsMap();
   root.innerHTML = `
     <div class="card">
       <h2>خطة دعم جديدة</h2>
       <div id="new-plan-picker"></div>
-      <div id="new-plan-selected" class="hint">${prefill?.student ? `الطالب المحدد: ${esc(prefill.student.name)} (${esc(prefill.student.academicId)})` : ""}</div>
+      <div id="new-plan-selected">${studentQuickCard(prefill?.student || null, prefill?.student ? studentQuickInfo(prefill.student, flagsMap) : null)}</div>
       <form id="new-plan-form" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <input name="domain" placeholder="المجال/المادة (مثال: الرياضيات)" style="flex:1; min-width:200px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
@@ -136,7 +138,7 @@ function renderNewPlanForm(root, prefill, onCreated) {
   mountStudentPicker(root.querySelector("#new-plan-picker"), {
     onSelect: (student) => {
       selected = student;
-      root.querySelector("#new-plan-selected").textContent = `الطالب المحدد: ${student.name} (${student.academicId || student.id})`;
+      root.querySelector("#new-plan-selected").innerHTML = studentQuickCard(student, studentQuickInfo(student, flagsMap));
     },
   });
 
@@ -236,13 +238,14 @@ async function renderActions(root, planId, refreshDetail) {
   });
 }
 
-async function renderPlanDetail(container, id, onBack) {
-  const refresh = () => renderPlanDetail(container, id, onBack);
+async function renderPlanDetail(container, id, onBack, onGoto) {
+  const refresh = () => renderPlanDetail(container, id, onBack, onGoto);
   const plan = await getPlan(id);
   if (!plan) {
     container.innerHTML = '<div class="card"><div class="empty">تعذّر إيجاد هذه الخطة</div></div>';
     return;
   }
+  const [student, flagsMap] = await Promise.all([getStudent(plan.studentId), loadAcademicFlagsMap()]);
 
   container.innerHTML = `
     <button class="backlink" id="plan-back">
@@ -263,11 +266,15 @@ async function renderPlanDetail(container, id, onBack) {
         <button class="btn btn-ghost" id="plan-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
+    ${student ? studentQuickCard(student, studentQuickInfo(student, flagsMap)) : ""}
+    ${student && onGoto ? '<div style="margin:-8px 0 16px;"><button class="link-btn" id="plan-open-profile">فتح ملف الطالب</button></div>' : ""}
     ${plan.goal ? `<div class="card" style="margin-bottom:16px;"><h2>الهدف</h2><p class="hint" style="margin:0;">${esc(plan.goal)}</p></div>` : ""}
     <div id="plan-actions"></div>
   `;
 
   container.querySelector("#plan-back").addEventListener("click", onBack);
+  const profileBtn = container.querySelector("#plan-open-profile");
+  if (profileBtn) profileBtn.addEventListener("click", () => onGoto("students", { studentId: student.id }));
   const completeBtn = container.querySelector("#plan-complete");
   if (completeBtn) completeBtn.addEventListener("click", async () => { await completePlan(id); await refresh(); });
   const cancelBtn = container.querySelector("#plan-cancel");
@@ -283,7 +290,22 @@ async function renderPlanDetail(container, id, onBack) {
   await renderActions(container.querySelector("#plan-actions"), id, refresh);
 }
 
-export async function mountSupportView(container) {
+// options.planId/studentId: نفس منطق deep-link بوحدة الحالات الإرشادية —
+// راجع التعليق أعلى mountCasesView.
+export async function mountSupportView(container, options = {}) {
+  const onGoto = options.onGoto;
+  const openDetail = (id) => renderPlanDetail(container, id, () => mountSupportView(container, { onGoto }), onGoto);
+
+  if (options.planId) { await openDetail(options.planId); return; }
+
+  let prefillStudent = null;
+  if (options.studentId) {
+    const plans = await listPlans();
+    const existing = plans.find((p) => String(p.studentId) === String(options.studentId) && p.status === "active");
+    if (existing) { await openDetail(existing.id); return; }
+    prefillStudent = await getStudent(options.studentId);
+  }
+
   container.innerHTML = `
     <div class="topbar">
       <div><h1>خطط الدعم الفردية</h1><div class="sub">خطة تدخل للطالب مع إجراءات متابَعة كقائمة مهام</div></div>
@@ -294,16 +316,14 @@ export async function mountSupportView(container) {
     <div id="support-candidates"></div>
   `;
 
-  const openDetail = (id) => renderPlanDetail(container, id, () => mountSupportView(container));
-
   const showNewForm = (student, reason) => {
     renderNewPlanForm(container.querySelector("#support-new-form"), student ? { student, reason } : null, async () => {
-      await mountSupportView(container);
+      await mountSupportView(container, { onGoto });
     });
     if (student) container.querySelector("#support-new-form").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  showNewForm(null, null);
+  showNewForm(prefillStudent, null);
   await renderPlansTable(container.querySelector("#support-table"), openDetail);
   await renderCandidates(container.querySelector("#support-candidates"), showNewForm);
 

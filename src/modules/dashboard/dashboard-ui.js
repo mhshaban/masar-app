@@ -233,7 +233,7 @@ export async function mountDashboardView(container, { onGoto }) {
                 <div class="meta">${esc(row.needs.flatMap((need) => need.reasons || []).join(" · "))}</div>
               </div>
                 <div class="daily-row-actions">
-                ${row.needs.map((n) => `<button class="pill pill-warning" style="border:none; cursor:pointer;" data-goto="${esc(NEED_TARGET_VIEW[n.type])}">${esc(NEED_LABELS[n.type])}</button>`).join("")}
+                ${row.needs.map((n) => `<button class="pill pill-warning" style="border:none; cursor:pointer;" data-goto="${esc(NEED_TARGET_VIEW[n.type])}" data-student-id="${esc(row.studentId)}">${esc(NEED_LABELS[n.type])}</button>`).join("")}
                 ${decisionControls(`student:${row.studentId}`)}
               </div>
             </li>
@@ -247,11 +247,11 @@ export async function mountDashboardView(container, { onGoto }) {
     ${(visibleStaleCases.length || visibleSupportActions.length) ? `<div class="grid g2 daily-split daily-operational" style="margin-bottom:20px;">
       ${visibleStaleCases.length ? `<div class="card daily-panel">
         <div class="card-head"><h2>حالات بلا متابعة حديثة</h2><button class="link-btn" data-goto="cases">فتح الحالات</button></div>
-        <ul class="plain">${visibleStaleCases.slice(0, 3).map((c) => `<li class="row-item"><div class="body"><div class="title">${esc(c.studentName) || c.studentId}</div><div class="meta">${esc(c.category) || ""}</div></div><span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا</span><button class="link-btn" data-goto="cases">فتح</button>${decisionControls(`case:${c.id}`)}</li>`).join("")}</ul>
+        <ul class="plain">${visibleStaleCases.slice(0, 3).map((c) => `<li class="row-item"><div class="body"><div class="title">${esc(c.studentName) || c.studentId}</div><div class="meta">${esc(c.category) || ""}</div></div><span class="pill pill-warning">${daysSince(c.lastActivity)} يومًا</span><button class="link-btn" data-goto="cases" data-case-id="${esc(c.id)}">فتح</button>${decisionControls(`case:${c.id}`)}</li>`).join("")}</ul>
       </div>` : ""}
       ${visibleSupportActions.length ? `<div class="card daily-panel">
         <div class="card-head"><h2>إجراءات دعم متأخرة</h2><button class="link-btn" data-goto="support">فتح خطط الدعم</button></div>
-        <ul class="plain">${visibleSupportActions.slice(0, 3).map((a) => `<li class="row-item"><div class="body"><div class="title">${esc(a.plan?.studentName) || a.plan?.studentId || "—"}</div><div class="meta">${esc(a.action)}</div></div><span class="pill pill-critical">${esc(a.dueDate)}</span><button class="link-btn" data-goto="support">فتح</button>${decisionControls(`support:${a.id}`)}</li>`).join("")}</ul>
+        <ul class="plain">${visibleSupportActions.slice(0, 3).map((a) => `<li class="row-item"><div class="body"><div class="title">${esc(a.plan?.studentName) || a.plan?.studentId || "—"}</div><div class="meta">${esc(a.action)}</div></div><span class="pill pill-critical">${esc(a.dueDate)}</span><button class="link-btn" data-goto="support" data-plan-id="${esc(a.planId)}">فتح</button>${decisionControls(`support:${a.id}`)}</li>`).join("")}</ul>
       </div>` : ""}
     </div>` : ""}
     </section>
@@ -293,7 +293,13 @@ export async function mountDashboardView(container, { onGoto }) {
   </div>`;
 
   container.querySelectorAll("[data-goto]").forEach((btn) => {
-    btn.addEventListener("click", () => onGoto(btn.dataset.goto));
+    btn.addEventListener("click", () => {
+      const params = {};
+      if (btn.dataset.studentId) params.studentId = btn.dataset.studentId;
+      if (btn.dataset.caseId) params.caseId = btn.dataset.caseId;
+      if (btn.dataset.planId) params.planId = btn.dataset.planId;
+      onGoto(btn.dataset.goto, params);
+    });
   });
   container.querySelectorAll("[data-daily-tab]").forEach((btn) => btn.addEventListener("click", () => {
     container.querySelectorAll("[data-daily-tab]").forEach((item) => { const active = item === btn; item.classList.toggle("active", active); item.setAttribute("aria-selected", String(active)); });
