@@ -1,6 +1,6 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
-  CASE_CATEGORIES, listCases, getCase, createCase, closeCase, reopenCase, removeCase,
+  CASE_CATEGORIES, listCases, getCase, createCase, updateCase, closeCase, reopenCase, removeCase,
   listSessions, addSession, removeSession, listCandidates,
 } from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
@@ -306,7 +306,7 @@ async function printCaseDirect(item, sessions) {
   } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الحالة."); }
 }
 
-async function renderCaseDetail(container, id, onBack, onGoto) {
+async function renderCaseDetail(container, id, onBack, onGoto, editMode = false) {
   const refresh = () => renderCaseDetail(container, id, onBack, onGoto);
   const item = await getCase(id);
   if (!item) {
@@ -330,13 +330,28 @@ async function renderCaseDetail(container, id, onBack, onGoto) {
         ${item.status === "closed"
           ? '<button class="btn btn-ghost" id="case-reopen">إعادة فتح</button>'
           : '<button class="btn btn-ghost" id="case-close">إغلاق الحالة</button>'}
+        <button class="btn btn-ghost" id="case-edit">تعديل</button>
         <button class="btn btn-ghost" id="case-print">طباعة</button>
         <button class="btn btn-ghost" id="case-delete" style="color:var(--critical);">حذف</button>
       </div>
     </div>
     ${student ? studentQuickCard(student, studentQuickInfo(student, flagsMap)) : ""}
     ${student && onGoto ? '<div style="margin:-8px 0 16px;"><button class="link-btn" id="case-open-profile">فتح ملف الطالب</button></div>' : ""}
-    ${item.notes ? `<div class="card" style="margin-bottom:16px;"><h2>ملاحظات</h2><p class="hint" style="margin:0;">${esc(item.notes)}</p></div>` : ""}
+    ${editMode ? `
+      <div class="card" style="margin-bottom:16px;">
+        <h2>تعديل بيانات الحالة</h2>
+        <form id="case-edit-form" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <select name="category" aria-label="فئة الحالة" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+              ${CASE_CATEGORIES.map((c) => `<option value="${esc(c)}" ${c === item.category ? "selected" : ""}>${esc(c)}</option>`).join("")}
+            </select>
+            <input name="title" value="${esc(item.title || "")}" placeholder="عنوان مختصر للحالة" style="flex:1; min-width:200px; padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
+          </div>
+          <textarea name="notes" rows="3" placeholder="ملاحظات" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit; resize:vertical;">${esc(item.notes || "")}</textarea>
+          <div style="display:flex; gap:8px;"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn btn-ghost" type="button" id="case-edit-cancel">إلغاء</button></div>
+        </form>
+      </div>
+    ` : (item.notes ? `<div class="card" style="margin-bottom:16px;"><h2>ملاحظات</h2><p class="hint" style="margin:0;">${esc(item.notes)}</p></div>` : "")}
     <div id="case-sessions"></div>
   `;
 
@@ -347,6 +362,19 @@ async function renderCaseDetail(container, id, onBack, onGoto) {
   if (closeBtn) closeBtn.addEventListener("click", async () => { await closeCase(id); await refresh(); });
   const reopenBtn = container.querySelector("#case-reopen");
   if (reopenBtn) reopenBtn.addEventListener("click", async () => { await reopenCase(id); await refresh(); });
+  container.querySelector("#case-edit").addEventListener("click", () => renderCaseDetail(container, id, onBack, onGoto, true));
+  const editForm = container.querySelector("#case-edit-form");
+  if (editForm) {
+    container.querySelector("#case-edit-cancel").addEventListener("click", () => refresh());
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      try {
+        await updateCase(id, { category: form.category.value, title: form.title.value.trim(), notes: form.notes.value });
+        await refresh();
+      } catch (err) { notify(err.message); }
+    });
+  }
   container.querySelector("#case-print").addEventListener("click", async () => {
     const sessions = await listSessions(id);
     await printCaseDirect(item, sessions);
