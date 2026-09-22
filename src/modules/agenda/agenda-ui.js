@@ -203,14 +203,14 @@ export async function mountAgendaView(container) {
       <button class="btn btn-ghost" id="agenda-export-btn">تصدير Word</button>
     </div>
     <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
-      <div class="tab active" data-sort="date" role="tab" aria-selected="true">حسب التاريخ</div>
-      <div class="tab" data-sort="text" role="tab" aria-selected="false">حسب نص الفترة</div>
+      <div class="tab" data-sort="date" role="tab" aria-selected="false">حسب التاريخ</div>
+      <div class="tab active" data-sort="text" role="tab" aria-selected="true">حسب نص الفترة</div>
     </div>
     <div id="agenda-groups"></div>
   `;
 
   const root = container.querySelector("#agenda-groups");
-  let sortMode = "date";
+  let sortMode = "text";
 
   const refresh = async () => {
     const [entries, followUpOptions] = await Promise.all([listAgendaEntries(), listFollowUpItemOptions()]);
