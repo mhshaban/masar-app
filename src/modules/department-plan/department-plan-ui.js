@@ -8,14 +8,13 @@ import {
   updateProject,
   deleteProject,
   addAction,
-  updateAction,
-  deleteAction,
   searchActions,
   getProject,
 } from "./department-plan-service.js";
 import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } from "../agenda/agenda-service.js?v=2026-09-13-period-order-fix-1";
 import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js?v=2026-09-13-period-order-fix-1";
 import { saveProgress } from "../execution/execution-service.js";
+import { mountActionEditor } from "../shared/action-editor.js";
 import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
@@ -172,32 +171,34 @@ function readProjectForm(form) {
   };
 }
 
-// followUpItemId عمدًا بنموذج تعديل الإجراء نفسه بخطة القسم — بدل شاشة
-// تقرير المتابعة المستقلة اللي اتحذفت — عشان يصير كل شي (نص الإجراء،
-// الجهات، وربطه ببند التقرير الرسمي) بمكان واحد بلا تنقل بين صفحات.
-function actionFormHtml(action, followUpOptions, currentFollowUpItemId) {
+// نموذج إضافة إجراء جديد فقط — تعديل إجراء موجود صار بالمحرر الموحَّد
+// المشترك (mountActionEditor بـsrc/modules/shared/action-editor.js)، يعرض
+// حقول خطة القسم هذي نفسها مع حقول الأجندة التنفيذية معًا بمكان واحد بدل
+// نموذجين منفصلين. إجراء جديد ما عنده بعد أي بيانات تنفيذ ليُعرض، فيبقى
+// نموذجه بحقول التخطيط فقط (زائد بند تقرير المتابعة، أول رابط يُنشأ للإجراء).
+function newActionFormHtml(followUpOptions) {
   return `
     <tr class="action-form-row">
       <td colspan="5">
         <form class="action-form" style="display:flex; flex-direction:column; gap:8px; padding:10px 0;">
-          <textarea name="action" placeholder="نص الإجراء" required rows="2" style="${FIELD_STYLE} resize:vertical;">${esc(action?.action) || ""}</textarea>
+          <textarea name="action" placeholder="نص الإجراء" required rows="2" style="${FIELD_STYLE} resize:vertical;"></textarea>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input name="target" placeholder="الفئة المستهدفة" value="${esc(action?.target) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="executor" placeholder="دور المكتب" value="${esc(action?.executor) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="follower" placeholder="الأقسام المشاركة" value="${esc(action?.follower) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="target" placeholder="الفئة المستهدفة" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="executor" placeholder="دور المكتب" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="follower" placeholder="الأقسام المشاركة" style="flex:1; min-width:140px; ${FIELD_STYLE}">
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input name="evidence" placeholder="الثبوتيات" value="${esc(action?.evidence) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
-            <input name="period" placeholder="وصف الفترة (مثال: طوال العام الدراسي)" value="${esc(action?.period) || ""}" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="evidence" placeholder="الثبوتيات" style="flex:1; min-width:140px; ${FIELD_STYLE}">
+            <input name="period" placeholder="وصف الفترة (مثال: طوال العام الدراسي)" style="flex:1; min-width:140px; ${FIELD_STYLE}">
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
             <div style="flex:1; min-width:140px;">
               <label class="hint" for="plan-action-period-start" style="display:block;margin-bottom:4px;">تاريخ بداية التنفيذ (اختياري)</label>
-              <input id="plan-action-period-start" name="periodStart" type="date" value="${esc(action?.periodStart) || ""}" style="width:100%; ${FIELD_STYLE}">
+              <input id="plan-action-period-start" name="periodStart" type="date" style="width:100%; ${FIELD_STYLE}">
             </div>
             <div style="flex:1; min-width:140px;">
               <label class="hint" for="plan-action-period-end" style="display:block;margin-bottom:4px;">تاريخ نهاية التنفيذ (اختياري)</label>
-              <input id="plan-action-period-end" name="periodEnd" type="date" value="${esc(action?.periodEnd) || ""}" style="width:100%; ${FIELD_STYLE}">
+              <input id="plan-action-period-end" name="periodEnd" type="date" style="width:100%; ${FIELD_STYLE}">
             </div>
           </div>
           <p class="hint" style="margin:0;">تحديد التاريخين يرتّب هذا الإجراء زمنيًا بالأجندة التنفيذية تلقائيًا — بدونهما يبقى ضمن قسم "بلا تاريخ محدد".</p>
@@ -205,10 +206,10 @@ function actionFormHtml(action, followUpOptions, currentFollowUpItemId) {
             <label class="hint" for="plan-action-followup" style="display:block;margin-bottom:4px;">بند تقرير المتابعة الرسمي</label>
             <select id="plan-action-followup" name="followUpItemId" style="width:100%; ${FIELD_STYLE}">
               <option value="">بدون ربط</option>
-              ${followUpOptions.map((o) => `<option value="${esc(o.id)}" ${currentFollowUpItemId === o.id ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+              ${followUpOptions.map((o) => `<option value="${esc(o.id)}">${esc(o.label)}</option>`).join("")}
             </select>
           </div>
-          <div data-role="form-actions" style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" type="submit">حفظ الإجراء</button>
             <button class="btn btn-ghost" type="button" data-cancel="1">إلغاء</button>
           </div>
@@ -238,7 +239,7 @@ function createEditState() {
   return { editingProjectId: null, newProjectPillar: null, addingActionFor: null, editingAction: null };
 }
 
-function renderProjects(root, projects, state, actions, followUpOptions, progressByActionId) {
+function renderProjects(root, projects, state, actions, followUpOptions, entryById) {
   if (!projects.length && state.newProjectPillar == null) {
     root.innerHTML = '<div class="card"><div class="empty">لا توجد مشاريع في هذا المحور</div></div>';
     return;
@@ -265,7 +266,7 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
           <tbody>
             ${(project.actions || []).map((a) => (
               state.editingAction && state.editingAction.projectId === project.id && state.editingAction.no === a.no
-                ? actionFormHtml(a, followUpOptions, progressByActionId.get(`${project.id}-a${a.no}`)?.followUpItemId || null)
+                ? `<tr><td colspan="5"><div class="action-editor-slot" data-project="${esc(project.id)}" data-no="${esc(a.no)}"></div></td></tr>`
                 : `
                   <tr data-action="${esc(project.id)}:${esc(a.no)}" style="cursor:pointer;">
                     <td class="num">${esc(a.no)}</td>
@@ -276,13 +277,27 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
                   </tr>
                 `
             )).join("")}
-            ${state.addingActionFor === project.id ? actionFormHtml(null, followUpOptions, null) : ""}
+            ${state.addingActionFor === project.id ? newActionFormHtml(followUpOptions) : ""}
           </tbody>
         </table></div>
         ${state.addingActionFor !== project.id ? `<button class="btn btn-ghost" style="margin-top:10px;" data-add-action="${esc(project.id)}">+ إضافة إجراء</button>` : ""}
       </div>
     `).join("")}
   `;
+
+  // الإجراء قيد التعديل: المحرر الموحَّد المشترك (نفس المستخدَم بالأجندة
+  // التنفيذية) — يعرض حقول التخطيط والتنفيذ معًا ويحفظهما بضغطة واحدة.
+  root.querySelectorAll(".action-editor-slot").forEach((slot) => {
+    const projectId = slot.dataset.project;
+    const no = Number(slot.dataset.no);
+    const entry = entryById.get(`${projectId}-a${no}`);
+    if (!entry) return;
+    mountActionEditor(slot, entry, followUpOptions, {
+      onSaved: actions.onProjectChanged,
+      onDeleted: actions.onProjectChanged,
+      onCancel: actions.cancelActionForm,
+    });
+  });
 
   // New-project form
   const newForm = root.querySelector("#new-project-card form");
@@ -336,7 +351,8 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
     });
   });
 
-  // Action forms (new + edit)
+  // Action forms — إضافة إجراء جديد فقط الآن؛ تعديل إجراء موجود صار
+  // بالمحرر الموحَّد أعلاه (action-editor-slot).
   root.querySelectorAll(".action-form").forEach((form) => {
     const row = form.closest("tr");
     const table = form.closest("table");
@@ -347,15 +363,8 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
       e.stopPropagation();
       try {
         const followUpItemId = form.followUpItemId.value || null;
-        let actionNo;
-        if (state.addingActionFor === projectId) {
-          const created = await addAction(projectId, readActionForm(form));
-          actionNo = created.no;
-        } else if (state.editingAction && state.editingAction.projectId === projectId) {
-          await updateAction(projectId, state.editingAction.no, readActionForm(form));
-          actionNo = state.editingAction.no;
-        }
-        if (actionNo != null) await saveProgress(`${projectId}-a${actionNo}`, { followUpItemId });
+        const created = await addAction(projectId, readActionForm(form));
+        await saveProgress(`${projectId}-a${created.no}`, { followUpItemId });
         await actions.onProjectChanged();
       } catch (err) { notify(err.message); }
     });
@@ -364,30 +373,6 @@ function renderProjects(root, projects, state, actions, followUpOptions, progres
       actions.cancelActionForm();
     });
     row.querySelectorAll("input, textarea, select").forEach((el) => el.addEventListener("click", (e) => e.stopPropagation()));
-  });
-
-  // Delete-action button lives inside the row when hovered — simplest: add a
-  // small delete link next to the edit form's save/cancel buttons instead.
-  root.querySelectorAll(".action-form").forEach((form) => {
-    if (form.querySelector("[data-delete-action]")) return;
-    const row = form.closest("tr");
-    const table = form.closest("table");
-    const projectId = table.closest("[data-project]").dataset.project;
-    const isEdit = state.editingAction && state.editingAction.projectId === projectId;
-    if (!isEdit) return;
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "link-btn";
-    delBtn.style.color = "var(--critical)";
-    delBtn.textContent = "حذف الإجراء";
-    delBtn.dataset.deleteAction = "1";
-    delBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!await confirmDialog("حذف هذا الإجراء نهائيًا؟ سيُحذف معه أي تقدم أو تقرير فعالية مسجَّل له.")) return;
-      await deleteAction(projectId, state.editingAction.no);
-      await actions.onProjectChanged();
-    });
-    form.querySelector('[data-role="form-actions"]').appendChild(delBtn);
   });
 }
 
@@ -495,7 +480,7 @@ export async function mountDepartmentPlanView(container) {
       currentPillar ? listProjectsByPillar(currentPillar) : Promise.resolve([]),
       listAgendaEntries(),
     ]);
-    const progressByActionId = new Map(entries.map((e) => [e.id, e.progress]));
+    const entryById = new Map(entries.map((e) => [e.id, e]));
     const actionsApi = {
       onProjectChanged: async () => {
         Object.assign(state, createEditState());
@@ -514,7 +499,7 @@ export async function mountDepartmentPlanView(container) {
       editAction: (projectId, no) => { state.editingAction = { projectId, no }; state.addingActionFor = null; draw(); },
       cancelActionForm: () => { state.addingActionFor = null; state.editingAction = null; draw(); },
     };
-    renderProjects(projectsRoot, projects, state, actionsApi, followUpOptions, progressByActionId);
+    renderProjects(projectsRoot, projects, state, actionsApi, followUpOptions, entryById);
   };
 
   const selectPillar = async (pillar) => {
