@@ -15,7 +15,7 @@ const VIEW_LOADERS = {
   dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-22-student-context-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-22-unified-action-editor-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-22-unified-action-editor-1")).mountAgendaView,
-  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-23-averages-from-workbook-1")).mountStudentsView,
+  students: async () => (await import("./modules/students/students-ui.js?v=2026-09-23-class-schedules-1")).mountStudentsView,
   grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-09-22-prep-rating-1")).mountGradesView,
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-22-case-edit-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-22-print-buttons-1")).mountSupportView,
@@ -25,7 +25,7 @@ const VIEW_LOADERS = {
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-09-import-fix-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
   audit: async () => (await import("./modules/audit/audit-ui.js?v=2026-09-07-academic-fix-1")).mountAuditView,
-  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-23-averages-from-workbook-2")).mountImportsView,
+  imports: async () => (await import("./modules/imports/imports-ui.js?v=2026-09-23-class-schedules-1")).mountImportsView,
 };
 // كل شاشة تحتاج تُقفز إليها مباشرة بمعلومة سياق (طالب/سجل محدَّد) تُسجَّل
 // هنا بـonGoto — renderView يدمج معه أي params ممرَّرة فعليًا (studentId،

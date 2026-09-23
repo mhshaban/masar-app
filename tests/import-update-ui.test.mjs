@@ -45,6 +45,57 @@ test('school update opens confirmation and cancelling leaves data untouched', as
   } finally { Object.assign(globalThis, saved); }
 });
 
+test('school update also commits academic averages/courseGrades when the file includes the grade sheets, without a second upload', async () => {
+  let dialog;
+  const sheets = {
+    'كشف الطلاب': [['الرقم الأكاديمي', 'اسم الطالب'], ['123', 'طالب تجريبي']],
+    'المعلمين': [['الرقم الشخصي', 'الاسم باللغة العربية'], ['456', 'معلم تجريبي']],
+    'المرفعين': [['الرقم الاكاديمي', 'اسم الطالب', 'المقرر', 'حالة الطالب']],
+    'درجات المقررات': [
+      ['رقم الطالب', 'السنة الدراسية', 'الفصل الدراسي', 'المستوى', 'رمز المقرر', 'اسم المقرر', 'الدرجة'],
+      ['123', '2025/2026', 'الأول', 'المستوي الأول', 'ريض101', 'رياضيات', 80],
+    ],
+    'المعدلات الفصلية': [
+      ['رقم الطالب', 'السنة الدراسية', 'الفصل الدراسي', 'المستوى', 'المعدل الفصلي', 'التقدير'],
+      ['123', '2025/2026', 'الأول', 'المستوي الأول', 0.9, 'ممتاز'],
+    ],
+    'المعدلات السنوية': [
+      ['رقم الطالب', 'السنة الدراسية', 'المعدل التراكمي السنوي'],
+      ['123', '2025/2026', 0.85],
+    ],
+    'الجدول الدراسي': [
+      ['الشعبة', 'اليوم', 'الحصة', 'المقرر', 'الغرفة', 'المعلم', 'القسم', 'الفترة(ص-م)'],
+      ['1تجر1', 'الأحد', 1, 'قصد801', '311-20', 'معلم', 'قسم', 'صباحي'],
+    ],
+  };
+  const saved = { document: globalThis.document, window: globalThis.window, XLSX: globalThis.XLSX, FileReader: globalThis.FileReader };
+  globalThis.XLSX = { read: () => ({ SheetNames: Object.keys(sheets), Sheets: sheets }), utils: { sheet_to_json: s => s } };
+  globalThis.window = { XLSX: globalThis.XLSX };
+  globalThis.FileReader = class { readAsArrayBuffer() { this.onload({ target: { result: new ArrayBuffer(0) } }); } };
+  globalThis.document = { createElement: () => new Element(), body: { appendChild: el => { dialog = el; } } };
+  try {
+    const root = new Element();
+    await mountImportsView(root);
+    const school = root.querySelector('#imports-root-school');
+    const file = school.querySelector('#school-import-file');
+    file.files = [{ name: 'test.xlsx' }];
+    await file.listeners.change();
+    const preview = school.querySelector('#school-import-preview');
+    assert.match(preview.innerHTML, /معدلات الطلبة: ستُحدَّث لـ1 طالبًا/);
+    assert.match(preview.innerHTML, /الجدول الدراسي: سيُحدَّث \(1 حصة\)/);
+    const click = preview.querySelector('#school-import-commit').listeners.click;
+    const pending = click();
+    assert.ok(dialog, 'confirmation must open before committing');
+    dialog.querySelector('[data-approve]').listeners.click();
+    await pending;
+    const backend = globalThis.__MASAR_TEST_BACKEND__;
+    assert.equal((await backend.list('academicFlags')).length, 1);
+    assert.equal((await backend.list('termAverages')).length, 1);
+    assert.equal((await backend.list('courseGrades')).length, 1);
+    assert.equal((await backend.list('classSchedules')).length, 1);
+  } finally { Object.assign(globalThis, saved); }
+});
+
 test('school update commits without reading backup collections or downloading files', async () => {
   const backend = globalThis.__MASAR_TEST_BACKEND__;
   const originalList = backend.list;
