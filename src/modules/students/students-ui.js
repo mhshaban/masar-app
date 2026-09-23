@@ -1,7 +1,7 @@
-import { scheduleFromClassScheduleRecords, renderScheduleTable } from "./student-schedule-parser.js?v=2026-09-23-class-schedules-1";
+import { scheduleFromClassScheduleRecords, renderScheduleTable } from "./student-schedule-parser.js?v=2026-09-23-class-schedules-2";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-23-averages-from-workbook-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-23-card-reorder-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-16-prep-school-results-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
@@ -505,7 +505,7 @@ async function renderDetail(container, id, onBack, onGoto) {
     listWhere("classSchedules", "section", s.section).then((records) => {
       const schedule = scheduleFromClassScheduleRecords(records, s.section);
       scheduleTableRoot.innerHTML = schedule
-        ? `${renderScheduleTable(schedule)}${schedule.session ? `<p class="hint">الفترة: ${esc(schedule.session)}</p>` : ""}`
+        ? renderScheduleTable(schedule)
         : '<p class="hint">لا يوجد جدول حصص مستورَد لهذه الشعبة بعد.</p>';
     });
   } else {

@@ -25,6 +25,22 @@ test('scheduleFromClassScheduleRecords returns null when the section has no rows
   assert.equal(scheduleFromClassScheduleRecords([record()], 'شعبة غير موجودة'), null);
 });
 
+test('the morning/evening session is carried per day, not fixed for the whole section', () => {
+  const records = [
+    record({ day: 'الأحد', period: '1', session: 'صباحي' }),
+    record({ day: 'الأحد', period: '2', session: 'صباحي' }),
+    record({ day: 'الخميس', period: '1', session: 'مسائي' }),
+  ];
+  const schedule = scheduleFromClassScheduleRecords(records, '1تجر1');
+  const sundayIndex = schedule.days.indexOf('الأحد');
+  const thursdayIndex = schedule.days.indexOf('الخميس');
+  assert.equal(schedule.lessons[0].cells[sundayIndex].period, 'صباحي');
+  assert.equal(schedule.lessons[0].cells[thursdayIndex].period, 'مسائي');
+  const html = renderScheduleTable(schedule);
+  assert.ok(html.includes('صباحي'));
+  assert.ok(html.includes('مسائي'));
+});
+
 test('renderScheduleTable preserves a missing cell and escapes file text', () => {
   const schedule = scheduleFromClassScheduleRecords([
     record({ day: 'الأحد', period: '1', room: '<script>bad()</script>' }),
