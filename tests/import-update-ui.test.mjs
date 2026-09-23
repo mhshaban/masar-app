@@ -63,6 +63,10 @@ test('school update also commits academic averages/courseGrades when the file in
       ['رقم الطالب', 'السنة الدراسية', 'المعدل التراكمي السنوي'],
       ['123', '2025/2026', 0.85],
     ],
+    'الجدول الدراسي': [
+      ['الشعبة', 'اليوم', 'الحصة', 'المقرر', 'الغرفة', 'المعلم', 'القسم', 'الفترة(ص-م)'],
+      ['1تجر1', 'الأحد', 1, 'قصد801', '311-20', 'معلم', 'قسم', 'صباحي'],
+    ],
   };
   const saved = { document: globalThis.document, window: globalThis.window, XLSX: globalThis.XLSX, FileReader: globalThis.FileReader };
   globalThis.XLSX = { read: () => ({ SheetNames: Object.keys(sheets), Sheets: sheets }), utils: { sheet_to_json: s => s } };
@@ -78,6 +82,7 @@ test('school update also commits academic averages/courseGrades when the file in
     await file.listeners.change();
     const preview = school.querySelector('#school-import-preview');
     assert.match(preview.innerHTML, /معدلات الطلبة: ستُحدَّث لـ1 طالبًا/);
+    assert.match(preview.innerHTML, /الجدول الدراسي: سيُحدَّث \(1 حصة\)/);
     const click = preview.querySelector('#school-import-commit').listeners.click;
     const pending = click();
     assert.ok(dialog, 'confirmation must open before committing');
@@ -87,6 +92,7 @@ test('school update also commits academic averages/courseGrades when the file in
     assert.equal((await backend.list('academicFlags')).length, 1);
     assert.equal((await backend.list('termAverages')).length, 1);
     assert.equal((await backend.list('courseGrades')).length, 1);
+    assert.equal((await backend.list('classSchedules')).length, 1);
   } finally { Object.assign(globalThis, saved); }
 });
 

@@ -1,12 +1,13 @@
-import { mountScheduleViewer } from "./student-schedule-viewer.js?v=2026-09-07-review-1";
+import { scheduleFromClassScheduleRecords, renderScheduleTable } from "./student-schedule-parser.js?v=2026-09-23-class-schedules-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
 import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-23-averages-from-workbook-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-16-prep-school-results-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
-import { findStudentScheduleFiles } from "./student-schedule-local.js?v=2026-09-07-finish-1";
+import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
+import { listWhere } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-08-academic-1";
 import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-09-22-prep-rating-1";
 import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
@@ -434,10 +435,12 @@ async function renderDetail(container, id, onBack, onGoto) {
 
     <div class="card" id="student-schedule-card" style="margin-top:16px;">
       <div class="card-head">
-        <div><h2>جدول الطالب</h2><div class="hint">جدول الشعبة ${esc(s.section) || "—"} — يُعرض داخل ملف الطالب من مجلد مسار على OneDrive.</div></div>
-        <button class="btn btn-primary" id="student-schedule-open" ${s.section ? "" : "disabled"}>عرض الجدول</button>
+        <div><h2>جدول الطالب</h2><div class="hint">جدول الشعبة ${esc(s.section) || "—"}</div></div>
+        <button class="btn btn-ghost" id="student-schedule-open-original" ${s.section ? "" : "disabled"}>فتح الجدول الأصلي (PDF)</button>
       </div>
-      <div id="student-schedule-result"></div>
+      <div id="student-schedule-table"></div>
+      <p class="hint" id="student-schedule-original-status" role="status"></p>
+      <div id="student-schedule-originals"></div>
     </div>
 
     <div class="topbar" style="margin-top:22px;">
@@ -497,38 +500,46 @@ async function renderDetail(container, id, onBack, onGoto) {
   photoButton.addEventListener("click", () => loadDetailPhoto(true, true));
   void loadDetailPhoto(false, false);
 
-  const scheduleButton = container.querySelector("#student-schedule-open");
-  const scheduleResult = container.querySelector("#student-schedule-result");
-  let disposeSchedule = null;
-  const showSchedulePreview = async (match) => {
-    disposeSchedule?.();
-    disposeSchedule = mountScheduleViewer(scheduleResult, match.handle, {
-      studentName: s.name,
-      section: s.section,
-      onClose: () => { scheduleButton.textContent = "عرض الجدول"; },
+  const scheduleTableRoot = container.querySelector("#student-schedule-table");
+  if (s.section) {
+    listWhere("classSchedules", "section", s.section).then((records) => {
+      const schedule = scheduleFromClassScheduleRecords(records, s.section);
+      scheduleTableRoot.innerHTML = schedule
+        ? `${renderScheduleTable(schedule)}${schedule.session ? `<p class="hint">الفترة: ${esc(schedule.session)}</p>` : ""}`
+        : '<p class="hint">لا يوجد جدول حصص مستورَد لهذه الشعبة بعد.</p>';
     });
-    scheduleButton.textContent = "تحديث الجدول";
-  };
-  scheduleButton.addEventListener("click", async () => {
-    scheduleButton.disabled = true;
-    disposeSchedule?.();
-    scheduleResult.innerHTML = '<p class="hint">جارٍ البحث في مجلد مسار…</p>';
+  } else {
+    scheduleTableRoot.innerHTML = '<p class="hint">لا شعبة مسجَّلة لهذا الطالب.</p>';
+  }
+
+  // "فتح الجدول الأصلي (PDF)" الاستثناء الوحيد الباقي لمجلد "مسار" المحلي
+  // بملف الطالب — فتح/طباعة نسخة PDF الرسمية نفسها فقط، لا بياناتها (الجدول
+  // أعلاه كافٍ للبيانات، مستورَد من ملف كشف الطلاب).
+  const originalButton = container.querySelector("#student-schedule-open-original");
+  const originalStatus = container.querySelector("#student-schedule-original-status");
+  const originalsRoot = container.querySelector("#student-schedule-originals");
+  originalButton.addEventListener("click", async () => {
+    originalButton.disabled = true;
+    originalsRoot.innerHTML = "";
+    originalStatus.textContent = "جارٍ البحث في مجلد مسار…";
     try {
       const result = await findStudentScheduleFiles(s, { prompt: true, refresh: true });
       if (!result.connected) {
-        scheduleResult.innerHTML = '<p class="hint" style="color:var(--critical);">تعذّر الوصول للمجلد. افتح التطبيق في Chrome أو Edge ثم اربط مجلد مسار.</p>';
+        originalStatus.textContent = "تعذّر الوصول للمجلد. افتح التطبيق في Chrome أو Edge ثم اربط مجلد مسار.";
       } else if (!result.matches.length) {
-        scheduleResult.innerHTML = `<p class="hint" style="color:var(--critical);">لم أجد ملف PDF باسم الشعبة «${esc(s.section)}». تأكد أن الملف موجود داخل مجلد مسار أو أحد مجلداته الفرعية.</p>`;
+        originalStatus.textContent = `لم أجد ملف PDF باسم الشعبة «${s.section}». تأكد أن الملف موجود داخل مجلد مسار أو أحد مجلداته الفرعية.`;
       } else if (result.matches.length === 1) {
-        await showSchedulePreview(result.matches[0]);
+        await openScheduleFile(result.matches[0].handle);
+        originalStatus.textContent = "";
       } else {
-        scheduleResult.innerHTML = `<p class="hint">وُجد أكثر من ملف مطابق؛ اختر المطلوب:</p><div class="forms-actions">${result.matches.map((file, index) => `<button class="btn btn-ghost" data-schedule-index="${index}">${esc(file.relativePath)}</button>`).join("")}</div>`;
-        scheduleResult.querySelectorAll("[data-schedule-index]").forEach((button) => button.addEventListener("click", () => showSchedulePreview(result.matches[Number(button.dataset.scheduleIndex)])));
+        originalStatus.textContent = "وُجد أكثر من ملف مطابق؛ اختر المطلوب:";
+        originalsRoot.innerHTML = `<div class="forms-actions">${result.matches.map((file, index) => `<button class="btn btn-ghost" data-schedule-index="${index}">${esc(file.relativePath)}</button>`).join("")}</div>`;
+        originalsRoot.querySelectorAll("[data-schedule-index]").forEach((button) => button.addEventListener("click", () => openScheduleFile(result.matches[Number(button.dataset.scheduleIndex)].handle)));
       }
     } catch (error) {
-      scheduleResult.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message || "تعذّر فتح جدول الطالب")}</p>`;
+      originalStatus.textContent = error.message || "تعذّر فتح جدول الطالب";
     } finally {
-      scheduleButton.disabled = false;
+      originalButton.disabled = false;
     }
   });
 

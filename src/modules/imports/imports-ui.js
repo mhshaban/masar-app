@@ -6,10 +6,11 @@
 // السنوية" صار جزءًا من نفس رفعة "تحديث شامل" — لا تبويب/رفعة منفصلة، نفس
 // ملف كشف الطلاب يحدّث السجل والدرجات معًا برفعة واحدة (2026-09-23: كان
 // تبويب "تحديث المعدلات" منفصلًا يطلب رفع نفس الملف مرة ثانية، ألغيناه).
-// شيتات الدرجات اختيارية بالملف (متل شيتي المقررات) — غيابها لا يوقف بقية
+// نفس المنطق لشيت "الجدول الدراسي" (classSchedules، أُضيف بنفس اليوم) —
+// كلاهما اختياري بالملف (متل شيتي المقررات) — غيابهما لا يوقف بقية
 // التحديث. "تدقيق قالب المقررات" بنفس التبويب يقرأ courseGrades المستوردة
 // أصلًا (بلا مسح أو رفع إضافي). الاستثناء الوحيد الباقي لـPDF/OneDrive بكل
-// التطبيق: عرض/طباعة شهادة الطالب الأصلية من ملف الطالب — راجع README.
+// التطبيق: عرض/طباعة شهادة الطالب/جدولها الأصلي — راجع README.
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
@@ -18,6 +19,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academi
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-16-prep-school-results-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
 import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook, commitAcademicAverages } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-23-averages-from-workbook-2";
+import { parseClassScheduleWorkbook, buildClassScheduleRecords, commitClassSchedules } from "../../services/class-schedule-import-service.js?v=2026-09-23-class-schedules-1";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
 import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-23-averages-from-workbook-2";
 
@@ -37,7 +39,7 @@ async function mountSchoolTab(root) {
   root.innerHTML = `
     <div class="card">
       <h2>تحديث بيانات المدرسة من ملف واحد</h2>
-      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين ومعدلات الطلبة (إن وُجدت شيتات الدرجات بالملف)، ويمكن تنزيل نسخة احتياطية من صفحة النسخ الاحتياطي.</p>
+      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين ومعدلات الطلبة والجدول الدراسي (إن وُجدت شيتاتها بالملف)، ويمكن تنزيل نسخة احتياطية من صفحة النسخ الاحتياطي.</p>
       <input type="file" id="school-import-file" aria-label="ملف كشف الطلاب الشامل" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
       <div id="school-import-preview"></div>
     </div>
@@ -66,6 +68,12 @@ async function mountSchoolTab(root) {
       } catch (error) {
         averagesError = error.message;
       }
+      let classScheduleRecords = null, classScheduleError = null;
+      try {
+        classScheduleRecords = buildClassScheduleRecords(await parseClassScheduleWorkbook(file));
+      } catch (error) {
+        classScheduleError = error.message;
+      }
       const matched = data.promotedRows.filter((row) => row.matchStatus === "matched").length;
       const unmatched = data.promotedRows.length - matched;
       const uniquePromoted = new Set(data.promotedRows.filter((row) => row.matchStatus === "matched").map((row) => `${row.studentId}::${String(row.subjectCode || "").trim()}`)).size;
@@ -82,10 +90,11 @@ async function mountSchoolTab(root) {
         <p class="hint">تكرارات المرفعين القديمة: ${historicalDuplicates.removableCount} سجل زائد آمن للحذف${historicalDuplicates.conflictGroupCount ? `، و${historicalDuplicates.conflictGroupCount} تعارض لن يُحذف تلقائيًا` : "، ولا توجد تعارضات"}.</p>
         <p class="hint">${curriculumTracks.length ? `قالب المقررات: سيُحدَّث (${curriculumTracks.map(esc).join("، ")}) — وُجد شيتا المقررات بالملف.` : "قالب المقررات: بلا تغيير — الملف لا يحتوي شيتي «الصناعي»/«التجاري»."}</p>
         <p class="hint">${averages ? `معدلات الطلبة: ستُحدَّث لـ${averages.academicFlagsRecords.length} طالبًا (${averages.termAveragesRecords.length} معدّلًا فصليًا، ${averages.courseGradesRecords.length} صف درجة)${averages.summary.termConflictsCount ? ` · ⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة: ${averages.summary.termConflictsCount} (اعتُمد آخر صف قُرئ)` : ""}.` : `معدلات الطلبة: بلا تحديث — تعذّر إيجاد شيتات الدرجات بالملف (${esc(averagesError)}).`}</p>
+        <p class="hint">${classScheduleRecords ? `الجدول الدراسي: سيُحدَّث (${classScheduleRecords.length} حصة).` : `الجدول الدراسي: بلا تحديث — تعذّر إيجاد شيت "الجدول الدراسي" بالملف (${esc(classScheduleError)}).`}</p>
         <button class="btn btn-primary" id="school-import-commit">تنفيذ التحديث</button>
         <div id="school-import-status"></div>`;
       preview.querySelector("#school-import-commit").addEventListener("click", async () => {
-        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين${curriculumTracks.length ? ` وقالب المقررات (${curriculumTracks.join("، ")})` : ""}${averages ? ` ومعدلات ${averages.academicFlagsRecords.length} طالبًا` : ""}، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. هل تريد التنفيذ؟`)) return;
+        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين${curriculumTracks.length ? ` وقالب المقررات (${curriculumTracks.join("، ")})` : ""}${averages ? ` ومعدلات ${averages.academicFlagsRecords.length} طالبًا` : ""}${classScheduleRecords ? ` والجدول الدراسي (${classScheduleRecords.length} حصة)` : ""}، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. هل تريد التنفيذ؟`)) return;
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;
@@ -93,7 +102,8 @@ async function mountSchoolTab(root) {
         try {
           const result = await commitSchoolWorkbook(data, { fileName: file.name });
           const averagesResult = averages ? await commitAcademicAverages(averages) : null;
-          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين${result.curriculumResult.updatedTracks.length ? `، وقالب المقررات (${result.curriculumResult.updatedTracks.map(esc).join("، ")})` : ""}${averagesResult ? `، ومعدلات ${averagesResult.academicFlagsCount} طالبًا (${averagesResult.termAveragesCount} معدّلًا فصليًا، ${averagesResult.courseGradesCount} صف درجة)` : ""}. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين${averagesResult ? ` و${averagesResult.removedCourseGradesCount} صف درجة لم يعد له مصدر` : ""}.</p>`;
+          const scheduleResult = classScheduleRecords ? await commitClassSchedules(classScheduleRecords) : null;
+          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين${result.curriculumResult.updatedTracks.length ? `، وقالب المقررات (${result.curriculumResult.updatedTracks.map(esc).join("، ")})` : ""}${averagesResult ? `، ومعدلات ${averagesResult.academicFlagsCount} طالبًا (${averagesResult.termAveragesCount} معدّلًا فصليًا، ${averagesResult.courseGradesCount} صف درجة)` : ""}${scheduleResult ? `، والجدول الدراسي (${scheduleResult.classSchedulesCount} حصة)` : ""}. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين${averagesResult ? ` و${averagesResult.removedCourseGradesCount} صف درجة لم يعد له مصدر` : ""}${scheduleResult ? ` و${scheduleResult.removedClassSchedulesCount} حصة لم يعد لها مصدر` : ""}.</p>`;
         } catch (error) {
           button.disabled = false;
           status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
