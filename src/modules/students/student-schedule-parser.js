@@ -7,6 +7,10 @@ const dayRank = (day) => { const i = DAY_ORDER.indexOf(clean(day)); return i ===
 // يبني شكل الجدول {section, days, lessons} من صفوف classSchedules خام
 // (مستوردة من شيت "الجدول الدراسي" بملف كشف الطلاب) — بدل تحليل PDF جدول
 // حصص هندسيًا كما كان سابقًا. null لو ما فيه أي صف لهذه الشعبة.
+//
+// الفترة (صباحي/مسائي) خاصية لكل يوم لا للشعبة كلها — شعبة واحدة ممكن
+// تكون صباحية معظم الأيام ومسائية بيوم واحد (مؤكَّد من بيانات حقيقية)،
+// فتُعرض لكل خلية بدل قيمة واحدة أعلى الجدول.
 export function scheduleFromClassScheduleRecords(records, section) {
   const rows = records.filter((r) => r.section === section);
   if (!rows.length) return null;
@@ -17,10 +21,10 @@ export function scheduleFromClassScheduleRecords(records, section) {
     label: `الحصة ${period}`,
     cells: days.map((day) => {
       const r = byDayPeriod.get(`${day}::${period}`);
-      return { course: r?.subjectCode || "", teacher: r?.teacher || "", room: r?.room || "", period: "" };
+      return { course: r?.subjectCode || "", teacher: r?.teacher || "", room: r?.room || "", period: r?.session || "" };
     }),
   }));
-  return { section, days, lessons, session: rows[0]?.session || null };
+  return { section, days, lessons };
 }
 
 const esc = value => String(value ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
