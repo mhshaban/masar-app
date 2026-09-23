@@ -8,7 +8,7 @@
 // نفس الطالب زمنيًا (أول فصل يظهر له بين شهاداته المقروءة = الفصل١،
 // وهكذا) — الشهادات نفسها لا تنص دائمًا صراحة على "المستوى"، فهذا أفضل
 // تقريب متاح بلا بيانات إضافية؛ يحتاج مراجعة المرشد قبل اعتماده بالقالب.
-import { scanCertificatesFolder, readCertificateFile } from "./academic-averages-import-service.js?v=2026-09-11-academic-averages-1";
+import { scanCertificatesFolder, readCertificateFile } from "./academic-averages-import-service.js?v=2026-09-23-averages-from-workbook-1";
 import { certificateTermOrder, codeKey, splitCodes } from "../modules/grades/curriculum-results.js?v=2026-09-11-curriculum-import-1";
 import { list } from "./cloud-runtime.js";
 import { loadCurriculumTemplates } from "./curriculum-template-service.js?v=2026-09-11-curriculum-import-1";
