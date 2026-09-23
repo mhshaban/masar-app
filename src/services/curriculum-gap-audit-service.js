@@ -1,14 +1,14 @@
-// تدقيق قالب المقررات (curriculumTemplates) مقابل شهادات الطلبة الفعلية —
-// يمسح نفس مجلد "مسار" المستخدَم بتحديث المعدلات، ويجمع كل رمز مقرر ظهر
-// بدرجة **ناجحة فقط** (يتجاهل غائب/محروم/دون 50٪) بشهادة طالب ولم يكن
-// موجودًا بقالب أي من المسارين (الصناعي/التجاري) — تدقيق للقراءة فقط، لا
-// يكتب أي شيء لـSupabase ولا يُحدّث القالب تلقائيًا.
+// تدقيق قالب المقررات (curriculumTemplates) مقابل درجات الطلبة الفعلية —
+// يقرأ مجموعة courseGrades (صفوف درجة خام، من نفس استيراد "تحديث المعدلات"
+// بملف كشف الطلاب — راجع academic-averages-workbook-import-service.js)
+// ويجمع كل رمز مقرر ظهر **بدرجة ناجحة فقط** (يتجاهل غائب/محروم/دون 50٪)
+// ولم يكن موجودًا بقالب أي من المسارين (الصناعي/التجاري) — تدقيق للقراءة
+// فقط، لا يكتب أي شيء لـSupabase ولا يُحدّث القالب تلقائيًا. لا يمسح أي
+// مجلد محلي ولا يقرأ PDF — كل بياناته مستوردة أصلًا.
 //
-// **"الفصل" لكل رمز مكتشَف تخمين لا تأكيد**: يُشتق من ترتيب فصول شهادات
-// نفس الطالب زمنيًا (أول فصل يظهر له بين شهاداته المقروءة = الفصل١،
-// وهكذا) — الشهادات نفسها لا تنص دائمًا صراحة على "المستوى"، فهذا أفضل
-// تقريب متاح بلا بيانات إضافية؛ يحتاج مراجعة المرشد قبل اعتماده بالقالب.
-import { scanCertificatesFolder, readCertificateFile } from "./academic-averages-import-service.js?v=2026-09-23-averages-from-workbook-1";
+// **"الفصل" لكل رمز مكتشَف تخمين لا تأكيد**: يُشتق من ترتيب فصول نفس الطالب
+// زمنيًا (أول فصل يظهر له بين صفوفه = الفصل١، وهكذا) — يحتاج مراجعة المرشد
+// قبل اعتماده بالقالب.
 import { certificateTermOrder, codeKey, splitCodes } from "../modules/grades/curriculum-results.js?v=2026-09-11-curriculum-import-1";
 import { list } from "./cloud-runtime.js";
 import { loadCurriculumTemplates } from "./curriculum-template-service.js?v=2026-09-11-curriculum-import-1";
@@ -17,8 +17,8 @@ import { ensureXlsx } from "./vendor-loader.js?v=2026-09-07-academic-fix-1";
 const PASS_THRESHOLD = 50;
 export const TRACKS = ["الصناعي", "التجاري"];
 
-function isPassingSubject(subject) {
-  return !subject.scoreStatus && subject.score != null && Number.isFinite(Number(subject.score)) && Number(subject.score) >= PASS_THRESHOLD;
+function isPassingSubject(row) {
+  return !row.scoreStatus && row.score != null && Number.isFinite(Number(row.score)) && Number(row.score) >= PASS_THRESHOLD;
 }
 
 function knownCodeSet(templates) {
@@ -36,71 +36,59 @@ function knownCodeSet(templates) {
   return set;
 }
 
-function chronologicalTerms(cert) {
-  return cert.terms
-    .map((term, index) => ({ term, order: certificateTermOrder(term.label, index) }))
+// ترتيب فصول نفس الطالب زمنيًا من عناوينها النصية وحدها (بلا فهرس مصفوفة
+// جاهز كما كان بشهادة PDF واحدة) — يرجع خريطة عنوان الفصل → رقمه الترتيبي.
+function studentTermNumbers(rows) {
+  const labels = [...new Set(rows.map((r) => r.term))];
+  const ordered = labels
+    .map((label, index) => ({ label, order: certificateTermOrder(label, index) }))
     .sort((a, b) => {
       for (let i = 0; i < a.order.length; i++) if (a.order[i] !== b.order[i]) return a.order[i] - b.order[i];
       return 0;
     });
+  return new Map(ordered.map((t, i) => [t.label, i + 1]));
 }
 
-// يأخذ نتائج شهادات مُحلَّلة مسبقًا (نفس شكل نتائج readCertificateFile) —
-// بلا أي اعتماد على متصفح حقيقي، قابل للاختبار مباشرة.
-export function analyzeCurriculumGaps(certResults, students, templates) {
+// يأخذ صفوف courseGrades مُحلَّلة مسبقًا (نفس شكل مجموعة courseGrades) —
+// بلا أي اعتماد على متصفح حقيقي أو Supabase، قابل للاختبار مباشرة.
+export function analyzeCurriculumGaps(courseGrades, students, templates) {
   const known = knownCodeSet(templates);
   const studentByAcademicId = new Map(students.filter((s) => s.academicId).map((s) => [String(s.academicId), s]));
 
+  const byStudent = new Map();
+  for (const row of courseGrades) {
+    const id = String(row.studentId);
+    if (!byStudent.has(id)) byStudent.set(id, []);
+    byStudent.get(id).push(row);
+  }
+
   const missing = new Map();
-  let certificatesRead = 0;
-
-  for (const result of certResults) {
-    if (result.kind !== "certificate") continue;
-    certificatesRead += 1;
-    const cert = result.cert;
-    if (!cert.academicId) continue;
-    const student = studentByAcademicId.get(String(cert.academicId));
-
-    chronologicalTerms(cert).forEach(({ term }, position) => {
-      const termNumber = position + 1;
-      for (const subject of term.subjects) {
-        if (!isPassingSubject(subject)) continue;
-        const key = codeKey(subject.code);
-        if (!key || known.has(key)) continue;
-        if (!missing.has(key)) missing.set(key, { code: subject.code, name: subject.name, observations: [] });
-        missing.get(key).observations.push({
-          term: term.label, termNumber,
-          department: student?.department || null,
-          track: student?.track || null,
-          studentId: cert.academicId, studentName: cert.studentName || student?.name || null,
-        });
-      }
-    });
+  for (const [studentId, rows] of byStudent) {
+    const student = studentByAcademicId.get(studentId);
+    const termNumberByLabel = studentTermNumbers(rows);
+    for (const row of rows) {
+      if (!isPassingSubject(row)) continue;
+      const key = codeKey(row.subjectCode);
+      if (!key || known.has(key)) continue;
+      if (!missing.has(key)) missing.set(key, { code: row.subjectCode, name: row.subjectName, observations: [] });
+      missing.get(key).observations.push({
+        term: row.term, termNumber: termNumberByLabel.get(row.term) || null,
+        department: student?.department || null,
+        track: student?.track || null,
+        studentId, studentName: student?.name || null,
+      });
+    }
   }
 
   const rows = [...missing.values()].sort((a, b) => a.code.localeCompare(b.code, "ar"));
-  return { rows, certificatesRead };
+  return { rows, studentsRead: byStudent.size };
 }
 
-export async function scanCurriculumGaps(onFile) {
-  const files = await scanCertificatesFolder();
-  if (!files) return null;
-  const [students, templates] = await Promise.all([list("students"), loadCurriculumTemplates()]);
-  const results = [];
-  for (const file of files) {
-    let result;
-    try {
-      const blob = await file.handle.getFile();
-      result = await readCertificateFile(blob);
-      result.sourceFile = file.name;
-    } catch (err) {
-      result = { kind: "error", reason: err.message, sourceFile: file.name };
-    }
-    results.push(result);
-    if (onFile) onFile(results.length, files.length);
-  }
-  const { rows, certificatesRead } = analyzeCurriculumGaps(results, students, templates);
-  return { rows, certificatesRead, filesScanned: files.length };
+export async function scanCurriculumGaps() {
+  const [courseGrades, students, templates] = await Promise.all([
+    list("courseGrades"), list("students"), loadCurriculumTemplates(),
+  ]);
+  return analyzeCurriculumGaps(courseGrades, students, templates);
 }
 
 function mode(values) {

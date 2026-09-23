@@ -1,7 +1,8 @@
 // استخراج نص PDF كصفوف (كل صف = عناصر نص بنفس ارتفاع y تقريبًا، من اليمين
-// لليسار) عبر pdf.js — منطق مشترك بين قراءة شهادة طالب واحد عند تصفّح
-// ملفه (student-certificate-local.js) ومسح مجلد الشهادات كامل لتحديث
-// معدلات الطلبة (academic-averages-import-service.js)، بدل تكراره بالملفين.
+// لليسار) عبر pdf.js — يقرأ شهادة الطالب الفردية عند تصفّح ملفها
+// (student-certificate-local.js)، آخر مكان بمسار لا يزال يقرأ PDF مباشرة
+// (تحديث المعدلات نفسه صار من ملف كشف الطلاب، راجع
+// academic-averages-workbook-import-service.js).
 import { ensurePdfJs } from "./vendor-loader.js?v=2026-09-07-academic-fix-1";
 
 export async function extractPdfTextRows(file) {

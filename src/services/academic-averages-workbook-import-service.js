@@ -12,6 +12,8 @@
 import { subjectKeyForGrade } from "../../scripts/lib/subject-groups.mjs";
 import { gradeRowPct, isEncodedAbsenceScore } from "../../scripts/lib/score-conventions.mjs";
 import { readWorkbook } from "./xlsx-parser.js";
+import { list, bulkPut, remove } from "./cloud-runtime.js";
+import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-academic-averages-1";
 
 const COURSE_GRADES_SHEET_HINT = "درجات المقررات";
 const TERM_AVERAGES_SHEET_HINT = "المعدلات الفصلية";
@@ -25,6 +27,7 @@ const COURSE_HEADER_ALIASES = {
   subjectCode: ["رمز المقرر"],
   subjectName: ["اسم المقرر"],
   score: ["الدرجة"],
+  notes: ["ملاحظات المقرر"],
   sourceFile: ["الملف المصدر"],
 };
 
@@ -113,6 +116,7 @@ export function parseCourseGradeRows(rows) {
       subjectName: toText(row[columns.subjectName]),
       score,
       scoreStatus,
+      notes: toText(row[columns.notes]),
       term: buildTermLabel({
         termName: toText(row[columns.termName]),
         level: toText(row[columns.level]),
@@ -265,9 +269,32 @@ export function buildAcademicAverages({ rows: allRows, termSummaries, finalCumul
     rating: t.rating,
   }));
 
+  // صف خام لكل محاولة مقرر لطالب مطابَق — يغذّي جدول "سجل المقررات" بملف
+  // الطالب وتدقيق قالب المقررات، بدل قراءة شهادة PDF حيًا لكليهما. id يضم
+  // الفصل (فريد عبر السنوات أصلًا) فرمز المقرر — محاولة معادة بنفس الفصل
+  // بالضبط (نادر) يستبدل آخر صف يُقرأ الأسبق، بلا تتبّع تعارض هنا (بعكس
+  // termAveragesRecords) لأنه تفصيل عرض لا رقم مُعتمَد بقرار ترشيح.
+  const courseGradesByKey = new Map();
+  for (const r of matchedRows) {
+    const key = `${r.studentId}--${r.term}--${r.subjectCode || "بلا-رمز"}`;
+    courseGradesByKey.set(key, r);
+  }
+  const courseGradesRecords = [...courseGradesByKey.entries()].map(([id, r]) => ({
+    id,
+    studentId: String(r.studentId),
+    term: r.term,
+    subjectCode: r.subjectCode,
+    subjectName: r.subjectName,
+    score: r.score,
+    scoreStatus: r.scoreStatus,
+    notes: r.notes,
+    sourceFile: r.sourceFile,
+  }));
+
   return {
     academicFlagsRecords,
     termAveragesRecords,
+    courseGradesRecords,
     summary: {
       courseRowsRead: allRows.length,
       termAveragesRead: termSummaries.length,
@@ -275,5 +302,41 @@ export function buildAcademicAverages({ rows: allRows, termSummaries, finalCumul
       unmatchedCount: unmatchedIds.size,
       termConflictsCount: termConflicts.length,
     },
+  };
+}
+
+// استبدال كامل لا تراكم — بنفس الترتيب الآمن المستخدم بالسكربت: يكتب
+// الجديد أولًا (upsert بـid ثابت يستبدل القديم تلقائيًا)، ثم يحذف فقط ما
+// لم يعد له مصدر بهذه التشغيلة، لكل المجموعات الثلاث معًا.
+export async function commitAcademicAverages({ academicFlagsRecords, termAveragesRecords, courseGradesRecords = [] }) {
+  const [existingFlags, existingTerms, existingCourseGrades] = await Promise.all([
+    list("academicFlags"), list("termAverages"), list("courseGrades"),
+  ]);
+
+  await bulkPut("academicFlags", academicFlagsRecords);
+  await bulkPut("termAverages", termAveragesRecords);
+  await bulkPut("courseGrades", courseGradesRecords);
+
+  const newFlagIds = new Set(academicFlagsRecords.map((r) => r.id));
+  const newTermIds = new Set(termAveragesRecords.map((r) => r.id));
+  const newCourseGradeIds = new Set(courseGradesRecords.map((r) => r.id));
+  const staleFlags = existingFlags.filter((r) => !newFlagIds.has(r.id));
+  const staleTerms = existingTerms.filter((r) => !newTermIds.has(r.id));
+  const staleCourseGrades = existingCourseGrades.filter((r) => !newCourseGradeIds.has(r.id));
+  await Promise.all([
+    ...staleFlags.map((r) => remove("academicFlags", r.id)),
+    ...staleTerms.map((r) => remove("termAverages", r.id)),
+    ...staleCourseGrades.map((r) => remove("courseGrades", r.id)),
+  ]);
+
+  await logAuditEvent("import_academic_averages", { tableName: "academicFlags", count: academicFlagsRecords.length });
+
+  return {
+    academicFlagsCount: academicFlagsRecords.length,
+    termAveragesCount: termAveragesRecords.length,
+    courseGradesCount: courseGradesRecords.length,
+    removedFlagsCount: staleFlags.length,
+    removedTermsCount: staleTerms.length,
+    removedCourseGradesCount: staleCourseGrades.length,
   };
 }

@@ -1,12 +1,13 @@
 // شاشة الاستيراد الموحَّدة (إدمن فقط): تحديث شامل من ملف المدرسة الواحد،
 // مع إبقاء النسخ الاحتياطي والاستعادة الآمنة في التبويب الثاني فقط.
 //
-// الدرجات والشهادات: تحديث معدلات الطلبة (academicFlags/termAverages) من
-// شيتات "درجات المقررات"/"المعدلات الفصلية"/"المعدلات السنوية" بملف كشف
-// الطلاب نفسه (تبويب "تحديث المعدلات") — مصدر واحد فقط، بلا شهادات PDF.
-// "تدقيق قالب المقررات" بنفس التبويب أداة منفصلة، لا تزال تمسح مجلد "مسار"
-// المحلي وتحلّل شهادات PDF بالمتصفح لغرض مختلف (اكتشاف رموز مقررات غير
-// مدرجة بالقالب) — راجع README.
+// الدرجات والشهادات: تحديث معدلات الطلبة (academicFlags/termAverages/
+// courseGrades) من شيتات "درجات المقررات"/"المعدلات الفصلية"/"المعدلات
+// السنوية" بملف كشف الطلاب نفسه (تبويب "تحديث المعدلات") — مصدر واحد فقط،
+// بلا شهادات PDF ولا مجلد OneDrive محلي. "تدقيق قالب المقررات" بنفس
+// التبويب يقرأ courseGrades المستوردة أصلًا (بلا مسح أو رفع إضافي). الاستثناء
+// الوحيد الباقي لـPDF/OneDrive بكل التطبيق: عرض/طباعة شهادة الطالب الأصلية
+// من ملف الطالب — راجع README.
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
@@ -14,12 +15,10 @@ import { renderImportSection as renderBackupRestoreImport } from "../backup/back
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-16-prep-school-results-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
-import { folderScanSupported, commitAcademicAverages } from "../../services/academic-averages-import-service.js?v=2026-09-23-averages-from-workbook-1";
-import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-23-averages-from-workbook-1";
+import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook, commitAcademicAverages } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-23-averages-from-workbook-2";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
-import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-23-averages-from-workbook-1";
+import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-23-averages-from-workbook-2";
 import { list } from "../../services/cloud-runtime.js";
-import { getMasarFolderName, forgetMasarFolder } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
@@ -150,14 +149,9 @@ async function mountAveragesTab(root) {
     </div>
     <div class="card" style="margin-top:16px;">
       <h2>تدقيق قالب المقررات</h2>
-      <p class="hint">يمسح مجلد "مسار" المحلي بحثًا عن شهادات PDF (نفس المجلد المستخدَم لصور/جداول/شهادات الطلبة وصور المعلمين)، ويجمع كل رمز مقرر ظهر بدرجة ناجحة (٥٠٪ فأكثر، بلا غياب/حرمان) ولم يكن موجودًا بقالب المقررات لأي من المسارين — لاكتشاف مقررات جديدة يحتاج القالب تحديثها. قراءة فقط، لا يُغيّر القالب أو أي بيانات بنفسه؛ ينزّل ملف Excel للمراجعة اليدوية.</p>
-      ${folderScanSupported() ? `
-      <p class="hint">⚠ ربط المجلد محفوظ بهذا المتصفح/الجهاز فقط — لو فتحت التطبيق من متصفح أو جهاز آخر، أو مسحت بيانات الموقع، سيُطلب اختيار المجلد من جديد.</p>
-      <p class="hint" id="gaps-folder-status"></p>
-      <button class="btn btn-ghost" id="gaps-reset-folder">إعادة تعيين مجلد "مسار"</button>
-      <button class="btn btn-ghost" id="gaps-scan">مسح الشهادات وتنزيل تقرير الفجوات</button>
-      <div id="gaps-progress"></div>
-      <div id="gaps-result"></div>` : `<p class="hint" style="color:var(--critical);">هذه الأداة تحتاج متصفح كروم أو إيدج (وصول لمجلد محلي) — غير مدعومة بمتصفحك الحالي.</p>`}
+      <p class="hint">يقرأ درجات المقررات المستوردة أصلًا (بلا رفع ملف إضافي)، ويجمع كل رمز مقرر ظهر بدرجة ناجحة (٥٠٪ فأكثر، بلا غياب/حرمان) ولم يكن موجودًا بقالب المقررات لأي من المسارين — لاكتشاف مقررات جديدة يحتاج القالب تحديثها. قراءة فقط، لا يُغيّر القالب أو أي بيانات بنفسه؛ ينزّل ملف Excel للمراجعة اليدوية.</p>
+      <button class="btn btn-ghost" id="gaps-scan">تحليل الفجوات وتنزيل التقرير</button>
+      <div id="gaps-result"></div>
     </div>`;
 
   const importInput = root.querySelector("#averages-import-file");
@@ -169,7 +163,7 @@ async function mountAveragesTab(root) {
     try {
       const parsed = await parseAcademicAveragesWorkbook(file);
       const students = await list("students");
-      const { academicFlagsRecords, termAveragesRecords, summary } = buildAcademicAveragesFromWorkbook(parsed, students);
+      const { academicFlagsRecords, termAveragesRecords, courseGradesRecords, summary } = buildAcademicAveragesFromWorkbook(parsed, students);
       preview.innerHTML = `
         <div class="grid g3" style="margin:16px 0;">
           <div class="card stat"><div class="label">صفوف درجات مقروءة</div><div class="value">${summary.courseRowsRead}</div></div>
@@ -186,8 +180,8 @@ async function mountAveragesTab(root) {
         commitButton.disabled = true;
         status.innerHTML = '<p class="hint">جارٍ الحفظ…</p>';
         try {
-          const commitResult = await commitAcademicAverages({ academicFlagsRecords, termAveragesRecords });
-          status.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${commitResult.academicFlagsCount} طالبًا، ${commitResult.termAveragesCount} معدّلًا فصليًا. حُذف ${commitResult.removedFlagsCount} سجل تحليل و${commitResult.removedTermsCount} معدّلًا فصليًا لم يعد لهما مصدر.</p>`;
+          const commitResult = await commitAcademicAverages({ academicFlagsRecords, termAveragesRecords, courseGradesRecords });
+          status.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${commitResult.academicFlagsCount} طالبًا، ${commitResult.termAveragesCount} معدّلًا فصليًا، ${commitResult.courseGradesCount} صف درجة. حُذف ${commitResult.removedFlagsCount} سجل تحليل و${commitResult.removedTermsCount} معدّلًا فصليًا و${commitResult.removedCourseGradesCount} صف درجة لم يعد لها مصدر.</p>`;
         } catch (error) {
           commitButton.disabled = false;
           status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
@@ -198,43 +192,22 @@ async function mountAveragesTab(root) {
     }
   });
 
-  if (!folderScanSupported()) return;
-
-  const folderStatus = root.querySelector("#gaps-folder-status");
-  const resetButton = root.querySelector("#gaps-reset-folder");
-  async function refreshFolderStatus() {
-    const name = await getMasarFolderName();
-    folderStatus.textContent = name ? `المجلد المتصل حاليًا: ${name}` : "لا يوجد مجلد متصل حاليًا — سيُطلب اختياره عند أول مسح.";
-  }
-  await refreshFolderStatus();
-  resetButton.addEventListener("click", async () => {
-    if (!await confirmDialog('سيُنسى المجلد المتصل حاليًا، وسيُطلب اختيار مجلد "مسار" من جديد عند أول مسح لاحق. هل تريد المتابعة؟')) return;
-    await forgetMasarFolder();
-    await refreshFolderStatus();
-  });
-
   const gapsButton = root.querySelector("#gaps-scan");
-  const gapsProgress = root.querySelector("#gaps-progress");
   const gapsResult = root.querySelector("#gaps-result");
   gapsButton.addEventListener("click", async () => {
     gapsButton.disabled = true;
-    gapsResult.innerHTML = "";
-    gapsProgress.innerHTML = '<p class="hint">جارٍ فتح المجلد…</p>';
+    gapsResult.innerHTML = '<p class="hint">جارٍ التحليل…</p>';
     try {
-      const scan = await scanCurriculumGaps((done, total) => {
-        gapsProgress.innerHTML = `<p class="hint">جارٍ قراءة الشهادات: ${done} من ${total}…</p>`;
-      });
-      gapsProgress.innerHTML = "";
+      const scan = await scanCurriculumGaps();
       gapsButton.disabled = false;
-      if (!scan) return;
       if (!scan.rows.length) {
-        gapsResult.innerHTML = `<p class="hint" role="status">لا توجد مقررات غير مدرجة بالقالب — فُحصت ${scan.certificatesRead} شهادة.</p>`;
+        gapsResult.innerHTML = `<p class="hint" role="status">لا توجد مقررات غير مدرجة بالقالب — فُحصت درجات ${scan.studentsRead} طالبًا.</p>`;
         return;
       }
       await downloadCurriculumGapsWorkbook(scan.rows);
-      gapsResult.innerHTML = `<p class="hint" role="status">تم تنزيل تقرير الفجوات: ${scan.rows.length} رمز مقرر غير مدرج، من أصل ${scan.certificatesRead} شهادة مقروءة. "الفصل" بالتقرير تخمين من ترتيب شهادات كل طالب زمنيًا — راجعه قبل تحديث القالب.</p>`;
+      gapsResult.innerHTML = `<p class="hint" role="status">تم تنزيل تقرير الفجوات: ${scan.rows.length} رمز مقرر غير مدرج، من درجات ${scan.studentsRead} طالبًا. "الفصل" بالتقرير تخمين من ترتيب فصول كل طالب زمنيًا — راجعه قبل تحديث القالب.</p>`;
     } catch (error) {
-      gapsProgress.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+      gapsResult.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
       gapsButton.disabled = false;
     }
   });
