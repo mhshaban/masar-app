@@ -3,11 +3,13 @@
 //
 // الدرجات والشهادات: تحديث معدلات الطلبة (academicFlags/termAverages/
 // courseGrades) من شيتات "درجات المقررات"/"المعدلات الفصلية"/"المعدلات
-// السنوية" بملف كشف الطلاب نفسه (تبويب "تحديث المعدلات") — مصدر واحد فقط،
-// بلا شهادات PDF ولا مجلد OneDrive محلي. "تدقيق قالب المقررات" بنفس
-// التبويب يقرأ courseGrades المستوردة أصلًا (بلا مسح أو رفع إضافي). الاستثناء
-// الوحيد الباقي لـPDF/OneDrive بكل التطبيق: عرض/طباعة شهادة الطالب الأصلية
-// من ملف الطالب — راجع README.
+// السنوية" صار جزءًا من نفس رفعة "تحديث شامل" — لا تبويب/رفعة منفصلة، نفس
+// ملف كشف الطلاب يحدّث السجل والدرجات معًا برفعة واحدة (2026-09-23: كان
+// تبويب "تحديث المعدلات" منفصلًا يطلب رفع نفس الملف مرة ثانية، ألغيناه).
+// شيتات الدرجات اختيارية بالملف (متل شيتي المقررات) — غيابها لا يوقف بقية
+// التحديث. "تدقيق قالب المقررات" بنفس التبويب يقرأ courseGrades المستوردة
+// أصلًا (بلا مسح أو رفع إضافي). الاستثناء الوحيد الباقي لـPDF/OneDrive بكل
+// التطبيق: عرض/طباعة شهادة الطالب الأصلية من ملف الطالب — راجع README.
 //
 // ملاحظة أمنية: إخفاء الشاشة في الواجهة مدعوم بسياسات RLS في قاعدة البيانات؛
 // لا يستطيع غير الإدمن تنفيذ عمليات الاستيراد حتى بطلب REST مباشر.
@@ -18,14 +20,12 @@ import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../
 import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook, commitAcademicAverages } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-23-averages-from-workbook-2";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
 import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-23-averages-from-workbook-2";
-import { list } from "../../services/cloud-runtime.js";
 
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 const TABS = [
   { key: "school", label: "تحديث شامل" },
   { key: "plan", label: "تحديث الخطة" },
-  { key: "averages", label: "تحديث المعدلات" },
   { key: "changes", label: "تصدير التحديثات" },
   { key: "backup", label: "النسخ الاحتياطي" },
 ];
@@ -37,9 +37,15 @@ async function mountSchoolTab(root) {
   root.innerHTML = `
     <div class="card">
       <h2>تحديث بيانات المدرسة من ملف واحد</h2>
-      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين، ويمكن تنزيل نسخة احتياطية من صفحة النسخ الاحتياطي.</p>
+      <p class="hint">يحدّث سجل الطلبة والمعلمين والمرفعين ومعدلات الطلبة (إن وُجدت شيتات الدرجات بالملف)، ويمكن تنزيل نسخة احتياطية من صفحة النسخ الاحتياطي.</p>
       <input type="file" id="school-import-file" aria-label="ملف كشف الطلاب الشامل" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
       <div id="school-import-preview"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h2>تدقيق قالب المقررات</h2>
+      <p class="hint">يقرأ درجات المقررات المستوردة أصلًا (بلا رفع ملف إضافي)، ويجمع كل رمز مقرر ظهر بدرجة ناجحة (٥٠٪ فأكثر، بلا غياب/حرمان) ولم يكن موجودًا بقالب المقررات لأي من المسارين — لاكتشاف مقررات جديدة يحتاج القالب تحديثها. قراءة فقط، لا يُغيّر القالب أو أي بيانات بنفسه؛ ينزّل ملف Excel للمراجعة اليدوية.</p>
+      <button class="btn btn-ghost" id="gaps-scan">تحليل الفجوات وتنزيل التقرير</button>
+      <div id="gaps-result"></div>
     </div>`;
   const input = root.querySelector("#school-import-file");
   const preview = root.querySelector("#school-import-preview");
@@ -53,6 +59,13 @@ async function mountSchoolTab(root) {
         previewStaleAcademicRecords(data.students),
         previewHistoricalPromotedDuplicates(data.promotedRows),
       ]);
+      let averages = null, averagesError = null;
+      try {
+        const parsedAverages = await parseAcademicAveragesWorkbook(file);
+        averages = buildAcademicAveragesFromWorkbook(parsedAverages, data.students);
+      } catch (error) {
+        averagesError = error.message;
+      }
       const matched = data.promotedRows.filter((row) => row.matchStatus === "matched").length;
       const unmatched = data.promotedRows.length - matched;
       const uniquePromoted = new Set(data.promotedRows.filter((row) => row.matchStatus === "matched").map((row) => `${row.studentId}::${String(row.subjectCode || "").trim()}`)).size;
@@ -68,17 +81,19 @@ async function mountSchoolTab(root) {
         <p class="hint">السجلات الأكاديمية القديمة خارج كشف الطلاب الحالي: ${staleAcademic.staleFlags.length} سجل تحليل و${staleAcademic.staleAverages.length} معدل فصلي. ستُحذف عند تنفيذ التحديث.</p>
         <p class="hint">تكرارات المرفعين القديمة: ${historicalDuplicates.removableCount} سجل زائد آمن للحذف${historicalDuplicates.conflictGroupCount ? `، و${historicalDuplicates.conflictGroupCount} تعارض لن يُحذف تلقائيًا` : "، ولا توجد تعارضات"}.</p>
         <p class="hint">${curriculumTracks.length ? `قالب المقررات: سيُحدَّث (${curriculumTracks.map(esc).join("، ")}) — وُجد شيتا المقررات بالملف.` : "قالب المقررات: بلا تغيير — الملف لا يحتوي شيتي «الصناعي»/«التجاري»."}</p>
+        <p class="hint">${averages ? `معدلات الطلبة: ستُحدَّث لـ${averages.academicFlagsRecords.length} طالبًا (${averages.termAveragesRecords.length} معدّلًا فصليًا، ${averages.courseGradesRecords.length} صف درجة)${averages.summary.termConflictsCount ? ` · ⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة: ${averages.summary.termConflictsCount} (اعتُمد آخر صف قُرئ)` : ""}.` : `معدلات الطلبة: بلا تحديث — تعذّر إيجاد شيتات الدرجات بالملف (${esc(averagesError)}).`}</p>
         <button class="btn btn-primary" id="school-import-commit">تنفيذ التحديث</button>
         <div id="school-import-status"></div>`;
       preview.querySelector("#school-import-commit").addEventListener("click", async () => {
-        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين${curriculumTracks.length ? ` وقالب المقررات (${curriculumTracks.join("، ")})` : ""}، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. هل تريد التنفيذ؟`)) return;
+        if (!await confirmDialog(`سيتم تحديث ${data.students.length} طالبًا و${data.teachers.length} معلمًا و${uniquePromoted} مقررًا للمرفعين${curriculumTracks.length ? ` وقالب المقررات (${curriculumTracks.join("، ")})` : ""}${averages ? ` ومعدلات ${averages.academicFlagsRecords.length} طالبًا` : ""}، وحذف ${staleAcademic.total} سجلًا أكاديميًا قديمًا و${historicalDuplicates.removableCount} تكرارًا زائدًا للمرفعين. هل تريد التنفيذ؟`)) return;
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;
         status.innerHTML = '<p class="hint">جارٍ تنفيذ التحديث…</p>';
         try {
           const result = await commitSchoolWorkbook(data, { fileName: file.name });
-          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين${result.curriculumResult.updatedTracks.length ? `، وقالب المقررات (${result.curriculumResult.updatedTracks.map(esc).join("، ")})` : ""}. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين.</p>`;
+          const averagesResult = averages ? await commitAcademicAverages(averages) : null;
+          preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين${result.curriculumResult.updatedTracks.length ? `، وقالب المقررات (${result.curriculumResult.updatedTracks.map(esc).join("، ")})` : ""}${averagesResult ? `، ومعدلات ${averagesResult.academicFlagsCount} طالبًا (${averagesResult.termAveragesCount} معدّلًا فصليًا، ${averagesResult.courseGradesCount} صف درجة)` : ""}. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين${averagesResult ? ` و${averagesResult.removedCourseGradesCount} صف درجة لم يعد له مصدر` : ""}.</p>`;
         } catch (error) {
           button.disabled = false;
           status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
@@ -86,6 +101,26 @@ async function mountSchoolTab(root) {
       });
     } catch (error) {
       preview.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+    }
+  });
+
+  const gapsButton = root.querySelector("#gaps-scan");
+  const gapsResult = root.querySelector("#gaps-result");
+  gapsButton.addEventListener("click", async () => {
+    gapsButton.disabled = true;
+    gapsResult.innerHTML = '<p class="hint">جارٍ التحليل…</p>';
+    try {
+      const scan = await scanCurriculumGaps();
+      gapsButton.disabled = false;
+      if (!scan.rows.length) {
+        gapsResult.innerHTML = `<p class="hint" role="status">لا توجد مقررات غير مدرجة بالقالب — فُحصت درجات ${scan.studentsRead} طالبًا.</p>`;
+        return;
+      }
+      await downloadCurriculumGapsWorkbook(scan.rows);
+      gapsResult.innerHTML = `<p class="hint" role="status">تم تنزيل تقرير الفجوات: ${scan.rows.length} رمز مقرر غير مدرج، من درجات ${scan.studentsRead} طالبًا. "الفصل" بالتقرير تخمين من ترتيب فصول كل طالب زمنيًا — راجعه قبل تحديث القالب.</p>`;
+    } catch (error) {
+      gapsResult.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
+      gapsButton.disabled = false;
     }
   });
 }
@@ -134,81 +169,6 @@ export async function mountPlanTab(root) {
       });
     } catch (error) {
       preview.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
-    }
-  });
-}
-
-async function mountAveragesTab(root) {
-  await ensureXlsx();
-  root.innerHTML = `
-    <div class="card">
-      <h2>تحديث معدلات الطلبة من ملف كشف الطلاب</h2>
-      <p class="hint">يقرأ شيتات "درجات المقررات"/"المعدلات الفصلية"/"المعدلات السنوية" من نفس ملف كشف الطلاب الشامل، ويحسب معدل كل طالب منها — استبدال كامل لكل المعدلات الحالية، لا تراكم. مصدر واحد فقط بدل شهادات PDF.</p>
-      <input type="file" id="averages-import-file" aria-label="ملف كشف الطلاب الشامل" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="margin-bottom:12px;">
-      <div id="averages-preview"></div>
-    </div>
-    <div class="card" style="margin-top:16px;">
-      <h2>تدقيق قالب المقررات</h2>
-      <p class="hint">يقرأ درجات المقررات المستوردة أصلًا (بلا رفع ملف إضافي)، ويجمع كل رمز مقرر ظهر بدرجة ناجحة (٥٠٪ فأكثر، بلا غياب/حرمان) ولم يكن موجودًا بقالب المقررات لأي من المسارين — لاكتشاف مقررات جديدة يحتاج القالب تحديثها. قراءة فقط، لا يُغيّر القالب أو أي بيانات بنفسه؛ ينزّل ملف Excel للمراجعة اليدوية.</p>
-      <button class="btn btn-ghost" id="gaps-scan">تحليل الفجوات وتنزيل التقرير</button>
-      <div id="gaps-result"></div>
-    </div>`;
-
-  const importInput = root.querySelector("#averages-import-file");
-  const preview = root.querySelector("#averages-preview");
-  importInput.addEventListener("change", async () => {
-    const file = importInput.files[0];
-    if (!file) return;
-    preview.innerHTML = '<p class="hint">جارٍ تحليل الملف…</p>';
-    try {
-      const parsed = await parseAcademicAveragesWorkbook(file);
-      const students = await list("students");
-      const { academicFlagsRecords, termAveragesRecords, courseGradesRecords, summary } = buildAcademicAveragesFromWorkbook(parsed, students);
-      preview.innerHTML = `
-        <div class="grid g3" style="margin:16px 0;">
-          <div class="card stat"><div class="label">صفوف درجات مقروءة</div><div class="value">${summary.courseRowsRead}</div></div>
-          <div class="card stat"><div class="label">طلاب بمعدلات محدَّثة</div><div class="value">${academicFlagsRecords.length}</div></div>
-          <div class="card stat"><div class="label">معدلات فصلية</div><div class="value">${termAveragesRecords.length}</div></div>
-        </div>
-        <p class="hint">أرقام أكاديمية بالملف غير مطابقة لسجل الطلبة الحالي: ${summary.unmatchedCount}${summary.termConflictsCount ? ` · ⚠ تعارض بمعدل فصلي لنفس الطالب/الفترة: ${summary.termConflictsCount} (اعتُمد آخر صف قُرئ)` : ""}</p>
-        <button class="btn btn-primary" id="averages-commit">تنفيذ التحديث</button>
-        <div id="averages-commit-status"></div>`;
-      preview.querySelector("#averages-commit").addEventListener("click", async () => {
-        if (!await confirmDialog(`سيُستبدَل كل ما هو محفوظ حاليًا بمعدلات ${academicFlagsRecords.length} طالبًا و${termAveragesRecords.length} معدّلًا فصليًا من الملف المقروء. أي طالب لا صفوف درجات له بهذا الملف ستُحذف معدلاته القديمة. هل تريد التنفيذ؟`)) return;
-        const commitButton = preview.querySelector("#averages-commit");
-        const status = preview.querySelector("#averages-commit-status");
-        commitButton.disabled = true;
-        status.innerHTML = '<p class="hint">جارٍ الحفظ…</p>';
-        try {
-          const commitResult = await commitAcademicAverages({ academicFlagsRecords, termAveragesRecords, courseGradesRecords });
-          status.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${commitResult.academicFlagsCount} طالبًا، ${commitResult.termAveragesCount} معدّلًا فصليًا، ${commitResult.courseGradesCount} صف درجة. حُذف ${commitResult.removedFlagsCount} سجل تحليل و${commitResult.removedTermsCount} معدّلًا فصليًا و${commitResult.removedCourseGradesCount} صف درجة لم يعد لها مصدر.</p>`;
-        } catch (error) {
-          commitButton.disabled = false;
-          status.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
-        }
-      });
-    } catch (error) {
-      preview.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
-    }
-  });
-
-  const gapsButton = root.querySelector("#gaps-scan");
-  const gapsResult = root.querySelector("#gaps-result");
-  gapsButton.addEventListener("click", async () => {
-    gapsButton.disabled = true;
-    gapsResult.innerHTML = '<p class="hint">جارٍ التحليل…</p>';
-    try {
-      const scan = await scanCurriculumGaps();
-      gapsButton.disabled = false;
-      if (!scan.rows.length) {
-        gapsResult.innerHTML = `<p class="hint" role="status">لا توجد مقررات غير مدرجة بالقالب — فُحصت درجات ${scan.studentsRead} طالبًا.</p>`;
-        return;
-      }
-      await downloadCurriculumGapsWorkbook(scan.rows);
-      gapsResult.innerHTML = `<p class="hint" role="status">تم تنزيل تقرير الفجوات: ${scan.rows.length} رمز مقرر غير مدرج، من درجات ${scan.studentsRead} طالبًا. "الفصل" بالتقرير تخمين من ترتيب فصول كل طالب زمنيًا — راجعه قبل تحديث القالب.</p>`;
-    } catch (error) {
-      gapsResult.innerHTML = `<p class="hint" style="color:var(--critical);">${esc(error.message)}</p>`;
-      gapsButton.disabled = false;
     }
   });
 }
@@ -277,7 +237,7 @@ export async function mountImportsView(container) {
   `;
 
   const roots = Object.fromEntries(TABS.map((t) => [t.key, container.querySelector(`#imports-root-${t.key}`)]));
-  const mounters = { school: mountSchoolTab, plan: mountPlanTab, averages: mountAveragesTab, changes: mountChangesTab, backup: mountBackupTab };
+  const mounters = { school: mountSchoolTab, plan: mountPlanTab, changes: mountChangesTab, backup: mountBackupTab };
   const mounted = new Set();
 
   const activate = async (key) => {
