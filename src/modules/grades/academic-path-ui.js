@@ -1,6 +1,7 @@
 import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-11-curriculum-import-1";
 import { getStudentTermTimeline, getStudentAcademicSummary, termSlots, officialAverage } from "./term-progress-service.js?v=2026-09-08-academic-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
+import { listWhere } from "../../services/cloud-runtime.js";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const statusLabels = { absent: "غائب", barred: "محروم" };
@@ -9,10 +10,40 @@ export function renderCertificateResults(certificate) {
   return certificate.terms.filter((term) => term.subjects.length).map((term) => `<section style="margin-top:16px;"><h3>${esc(term.label)}</h3><div class="tablewrap"><table><thead><tr><th>رمز المقرر</th><th>المادة</th><th>الساعات</th><th>الدرجة</th><th>الملاحظات</th></tr></thead><tbody>${term.subjects.map((subject) => `<tr><td>${esc(subject.code)}</td><td>${esc(subject.name)}</td><td>${esc(subject.hours ?? "—")}</td><td class="num">${esc(subject.scoreStatus ? (statusLabels[subject.scoreStatus] || subject.scoreStatus) : (subject.score ?? "—"))}</td><td>${esc(subject.notes || "—")}</td></tr>`).join("")}</tbody></table></div>${term.average != null ? `<p><strong>المعدل الفصلي: ${esc(term.average)}٪</strong> ${esc(term.rating || "")}</p>` : ""}</section>`).join("");
 }
 
+// جدول "سجل المقررات" صار يُبنى من courseGrades المستوردة من ملف كشف
+// الطلاب (نفس مصدر تحديث المعدلات)، لا من قراءة PDF حية — متاح فورًا بلا
+// أي زر أو اتصال مجلد محلي. renderCurriculumResults/curriculumTrack نفس
+// الدالتين المستخدَمتين سابقًا مع الشهادات، بلا تغيير: نبني لهما شكل
+// "شهادة" اصطناعي واحد يجمع صفوف courseGrades حسب الفصل، فيبقى منطق
+// latestCourseResults (تمييز المعاد، القالب) كما هو تمامًا.
+function courseGradesToCertificate(rows) {
+  const byTerm = new Map();
+  for (const r of rows) {
+    if (!byTerm.has(r.term)) byTerm.set(r.term, []);
+    byTerm.get(r.term).push({ code: r.subjectCode, name: r.subjectName, score: r.score, scoreStatus: r.scoreStatus, notes: r.notes });
+  }
+  const terms = [...byTerm.entries()].map(([label, subjects]) => ({ label, subjects, average: null, rating: null }));
+  return { terms, track: null };
+}
+
+async function mountCourseGradesTable(root, student) {
+  const rows = await listWhere("courseGrades", "studentId", String(student.academicId || student.id));
+  if (!rows.length) {
+    root.innerHTML = '<h2>سجل المقررات</h2><p class="hint">لا توجد درجات مقررات مستوردة لهذا الطالب بعد.</p>';
+    return;
+  }
+  const certificates = [courseGradesToCertificate(rows)];
+  root.innerHTML = `<h2>سجل المقررات</h2>${await renderCurriculumResults(certificates, curriculumTrack(student, certificates))}`;
+}
+
+// "الشهادة الأصلية" تبقى الاستثناء الوحيد اللي يحتاج مجلد "مسار" المحلي —
+// فتح/طباعة/تنزيل نسخة PDF الرسمية نفسها، لا بياناتها (سجل المقررات أعلاه
+// كافٍ للبيانات). يبقى أيضًا يغذّي دمج المعدل الفصلي/التراكمي بالرسم
+// البياني لو الشهادة المفتوحة تحمل قيمة مختلفة عمّا هو مستورَد — راجع
+// drawAcademic أدناه.
 async function mountCertificateResults(root, student, onCertificates) {
-  root.innerHTML = `<div class="certificate-heading"><h2>شهادة الطالب</h2><div class="forms-actions"><button class="btn btn-primary" data-show>عرض الشهادة</button></div></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div class="schedule-controls certificate-controls"><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div></div><div data-results></div></section>`;
+  root.innerHTML = `<div class="certificate-heading"><h2>الشهادة الأصلية (PDF)</h2><div class="forms-actions"><button class="btn btn-primary" data-show>فتح الشهادة الأصلية</button></div></div><p data-status role="status"></p><section class="schedule-viewer" data-preview hidden><div class="schedule-toolbar"><strong>${esc(student.name || student.studentName || "شهادة الطالب")}</strong><div class="schedule-controls certificate-controls"><div data-originals class="forms-actions"></div><button class="btn btn-ghost" data-close>إغلاق</button></div></div></section>`;
   const status = root.querySelector("[data-status]");
-  const results = root.querySelector("[data-results]");
   const preview = root.querySelector("[data-preview]");
   const originals = root.querySelector("[data-originals]");
   let loadedCertificates = [], urls = [], version = 0;
@@ -42,20 +73,19 @@ async function mountCertificateResults(root, student, onCertificates) {
         const url = URL.createObjectURL(file); urls.push(url);
         return `<span class="certificate-source">${sources.length > 1 ? `<small>${esc(file.name)}</small>` : ""}<a class="btn btn-ghost" href="${url}" download="${esc(file.name)}">تنزيل الأصل</a><a class="btn btn-ghost" href="${url}" target="_blank" rel="noopener">فتح / طباعة الأصل</a></span>`;
       }).join("");
-      results.innerHTML = await renderCurriculumResults(certificates, curriculumTrack(student, certificates));
       preview.hidden = false;
       onCertificates(certificates);
     }
-    status.textContent = [certificates.length ? `تم عرض ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
+    status.textContent = [certificates.length ? `تم فتح ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
   }
   async function loadFolder() {
     const ticket = ++version;
     status.textContent = "جارٍ البحث عن شهادة الطالب…";
     try {
-      const found = await findStudentCertificates(student, { prompt: false, refresh: false });
+      const found = await findStudentCertificates(student, { prompt: true, refresh: false });
       if (ticket !== version || !root.isConnected) return;
       if (!found.files.length) {
-        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي بمجلد مسار." : 'مجلد مسار غير متصل — اتصل به من الإدارة ← الاستيراد ← "تحديث المعدلات".';
+        status.textContent = found.connected ? "لم توجد شهادة باسم الطالب أو رقمه الأكاديمي بمجلد مسار." : "لم يُختَر مجلد مسار.";
         return;
       }
       await readFiles(found.files, ticket);
@@ -144,8 +174,9 @@ export async function renderAcademicPath(container, student) {
   const subjects = summary.subjects;
   container.innerHTML = `
     <div class="card cumulative-card"><span>المعدل التراكمي النهائي</span><strong data-cumulative></strong><small data-cumulative-note></small></div>
+    <div class="card" id="student-course-grades" style="margin-bottom:16px;"></div>
     <div class="card" id="student-certificate-results" style="margin-bottom:16px;"></div>
-    ${subjects.length ? `<details class="card" style="margin-bottom:16px;" open><summary>ملخص درجات المواد المتاح (${subjects.length})</summary><p class="hint">ملخص التحليل المجمع عبر الفترات؛ درجات كل فصل تظهر في الشهادة أعلاه.</p><div class="tablewrap"><table><thead><tr><th>المادة</th><th>النسبة</th></tr></thead><tbody>${subjects.map((subject) => `<tr><td>${esc(subject.subject)}</td><td>${subject.pct == null ? "—" : `${esc(subject.pct)}٪`}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
+    ${subjects.length ? `<details class="card" style="margin-bottom:16px;" open><summary>ملخص درجات المواد المتاح (${subjects.length})</summary><p class="hint">ملخص التحليل المجمع عبر الفترات؛ درجات كل فصل تظهر بسجل المقررات أعلاه.</p><div class="tablewrap"><table><thead><tr><th>المادة</th><th>النسبة</th></tr></thead><tbody>${subjects.map((subject) => `<tr><td>${esc(subject.subject)}</td><td>${subject.pct == null ? "—" : `${esc(subject.pct)}٪`}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
     <div class="card">
       <h2>المعدل الفصلي عبر الزمن</h2>
       <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط.</p>
@@ -172,5 +203,8 @@ export async function renderAcademicPath(container, student) {
     container.querySelector("[data-cumulative-note]").textContent = values.length > 1 ? "توجد قيم تراكمية مختلفة في الشهادات؛ المعروض هو المحفوظ، ويحتاج مراجعة الأصل." : cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "";
   }
   drawAcademic();
-  await mountCertificateResults(container.querySelector("#student-certificate-results"), student, drawAcademic);
+  await Promise.all([
+    mountCourseGradesTable(container.querySelector("#student-course-grades"), student),
+    mountCertificateResults(container.querySelector("#student-certificate-results"), student, drawAcademic),
+  ]);
 }

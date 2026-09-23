@@ -1,11 +1,20 @@
-import { test } from 'node:test';
+import './helpers/fake-cloud-backend.mjs';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { bulkPut, clear, list } from '../src/services/cloud-runtime.js';
 import {
   parseCourseGradeRows,
   parseTermAverageRows,
   parseAnnualAverageRows,
   buildAcademicAverages,
+  commitAcademicAverages,
 } from '../src/services/academic-averages-workbook-import-service.js';
+
+beforeEach(async () => {
+  await clear('academicFlags');
+  await clear('termAverages');
+  await clear('courseGrades');
+});
 
 const students = [
   { id: 'u1', academicId: '20241111', name: 'طالب واحد' },
@@ -110,4 +119,36 @@ test('buildAcademicAverages flags conflicting term averages for the same student
   assert.equal(termAveragesRecords.length, 1);
   assert.equal(termAveragesRecords[0].averagePct, 92);
   assert.equal(summary.termConflictsCount, 1);
+});
+
+test('buildAcademicAverages produces one courseGrades record per matched course-grade row, with notes carried through, excluding unmatched students', () => {
+  const rows = parseCourseGradeRows([COURSE_HEADER,
+    courseRow({ id: '20241111', code: 'ريض101', name: 'رياضيات', score: 40 }),
+    courseRow({ id: '99999999', code: 'ريض101', name: 'رياضيات', score: 90 }),
+  ]);
+  const { courseGradesRecords } = buildAcademicAverages({ rows, termSummaries: [], finalCumulativeSummaries: [] }, students);
+  assert.equal(courseGradesRecords.length, 1);
+  assert.equal(courseGradesRecords[0].studentId, '20241111');
+  assert.equal(courseGradesRecords[0].subjectCode, 'ريض101');
+  assert.equal(courseGradesRecords[0].id, `20241111--${rows[0].term}--ريض101`);
+});
+
+test('commitAcademicAverages replaces academicFlags/termAverages/courseGrades together and prunes stale rows from all three', async () => {
+  await bulkPut('academicFlags', [{ id: 'stale-student', studentId: 'stale-student', overallPct: 50, subjects: [] }]);
+  await bulkPut('termAverages', [{ id: 'stale-student--الفصل الأول', studentId: 'stale-student', term: 'الفصل الأول', averagePct: 50 }]);
+  await bulkPut('courseGrades', [{ id: 'stale-student--t--c', studentId: 'stale-student', term: 't', subjectCode: 'c' }]);
+
+  const academicFlagsRecords = [{ id: '20241111', studentId: '20241111', overallPct: 90, subjects: [] }];
+  const termAveragesRecords = [{ id: '20241111--الفصل الدراسي الأول', studentId: '20241111', term: 'الفصل الدراسي الأول', averagePct: 90, rating: 'ممتاز' }];
+  const courseGradesRecords = [{ id: '20241111--t--ريض101', studentId: '20241111', term: 't', subjectCode: 'ريض101', subjectName: 'رياضيات', score: 90, scoreStatus: null, notes: null, sourceFile: null }];
+
+  const result = await commitAcademicAverages({ academicFlagsRecords, termAveragesRecords, courseGradesRecords });
+  assert.equal(result.academicFlagsCount, 1);
+  assert.equal(result.courseGradesCount, 1);
+  assert.equal(result.removedFlagsCount, 1);
+  assert.equal(result.removedTermsCount, 1);
+  assert.equal(result.removedCourseGradesCount, 1);
+
+  const courseGrades = await list('courseGrades');
+  assert.deepEqual(courseGrades.map((r) => r.id), ['20241111--t--ريض101']);
 });

@@ -1,6 +1,6 @@
 import { getMasarFolderHandle } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
 import { normalizeKey } from "../../services/text-normalize.js";
-import { extractPdfTextRows } from "../../services/pdf-text-rows.js?v=2026-09-11-academic-averages-1";
+import { extractPdfTextRows } from "../../services/pdf-text-rows.js?v=2026-09-23-averages-from-workbook-1";
 import { parseCertificateRows } from "../../../scripts/lib/certificate-parser.mjs";
 import { looksLikeScheduleDocument, MAX_PLAUSIBLE_SUBJECTS_PER_TERM } from "../../../scripts/lib/document-classifier.mjs";
 
