@@ -1,4 +1,4 @@
-import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup } from "../../services/backup-service.js?v=2026-08-31-egress-1";
+import { buildBackup, downloadBackup, parseBackupFile, summarizeBackup, restoreBackup, listBackupSnapshots, fetchBackupSnapshot } from "../../services/backup-service.js?v=2026-09-24-scheduled-snapshots-1";
 import { count, clear } from "../../services/cloud-runtime.js?v=2026-08-31-egress-1";
 import { COLLECTIONS } from "../../core/config.js";
 import { loadingHtml, errorHtml, showToast, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
@@ -136,6 +136,69 @@ async function renderExportSection(root) {
   }
 }
 
+function formatBytes(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return "—";
+  return `${(n / (1024 * 1024)).toFixed(1)} م.ب`;
+}
+
+// نسخ pg_cron الأسبوعية التلقائية (آخر 4 فقط) — للاطمئنان إنها فعلًا
+// تعمل، وتنزيل أي منها عند الحاجة، بلا انتظار الضغط اليدوي على "تنزيل الآن".
+async function renderScheduledSnapshotsSection(root) {
+  root.innerHTML = `
+    <div class="card" style="margin-top:16px;">
+      <h2>النسخ التلقائية الأسبوعية</h2>
+      <p class="hint">تُبنى تلقائيًا كل خميس بالليل (Supabase)، ويُحتفَظ بآخر 4 نسخ فقط. هذه إضافة للنسخة اليدوية أعلاه، لا بديل عنها.</p>
+      <div id="scheduled-snapshots-list">${loadingHtml("جارٍ تحميل قائمة النسخ…")}</div>
+    </div>
+  `;
+  const listRoot = root.querySelector("#scheduled-snapshots-list");
+  try {
+    const snapshots = await listBackupSnapshots();
+    if (!snapshots.length) {
+      listRoot.innerHTML = emptyHtml("لا توجد نسخة تلقائية بعد — أول نسخة تُبنى الخميس القادم.");
+      return;
+    }
+    listRoot.innerHTML = `
+      <div class="tablewrap"><table>
+        <thead><tr><th>التاريخ</th><th>الحجم</th><th></th></tr></thead>
+        <tbody>
+          ${snapshots.map((s) => `
+            <tr>
+              <td>${esc(new Date(s.created_at).toLocaleString("ar-BH"))}</td>
+              <td class="num">${esc(formatBytes(s.size_bytes))}</td>
+              <td><button class="btn btn-ghost" data-download-snapshot="${esc(s.id)}">تنزيل</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table></div>
+      <div id="scheduled-snapshot-status" style="margin-top:8px;"></div>
+    `;
+    const statusRoot = listRoot.querySelector("#scheduled-snapshot-status");
+    listRoot.querySelectorAll("[data-download-snapshot]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = "جارٍ التحضير…";
+        statusRoot.innerHTML = "";
+        try {
+          const data = await fetchBackupSnapshot(btn.dataset.downloadSnapshot);
+          downloadBackup(data);
+          showToast("تم تنزيل النسخة التلقائية بنجاح");
+        } catch (err) {
+          statusRoot.innerHTML = errorHtml(`تعذّر التنزيل: ${err.message}`);
+          showToast(`تعذّر التنزيل: ${err.message}`, { type: "error" });
+        } finally {
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      });
+    });
+  } catch (err) {
+    listRoot.innerHTML = errorHtml(`تعذّر تحميل قائمة النسخ التلقائية: ${err.message}`);
+  }
+}
+
 export function renderImportSection(root, onRestored) {
   root.innerHTML = `
     <div class="card" style="margin-top:16px;">
@@ -200,7 +263,9 @@ export async function mountBackupView(container) {
       <div><h1>النسخ الاحتياطي</h1><div class="sub">بيانات مسار مخزّنة سحابيًا ومشتركة لكل الحسابات النشطة — تصدير نسخة JSON للأرشفة (الاستيراد/الاستعادة صار من تبويب الاستيراد بالإدارة)</div></div>
     </div>
     <div id="backup-export"></div>
+    <div id="backup-scheduled"></div>
   `;
 
   await renderExportSection(container.querySelector("#backup-export"));
+  await renderScheduledSnapshotsSection(container.querySelector("#backup-scheduled"));
 }
