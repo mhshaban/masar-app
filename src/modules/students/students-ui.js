@@ -135,7 +135,7 @@ function renderEmptyState(container, { isAdmin, onGoto } = {}) {
 // accepts one letter" bug.
 function renderFilters(root, options, current, onChange, onQueryChange, onSectionChange, onPrintSection, onPrintSettingsChange, onLoadPhotos) {
   root.innerHTML = `
-    <div class="search" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <div class="search" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; max-width:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="students-q" type="search" placeholder="ابحث بالاسم أو الرقم الأكاديمي أو الرقم الشخصي..." value="${esc(current.query)}" style="flex:1 1 220px;">
       <span class="students-filter-count" id="students-count" role="status" aria-live="polite"></span>
@@ -157,7 +157,7 @@ function renderFilters(root, options, current, onChange, onQueryChange, onSectio
       <button class="btn btn-ghost" id="students-load-photos">عرض صور الطلاب</button>
     </div>
     <div class="card" style="margin:-2px 0 16px; padding:14px;">
-      <div class="grid g2">
+      <div style="display:flex; flex-direction:column; gap:12px;">
         <label class="forms-field"><span>عنوان كشف الشعبة</span><input id="students-print-title" type="text" value="${esc(current.printTitle)}" placeholder="مثال: تسليم استمارات اختيار التخصص"></label>
         <label class="forms-field"><span>التعليمات</span><textarea id="students-print-instructions" rows="2" placeholder="اكتب التعليمات التي ستظهر فوق الجدول">${esc(current.printInstructions)}</textarea></label>
       </div>
