@@ -108,8 +108,8 @@ export async function mountAgendaView(container) {
       <input id="agenda-search-input" type="search" placeholder="ابحث عن إجراء..." style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;">
     </div>
     <div class="tabs" role="tablist" aria-label="ترتيب الإجراءات">
-      <div class="tab" data-sort="date" role="tab" aria-selected="false">حسب التاريخ</div>
       <div class="tab active" data-sort="text" role="tab" aria-selected="true">حسب نص الفترة</div>
+      <div class="tab" data-sort="date" role="tab" aria-selected="false">حسب التاريخ</div>
     </div>
     <div id="agenda-groups"></div>
   `;

@@ -134,15 +134,10 @@ function renderEmptyState(container, { isAdmin, onGoto } = {}) {
 // every single character — confirmed as the reported "search box only
 // accepts one letter" bug.
 function renderFilters(root, options, current, onChange, onQueryChange, onSectionChange, onPrintSection, onPrintSettingsChange, onLoadPhotos) {
-  const orderedLevels = [...STUDENT_LEVEL_ORDER.filter((level) => options.levels.includes(level)), ...options.levels.filter((level) => !STUDENT_LEVEL_ORDER.includes(level))];
   root.innerHTML = `
-    <div class="search">
+    <div class="search" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="students-q" type="search" placeholder="ابحث بالاسم أو الرقم الأكاديمي أو الرقم الشخصي..." value="${esc(current.query)}">
-    </div>
-    <div class="chip-row" id="students-level-chips">
-      <div class="chip${!current.level ? " on" : ""}" data-level="">الكل</div>
-      ${orderedLevels.map((l) => `<div class="chip${current.level === l ? " on" : ""}" data-level="${esc(l)}">${esc(l)}</div>`).join("")}
+      <input id="students-q" type="search" placeholder="ابحث بالاسم أو الرقم الأكاديمي أو الرقم الشخصي..." value="${esc(current.query)}" style="flex:1 1 220px;">
       <span class="students-filter-count" id="students-count" role="status" aria-live="polite"></span>
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
@@ -170,9 +165,6 @@ function renderFilters(root, options, current, onChange, onQueryChange, onSectio
   `;
 
   root.querySelector("#students-q").addEventListener("input", (e) => onQueryChange(e.target.value));
-  root.querySelectorAll("#students-level-chips .chip").forEach((chip) => {
-    chip.addEventListener("click", () => onChange({ ...current, level: chip.dataset.level }));
-  });
   root.querySelector("#students-department").addEventListener("change", (e) => onChange({ ...current, department: e.target.value }));
   root.querySelector("#students-track").addEventListener("change", (e) => onChange({ ...current, track: e.target.value }));
   root.querySelector("#students-section").addEventListener("change", (e) => onSectionChange(e.target.value));
@@ -576,12 +568,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
 
   const { stats, options } = await getRosterMeta();
   const byLevelTrack = await getLevelTrackBreakdown();
-  container.querySelector("#students-stats").innerHTML = `
-    <div class="card stat"><div class="label">إجمالي الطلبة</div><div class="value">${stats.total}</div></div>
-    ${STUDENT_LEVEL_ORDER.map((level) => `
-      <div class="card stat"><div class="label">المستوى ${esc(level)}</div><div class="value">${Number(stats.byLevel[level] || 0)}</div><div class="hint">صناعي: ${Number(byLevelTrack[level]?.الصناعي || 0)} · تجاري: ${Number(byLevelTrack[level]?.التجاري || 0)}</div></div>
-    `).join("")}
-  `;
+  const statsRoot = container.querySelector("#students-stats");
 
   const resultsRoot = container.querySelector("#students-results");
 
@@ -647,8 +634,31 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
     draw();
   };
 
+  // بطاقات المستوى فوق هي الفلتر نفسه (بدل شريط فلاتر منفصل تحتها يكرّر
+  // نفس التصنيف) — الضغط على بطاقة يغيّر state.level ويعيد البحث.
+  const drawStats = () => {
+    const cards = [
+      { level: "", label: "إجمالي الطلبة", value: stats.total, hint: "" },
+      ...STUDENT_LEVEL_ORDER.map((level) => ({
+        level,
+        label: `المستوى ${level}`,
+        value: Number(stats.byLevel[level] || 0),
+        hint: `صناعي: ${Number(byLevelTrack[level]?.الصناعي || 0)} · تجاري: ${Number(byLevelTrack[level]?.التجاري || 0)}`,
+      })),
+    ];
+    statsRoot.innerHTML = cards.map((c) => `
+      <div class="card stat selectable${state.level === c.level ? " on" : ""}" data-level="${esc(c.level)}">
+        <div class="label">${esc(c.label)}</div><div class="value">${c.value}</div>${c.hint ? `<div class="hint">${esc(c.hint)}</div>` : ""}
+      </div>
+    `).join("");
+    statsRoot.querySelectorAll(".card").forEach((card) => {
+      card.addEventListener("click", () => onChange({ ...state, level: card.dataset.level }));
+    });
+  };
+
   const onChange = async (next) => {
     state = next;
+    drawStats();
     renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange, onSectionChange, onPrintSection, onPrintSettingsChange, onLoadPhotos);
     await refresh();
   };
@@ -706,6 +716,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
     }
   };
 
+  drawStats();
   renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange, onSectionChange, onPrintSection, onPrintSettingsChange, onLoadPhotos);
   await refresh();
 }

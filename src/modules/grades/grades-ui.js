@@ -76,19 +76,23 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   const counts = { high: 0, medium: 0, low: 0 };
   for (const r of achievement) counts[r.tier] += 1;
   const nameById = new Map(achievement.map((r) => [r.studentId, r.studentName]));
+  const needsSupportIds = new Set(needsSupport.map((s) => s.studentId));
+
+  // بطاقات علوية قابلة للضغط — هي نفسها الفلتر (ألغينا شريط الفلاتر
+  // المكرَّر تحتها). "يحتاجون تدخل" هنا نفس مرشّحي القائمة التفصيلية أسفل
+  // الصفحة (نفس معيار الحالات الإرشادية/خطط الدعم)، لا شريحة "متدني" —
+  // طالب قد يظهر بالاثنين معًا أو بواحد فقط.
+  const FILTERS = [
+    { key: "", label: `الكل (${achievement.length})` },
+    { key: "high", label: `${TIER_LABELS.high} (${counts.high})` },
+    { key: "medium", label: `${TIER_LABELS.medium} (${counts.medium})` },
+    { key: "low", label: `${TIER_LABELS.low} (${counts.low})` },
+    { key: "needs-support", label: `يحتاجون تدخل (${needsSupport.length})` },
+  ];
 
   root.innerHTML = `
-    <div class="grid g4" style="margin-bottom:16px;">
-      <div class="card stat"><div class="label">متفوقون (90٪ فأكثر)</div><div class="value">${counts.high}</div></div>
-      <div class="card stat"><div class="label">متوسطو التحصيل (60–90٪)</div><div class="value">${counts.medium}</div></div>
-      <div class="card stat"><div class="label">متدنو التحصيل (أقل من 60٪)</div><div class="value">${counts.low}</div></div>
-      <div class="card stat"><div class="label">يحتاجون تدخل (دعم أكاديمي)</div><div class="value" style="color:var(--critical);">${needsSupport.length}</div></div>
-    </div>
-    <div class="chip-row" id="tier-chips">
-      <div class="chip on" data-tier="">الكل (${achievement.length})</div>
-      <div class="chip" data-tier="high">${TIER_LABELS.high} (${counts.high})</div>
-      <div class="chip" data-tier="medium">${TIER_LABELS.medium} (${counts.medium})</div>
-      <div class="chip" data-tier="low">${TIER_LABELS.low} (${counts.low})</div>
+    <div class="grid g5" style="margin-bottom:16px;" id="tier-cards">
+      ${FILTERS.map((f) => `<div class="card stat selectable${f.key === "" ? " on" : ""}" data-tier="${f.key}"><div class="label">${esc(f.label)}</div><div class="value"${f.key === "needs-support" ? ' style="color:var(--critical);"' : ""}>${f.key === "needs-support" ? needsSupport.length : f.key === "" ? achievement.length : counts[f.key]}</div></div>`).join("")}
     </div>
     <div id="tier-table"></div>
 
@@ -103,14 +107,16 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   `;
 
   const drawTable = (tier) => {
-    const rows = tier ? achievement.filter((r) => r.tier === tier) : achievement;
+    const rows = tier === "needs-support" ? achievement.filter((r) => needsSupportIds.has(r.studentId))
+      : tier ? achievement.filter((r) => r.tier === tier)
+      : achievement;
     root.querySelector("#tier-table").innerHTML = `
       <div class="card">
         <div class="tablewrap"><table>
           <thead><tr><th>الطالب</th><th>الصف</th><th>المعدل العام</th><th>التقدير</th><th>مواد ضعيفة (أقل من 50٪)</th></tr></thead>
           <tbody>
             ${rows.map((r) => `
-              <tr>
+              <tr data-goto-student="${esc(r.studentId)}">
                 <td>${esc(r.studentName) || esc(r.studentId)}</td>
                 <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
                 <td class="num" style="font-weight:700;">${r.avgPct}٪</td>
@@ -122,21 +128,24 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
         </table></div>
       </div>
     `;
+    root.querySelectorAll("#tier-table [data-goto-student]").forEach((row) => {
+      row.addEventListener("click", () => onGoto && onGoto("students", { studentId: row.dataset.gotoStudent }));
+    });
   };
   drawTable("");
 
-  root.querySelectorAll("#tier-chips .chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      root.querySelectorAll("#tier-chips .chip").forEach((c) => c.classList.remove("on"));
-      chip.classList.add("on");
-      drawTable(chip.dataset.tier);
+  root.querySelectorAll("#tier-cards .card").forEach((card) => {
+    card.addEventListener("click", () => {
+      root.querySelectorAll("#tier-cards .card").forEach((c) => c.classList.remove("on"));
+      card.classList.add("on");
+      drawTable(card.dataset.tier);
     });
   });
 
   const needsRoot = root.querySelector("#needs-support-list");
   needsRoot.innerHTML = needsSupport.length
     ? `<ul class="plain">${needsSupport.map((s) => `
-        <li class="row-item">
+        <li class="row-item" data-goto-student="${esc(s.studentId)}">
           <div class="body">
             <div class="title">${esc(nameById.get(s.studentId)) || esc(s.studentId)}</div>
             <div class="meta">${s.reasons.map(esc).join(" · ")}</div>
@@ -144,6 +153,9 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
         </li>
       `).join("")}</ul>`
     : '<div class="empty">لا يوجد طلاب يحتاجون تدخلًا حاليًا</div>';
+  needsRoot.querySelectorAll("[data-goto-student]").forEach((row) => {
+    row.addEventListener("click", () => onGoto && onGoto("students", { studentId: row.dataset.gotoStudent }));
+  });
 
   root.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => onGoto && onGoto(btn.dataset.goto));
@@ -239,18 +251,18 @@ export async function mountGradesView(container, { onGoto } = {}) {
       <div><h1>الدرجات والتحليلات</h1></div>
     </div>
     <div class="tabs">
-      <div class="tab active" data-tab="analytics">التحليلات</div>
-      <div class="tab" data-tab="classification">تصنيف الطلاب</div>
+      <div class="tab active" data-tab="classification">تصنيف الطلاب</div>
+      <div class="tab" data-tab="analytics">التحليلات</div>
     </div>
-    <div id="grades-analytics-root"></div>
-    <div id="grades-classification-root" style="display:none;"></div>
+    <div id="grades-classification-root"></div>
+    <div id="grades-analytics-root" style="display:none;"></div>
   `;
 
   const analyticsRoot = container.querySelector("#grades-analytics-root");
   const classificationRoot = container.querySelector("#grades-classification-root");
   const roots = { analytics: analyticsRoot, classification: classificationRoot };
 
-  await renderAnalyticsTab(analyticsRoot);
+  await renderClassificationTab(classificationRoot, onGoto);
 
   container.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", async () => {
