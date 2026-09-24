@@ -166,7 +166,6 @@ export async function renderAcademicPath(container, student) {
     <div class="card cumulative-card"><span>المعدل التراكمي النهائي</span><strong data-cumulative></strong><small data-cumulative-note></small></div>
     <div class="card" style="margin-bottom:16px;">
       <h2>المعدل الفصلي عبر الزمن</h2>
-      <p class="hint">المعدل الرسمي المطبوع على شهادات الطالب فقط.</p>
       <div class="term-average-cards" data-term-slots></div>
       <div id="term-chart-root"></div>
     </div>
