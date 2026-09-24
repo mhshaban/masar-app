@@ -12,7 +12,7 @@
 import { subjectKeyForGrade } from "../../scripts/lib/subject-groups.mjs";
 import { gradeRowPct, isEncodedAbsenceScore } from "../../scripts/lib/score-conventions.mjs";
 import { readWorkbook } from "./xlsx-parser.js";
-import { list, bulkPut, removeMany } from "./cloud-runtime.js";
+import { listIds, bulkPut, removeMany } from "./cloud-runtime.js";
 import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-academic-averages-1";
 
 const COURSE_GRADES_SHEET_HINT = "درجات المقررات";
@@ -305,8 +305,8 @@ export function buildAcademicAverages({ rows: allRows, termSummaries, finalCumul
 // الجديد أولًا (upsert بـid ثابت يستبدل القديم تلقائيًا)، ثم يحذف فقط ما
 // لم يعد له مصدر بهذه التشغيلة، لكل المجموعات الثلاث معًا.
 export async function commitAcademicAverages({ academicFlagsRecords, termAveragesRecords, courseGradesRecords = [] }) {
-  const [existingFlags, existingTerms, existingCourseGrades] = await Promise.all([
-    list("academicFlags"), list("termAverages"), list("courseGrades"),
+  const [existingFlagIds, existingTermIds, existingCourseGradeIds] = await Promise.all([
+    listIds("academicFlags"), listIds("termAverages"), listIds("courseGrades"),
   ]);
 
   await bulkPut("academicFlags", academicFlagsRecords);
@@ -316,13 +316,13 @@ export async function commitAcademicAverages({ academicFlagsRecords, termAverage
   const newFlagIds = new Set(academicFlagsRecords.map((r) => r.id));
   const newTermIds = new Set(termAveragesRecords.map((r) => r.id));
   const newCourseGradeIds = new Set(courseGradesRecords.map((r) => r.id));
-  const staleFlags = existingFlags.filter((r) => !newFlagIds.has(r.id));
-  const staleTerms = existingTerms.filter((r) => !newTermIds.has(r.id));
-  const staleCourseGrades = existingCourseGrades.filter((r) => !newCourseGradeIds.has(r.id));
+  const staleFlags = existingFlagIds.filter((id) => !newFlagIds.has(id));
+  const staleTerms = existingTermIds.filter((id) => !newTermIds.has(id));
+  const staleCourseGrades = existingCourseGradeIds.filter((id) => !newCourseGradeIds.has(id));
   await Promise.all([
-    removeMany("academicFlags", staleFlags.map((r) => r.id)),
-    removeMany("termAverages", staleTerms.map((r) => r.id)),
-    removeMany("courseGrades", staleCourseGrades.map((r) => r.id)),
+    removeMany("academicFlags", staleFlags),
+    removeMany("termAverages", staleTerms),
+    removeMany("courseGrades", staleCourseGrades),
   ]);
 
   await logAuditEvent("import_academic_averages", { tableName: "academicFlags", count: academicFlagsRecords.length });

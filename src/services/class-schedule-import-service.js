@@ -3,7 +3,7 @@
 // (نفس القرار المتبع لاستيراد الدرجات، راجع
 // academic-averages-workbook-import-service.js وREADME). جزء من رفعة
 // "تحديث شامل" الواحدة — شيت اختياري، غيابه لا يوقف بقية التحديث.
-import { list, bulkPut, removeMany } from "./cloud-runtime.js";
+import { listIds, bulkPut, removeMany } from "./cloud-runtime.js";
 import { readWorkbook } from "./xlsx-parser.js";
 
 const CLASS_SCHEDULE_SHEET_HINT = "الجدول الدراسي";
@@ -90,10 +90,10 @@ export function buildClassScheduleRecords(rows) {
 
 // استبدال كامل لا تراكم — نفس نمط commitAcademicAverages.
 export async function commitClassSchedules(records) {
-  const existing = await list("classSchedules");
+  const existingIds = await listIds("classSchedules");
   await bulkPut("classSchedules", records);
   const newIds = new Set(records.map((r) => r.id));
-  const stale = existing.filter((r) => !newIds.has(r.id));
-  await removeMany("classSchedules", stale.map((r) => r.id));
+  const stale = existingIds.filter((id) => !newIds.has(id));
+  await removeMany("classSchedules", stale);
   return { classSchedulesCount: records.length, removedClassSchedulesCount: stale.length };
 }

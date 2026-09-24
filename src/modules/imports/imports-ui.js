@@ -18,8 +18,8 @@ import { renderImportSection as renderBackupRestoreImport } from "../backup/back
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { parseSchoolWorkbook, previewStaleAcademicRecords, previewHistoricalPromotedDuplicates, commitSchoolWorkbook } from "../../services/school-data-import-service.js?v=2026-09-24-batch-remove-fix-1";
 import { parsePlanWorkbook, previewPlanReplace, commitPlanReplace } from "../../services/department-plan-import-service.js?v=2026-09-10-plan-order-fix-1";
-import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook, commitAcademicAverages } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-24-batch-remove-fix-1";
-import { parseClassScheduleWorkbook, buildClassScheduleRecords, commitClassSchedules } from "../../services/class-schedule-import-service.js?v=2026-09-24-batch-remove-fix-1";
+import { parseAcademicAveragesWorkbook, buildAcademicAverages as buildAcademicAveragesFromWorkbook, commitAcademicAverages } from "../../services/academic-averages-workbook-import-service.js?v=2026-09-24-list-ids-perf-1";
+import { parseClassScheduleWorkbook, buildClassScheduleRecords, commitClassSchedules } from "../../services/class-schedule-import-service.js?v=2026-09-24-list-ids-perf-1";
 import { exportStudentsRosterChanges, exportTeachersRosterChanges } from "../../services/roster-changes-export-service.js?v=2026-09-11-roster-changes-1";
 import { scanCurriculumGaps, downloadCurriculumGapsWorkbook } from "../../services/curriculum-gap-audit-service.js?v=2026-09-23-averages-from-workbook-2";
 
