@@ -1,5 +1,5 @@
 import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.js?v=2026-09-11-curriculum-import-1";
-import { getStudentTermTimeline, getStudentAcademicSummary, termSlots, officialAverage } from "./term-progress-service.js?v=2026-09-08-academic-1";
+import { getStudentTermTimeline, getStudentAcademicSummary, officialAverage } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 
@@ -186,8 +186,12 @@ export async function renderAcademicPath(container, student) {
   // academicFlags) — بلا أي دمج مع الشهادة الأصلية المفتوحة اختياريًا
   // (راجع wireCertificateOriginal أعلاه)، حفاظًا على مصدر واحد فقط.
   function drawAcademic() {
-    const slots = termSlots(student, timeline);
-    container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${esc(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">معدلات المرحلة الإعدادية بانتظار تزويدها.</p>';
+    // بطاقات بعدد الفصول الموجودة فعليًا بـtermAverages فقط — لا بطاقة
+    // "متوقَّعة" بمستوى الطالب لفصل لا يحمل بيانات حقيقية أصلًا (كان
+    // termSlots يضيف بطاقة "غير متوفر" لكل فصل حتى مستوى الطالب حتى لو
+    // لم يظهر بأي شهادة، تسمية اصطناعية لا تطابق شيء بالسجل الرسمي).
+    const slots = timeline;
+    container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${esc(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">لا توجد معدلات فصلية مستوردة لهذا الطالب بعد.</p>';
     const points = slots.filter(p => officialAverage(p.averagePct) != null);
     chartRoot.innerHTML = renderTermLineChart(points);
     wireTermChart(chartRoot, points);

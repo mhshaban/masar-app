@@ -6,13 +6,6 @@ export function termSortKey(term) {
   return certificateTermOrder(term).slice(0, 3).map(n => String(n).padStart(4, "0")).join("-");
 }
 
-export function termSlots(student, timeline) {
-  const level = String(student.level || "").replace(/[أإآ]/g, "ا");
-  const count = /الثالث|3|٣/.test(level) ? 3 : /الثاني|الثانى|2|٢/.test(level) ? 2 : 0;
-  const rows = [...timeline].sort((a,b) => termSortKey(a.term).localeCompare(termSortKey(b.term)));
-  return Array.from({ length: Math.max(count, rows.length) }, (_, i) => rows[i] || { term: `الفصل ${["الأول", "الثاني", "الثالث"][i] || i + 1}`, averagePct: null });
-}
-
 export function officialAverage(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100 ? Number(value) : null;
 }
