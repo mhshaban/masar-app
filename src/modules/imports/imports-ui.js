@@ -98,11 +98,25 @@ async function mountSchoolTab(root) {
         const button = preview.querySelector("#school-import-commit");
         const status = preview.querySelector("#school-import-status");
         button.disabled = true;
-        status.innerHTML = '<p class="hint">جارٍ تنفيذ التحديث…</p>';
+        // العملية الكاملة (خصوصًا شيت الدرجات بحجمه الحالي — عشرات آلاف
+        // الصفوف) قد تأخذ عدة دقائق. رسالة ثابتة بلا تحديث كانت تبدو متجمّدة
+        // فيغادر المستخدم الصفحة قبل اكتمال خطوة الحذف النهائية، ما يترك
+        // سجلات قديمة مكرّرة بلا تنظيف — رُصد هذا فعليًا. نعرض المرحلة
+        // الحالية صراحة، ونحذّر بوضوح من عدم مغادرة الصفحة.
+        const setStatus = (html) => { status.innerHTML = `<p class="hint">${html}</p><p class="hint" style="color:var(--warning);"><strong>تنبيه:</strong> لا تغلق الصفحة ولا تنتقل لشاشة أخرى حتى تظهر رسالة "تم التحديث بنجاح" — العملية قد تأخذ عدة دقائق مع الملفات الكبيرة.</p>`; };
+        setStatus("جارٍ تحديث سجل الطلبة والمعلمين والمرفعين وقالب المقررات…");
         try {
           const result = await commitSchoolWorkbook(data, { fileName: file.name });
-          const averagesResult = averages ? await commitAcademicAverages(averages) : null;
-          const scheduleResult = classScheduleRecords ? await commitClassSchedules(classScheduleRecords) : null;
+          let averagesResult = null;
+          if (averages) {
+            setStatus(`جارٍ حفظ الدرجات (${averages.courseGradesRecords.length} صف درجة، ${averages.termAveragesRecords.length} معدّلًا فصليًا) — أطول خطوة، تستغرق دقيقة أو أكثر…`);
+            averagesResult = await commitAcademicAverages(averages);
+          }
+          let scheduleResult = null;
+          if (classScheduleRecords) {
+            setStatus(`جارٍ حفظ الجدول الدراسي (${classScheduleRecords.length} حصة)…`);
+            scheduleResult = await commitClassSchedules(classScheduleRecords);
+          }
           preview.innerHTML = `<p class="hint" role="status">تم التحديث بنجاح: ${result.studentsCount} طالبًا، ${result.teachersCount} معلمًا، و${result.promotedBatch.matchedCount - result.promotedBatch.duplicateRowsRemoved} مقررًا للمرفعين${result.curriculumResult.updatedTracks.length ? `، وقالب المقررات (${result.curriculumResult.updatedTracks.map(esc).join("، ")})` : ""}${averagesResult ? `، ومعدلات ${averagesResult.academicFlagsCount} طالبًا (${averagesResult.termAveragesCount} معدّلًا فصليًا، ${averagesResult.courseGradesCount} صف درجة)` : ""}${scheduleResult ? `، والجدول الدراسي (${scheduleResult.classSchedulesCount} حصة)` : ""}. حُذف ${result.academicPrune.totalRemoved} سجلًا أكاديميًا قديمًا و${result.promotedBatch.historicalDuplicatesRemoved} تكرارًا زائدًا للمرفعين${averagesResult ? ` و${averagesResult.removedCourseGradesCount} صف درجة لم يعد له مصدر` : ""}${scheduleResult ? ` و${scheduleResult.removedClassSchedulesCount} حصة لم يعد لها مصدر` : ""}.</p>`;
         } catch (error) {
           button.disabled = false;
