@@ -5,7 +5,7 @@
 // حقيقية داخل نفس المستودع كان يعني أي زائر يقدر يجلبه مباشرة بدون تسجيل
 // دخول — استيراد داخل التطبيق (يكتب عبر cloud-runtime.js، خلف تسجيل
 // الدخول + RLS) هو البديل الآمن.
-import { list, bulkPut, remove } from "./cloud-runtime.js";
+import { list, bulkPut, removeMany } from "./cloud-runtime.js";
 import { invalidateStudentsCache } from "../modules/students/students-service.js";
 import { readWorkbook } from "./xlsx-parser.js";
 import { resetStudentsSeedCache } from "./students-source.js";
@@ -249,9 +249,8 @@ export async function commitStudentsImport(students) {
   // اكتب السجل الجديد أولًا؛ لو انقطع الاتصال لا يصبح سجل الطلبة فارغًا.
   if (merged.length) await bulkPut("students", merged);
   const incomingIds = new Set(merged.map((student) => String(student.id)));
-  for (const student of existing) {
-    if (!incomingIds.has(String(student.id))) await remove("students", student.id);
-  }
+  const staleIds = existing.filter((student) => !incomingIds.has(String(student.id))).map((student) => student.id);
+  await removeMany("students", staleIds);
   invalidateStudentsCache();
   resetStudentsSeedCache();
   await logAuditEvent("import_students", { tableName: "students", count: merged.length });

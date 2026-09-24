@@ -248,6 +248,31 @@ export async function remove(collection, id) {
   invalidateCollection(collection);
 }
 
+// حذف عدد كبير من المعرّفات دفعة بدفعة (id=in.(...))، لا طلب DELETE منفصل
+// لكل معرّف. استيراد "استبدال كامل" (تحديث المعدلات مثلًا) قد يجد آلاف
+// الصفوف صارت بلا مصدر بتشغيلة واحدة — Promise.all لطلبات remove() فردية
+// بهذا العدد كان يطلق آلاف اتصالات HTTP متزامنة من المتصفح دفعة وحدة،
+// يُغرق Supabase ويظهر كأخطاء اتصال عشوائية ("تعذر الاتصال بالخادم") بلا
+// علاقة فعلية بشبكة المستخدم — رُصد هذا فعليًا بعد تغيير صيغة id لـ
+// termAverages/courseGrades (حذف "المستوى" من نص الفصل) جعل كل الصفوف
+// القديمة "بلا مصدر" دفعة واحدة.
+export async function removeMany(collection, ids) {
+  const backend = testBackend();
+  if (backend) {
+    for (const id of ids) await backend.remove(collection, id);
+    return;
+  }
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const idList = ids.slice(i, i + CHUNK_SIZE).map((id) => encodeURIComponent(id)).join(",");
+    if (!idList) continue;
+    await request(`${collection}?id=in.(${idList})`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+  invalidateCollection(collection);
+}
+
 export async function count(collection) {
   const backend = testBackend();
   if (backend) return backend.count(collection);
@@ -261,18 +286,10 @@ export async function count(collection) {
 }
 
 // PostgREST يرفض DELETE بدون فلتر (حماية من مسح جدول كامل بالخطأ)، فنجيب
-// كل المعرّفات أولًا ثم نحذفها على دفعات بفلتر id=in.(...) صريح.
+// كل المعرّفات أولًا ثم نحذفها دفعة بدفعة عبر removeMany.
 export async function clear(collection) {
   const backend = testBackend();
   if (backend) return backend.clear(collection);
   const all = await list(collection);
-  const ids = all.map((r) => r.id);
-  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-    const idList = ids.slice(i, i + CHUNK_SIZE).join(",");
-    await request(`${collection}?id=in.(${idList})`, {
-      method: "DELETE",
-      headers: { Prefer: "return=minimal" },
-    });
-  }
-  invalidateCollection(collection);
+  await removeMany(collection, all.map((r) => r.id));
 }

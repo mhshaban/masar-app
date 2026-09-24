@@ -1,9 +1,9 @@
 import { readWorkbook } from "./xlsx-parser.js";
-import { parseStudentsRows, applyPrepResults, commitStudentsImport } from "./students-import-service.js?v=2026-09-16-prep-school-results-1";
+import { parseStudentsRows, applyPrepResults, commitStudentsImport } from "./students-import-service.js?v=2026-09-24-batch-remove-fix-1";
 import { importTeachers } from "../modules/forms/forms-service.js?v=2026-09-08-form-fields-1";
 import { parsePromotedRows, previewHistoricalPromotedDuplicates, commitPromotedBatch } from "../modules/promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseCurriculumTemplateSheets, commitCurriculumTemplates } from "./curriculum-template-service.js?v=2026-09-11-curriculum-import-1";
-import { list, remove } from "./cloud-runtime.js";
+import { list, removeMany } from "./cloud-runtime.js";
 
 const clean = (value) => String(value ?? "").replace(/[‎‏‪-‮]/g, "").trim();
 
@@ -72,8 +72,8 @@ export async function previewStaleAcademicRecords(students) {
 
 export async function pruneStaleAcademicRecords(students) {
   const preview = await previewStaleAcademicRecords(students);
-  for (const record of preview.staleFlags) await remove("academicFlags", record.id);
-  for (const record of preview.staleAverages) await remove("termAverages", record.id);
+  await removeMany("academicFlags", preview.staleFlags.map((r) => r.id));
+  await removeMany("termAverages", preview.staleAverages.map((r) => r.id));
   return { flagsRemoved: preview.staleFlags.length, averagesRemoved: preview.staleAverages.length, totalRemoved: preview.total };
 }
 

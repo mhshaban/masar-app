@@ -12,7 +12,7 @@
 import { subjectKeyForGrade } from "../../scripts/lib/subject-groups.mjs";
 import { gradeRowPct, isEncodedAbsenceScore } from "../../scripts/lib/score-conventions.mjs";
 import { readWorkbook } from "./xlsx-parser.js";
-import { list, bulkPut, remove } from "./cloud-runtime.js";
+import { list, bulkPut, removeMany } from "./cloud-runtime.js";
 import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-academic-averages-1";
 
 const COURSE_GRADES_SHEET_HINT = "درجات المقررات";
@@ -320,9 +320,9 @@ export async function commitAcademicAverages({ academicFlagsRecords, termAverage
   const staleTerms = existingTerms.filter((r) => !newTermIds.has(r.id));
   const staleCourseGrades = existingCourseGrades.filter((r) => !newCourseGradeIds.has(r.id));
   await Promise.all([
-    ...staleFlags.map((r) => remove("academicFlags", r.id)),
-    ...staleTerms.map((r) => remove("termAverages", r.id)),
-    ...staleCourseGrades.map((r) => remove("courseGrades", r.id)),
+    removeMany("academicFlags", staleFlags.map((r) => r.id)),
+    removeMany("termAverages", staleTerms.map((r) => r.id)),
+    removeMany("courseGrades", staleCourseGrades.map((r) => r.id)),
   ]);
 
   await logAuditEvent("import_academic_averages", { tableName: "academicFlags", count: academicFlagsRecords.length });
