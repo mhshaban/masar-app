@@ -1,14 +1,14 @@
 import { scheduleFromClassScheduleRecords, renderScheduleTable } from "./student-schedule-parser.js?v=2026-09-23-class-schedules-2";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-24-single-source-averages-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-24-no-synthetic-terms-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-24-batch-remove-fix-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 import { listWhere } from "../../services/cloud-runtime.js";
-import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-08-academic-1";
+import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-09-22-prep-rating-1";
 import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";

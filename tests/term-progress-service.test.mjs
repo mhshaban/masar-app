@@ -68,11 +68,8 @@ test("getStudentTermTimeline sorts multiple terms chronologically", async () => 
 test('term ordering ignores the level ordinal and normalizes Arabic digits', () => {
   assert.ok(termSortKey('المستوى الثالث الفصل الأول ٢٠٢٥/٢٠٢٦') < termSortKey('المستوى الثالث الفصل الثاني 2025/2026'));
 });
-test('expected term slots preserve real scores and leave missing averages null', async () => {
-  const {termSlots, officialAverage, getStudentAcademicSummary} = await import('../src/modules/grades/term-progress-service.js');
-  assert.equal(termSlots({level:'الأول'}, []).length, 0);
-  assert.deepEqual(termSlots({level:'الثاني'}, []).map(x=>x.averagePct), [null,null]);
-  assert.deepEqual(termSlots({level:'الثالث'}, [{term:'الفصل الأول', averagePct:0}]).map(x=>x.averagePct), [0,null,null]);
+test('officialAverage validates range and getStudentAcademicSummary resolves by id', async () => {
+  const {officialAverage, getStudentAcademicSummary} = await import('../src/modules/grades/term-progress-service.js');
   assert.equal(officialAverage(null), null);
   assert.equal(officialAverage(''), null);
   assert.equal(officialAverage(0), 0);
