@@ -124,6 +124,30 @@ export async function list(collection) {
   }
 }
 
+// "استبدال كامل لا تراكم" بالاستيراد (termAverages/courseGrades/
+// classSchedules) يحتاج فقط معرّفات الصفوف الحالية لمقارنتها بمعرّفات
+// الملف الجديد (أيها لم يعد له مصدر)، لا محتوى data الكامل. list() كان
+// يُستخدم لهذا الغرض فيسحب jsonb كل صف (حمولة ضخمة بلا داعٍ لجدول بـ٢٠
+// ألف+ صف) — رُصد فعليًا: هذا وحده كان يأخذ ٤٠+ ثانية من صفحات القراءة
+// المتتالية بـcourseGrades، يمدّد "تحديث شامل" لدقائق ويزيد فرصة انقطاع
+// عابر بالشبكة يُظهر خطأ اتصال عام بلا علاقة بالسبب الحقيقي.
+export async function listIds(collection) {
+  const backend = testBackend();
+  if (backend) return (await backend.list(collection)).map((r) => r.id);
+  const allIds = [];
+  let offset = 0;
+  while (true) {
+    const res = await request(`${collection}?select=id&order=id.asc`, {
+      headers: { Range: `${offset}-${offset + PAGE_SIZE - 1}` },
+    });
+    const page = await res.json();
+    allIds.push(...page.map((r) => r.id));
+    if (page.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return allIds;
+}
+
 // list() fetches an entire collection — correct for screens that genuinely
 // need every row (roster stats, cross-student candidate lists), but a real
 // cost once a collection is large and the caller only wants one student's

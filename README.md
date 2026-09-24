@@ -166,6 +166,8 @@ OneDrive) شبه محدَّثة بعد تعديلات تتم من داخل ال�
 
 **عطل حقيقي بالإنتاج (2026-09-24)**: تبسيط صيغة `term` (حذف "المستوى" منها — راجع "تبسيط تسمية الفصل الدراسي" أعلاه) غيّر id كل صفوف `termAverages`/`courseGrades` دفعة واحدة، فصار "الحذف لما فقد المصدر" يجد ~24,600 صف "بلا مصدر" بتشغيلة واحدة. الكود القديم كان يرسل طلب `DELETE` منفصل لكل صف عبر `Promise.all` — أي آلاف اتصالات HTTP متزامنة من المتصفح دفعة وحدة، تُغرق Supabase وتظهر كخطأ "تعذر الاتصال بالخادم" عشوائي (بلا علاقة فعلية بشبكة المستخدم، ولو من أكثر من جهاز). الإصلاح: `removeMany()` جديدة بـ`cloud-runtime.js` تحذف دفعة بدفعة (`id=in.(...)`، حجم دفعة 500 كـ`bulkPut`) — نفس الحمل يصير ~50 طلبًا لا ~24,600. مطبَّق أيضًا على `classSchedules`/`students` وتنظيف `academicFlags`/`termAverages` اليتيمة بـ"تحديث شامل" (نفس نمط الخلل، احتياطًا). (`tests/cloud-runtime-remove-many.test.mjs`.)
 
+بعد هذا الإصلاح تبيّن عطل ثانٍ مرتبط: `commitAcademicAverages`/`commitClassSchedules` كانا يستخدمان `list()` (يسحب عمود `data` الكامل لكل صف) فقط ليقارنا المعرّفات الحالية بالجديدة — لجدول `courseGrades` بحجمه الحالي (٢٠ ألف+ صف) هذا وحده كان يأخذ ٤٠+ ثانية من صفحات قراءة متتالية (أكثر من ١ ميجابايت من JSON لغرض لا يحتاج غير المعرّف)، يمدّد "تحديث شامل" لدقائق ويزيد فرصة انقطاع عابر بالشبكة يُظهر نفس خطأ الاتصال العام. `listIds()` جديدة بـ`cloud-runtime.js` تطلب `select=id` فقط بلا عمود `data` إطلاقًا — تخفيض حقيقي للبيانات المنقولة من ميجابايتات إلى مئات الكيلوبايتات. (`tests/cloud-runtime-list-ids.test.mjs`.)
+
 **تحويل الوحدات**: "المعدل الفصلي" و"المعدل التراكمي السنوي" بالملف كسر عشري (0.911 مثلًا لا 91.1) — يُحوَّلان ×100 عند القراءة لأن كل شاشات مسار تعرض/تقارن هذي الأرقام كنسبة مئوية (`FAIL_THRESHOLD_PCT` بـ`grade-flags-service.js` وغيرها). عمود "الدرجة" بشيت "درجات المقررات" نفسه نسبة مئوية جاهزة (0-100) بلا تحويل.
 
 طبقة `src/services/academic-averages-workbook-import-service.js` (قراءة الشيتات الثلاث، مطابقة/تجميع الطلبة، وكتابة النتيجة الثلاثية لـSupabase عبر `commitAcademicAverages` — كل هذا بملف واحد الآن، قابل للاختبار بلا XLSX أو متصفح حقيقي) تعيد استخدام نفس وحدتي `scripts/lib/subject-groups.mjs`/`score-conventions.mjs` اللي كانت تُستخدم مع شهادات PDF — بلا نسخ ولا اختلاف بمنطق تسمية المقرر أو اصطلاح الغياب.
@@ -206,7 +208,7 @@ OneDrive) شبه محدَّثة بعد تعديلات تتم من داخل ال�
 
 ## اختبارات آلية (dev-only، لا تخصّ التطبيق المُشغَّل في المتصفح)
 
-301 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
+303 اختبارًا عبر `node --test` (مُشغِّل الاختبارات المدمج في Node، بدون إطار خارجي). كل ملفات الخدمة تختبَر فوق `tests/helpers/fake-cloud-backend.mjs` (نسخة ذاكرة بسيطة تُزرع تحت `globalThis.__MASAR_TEST_BACKEND__`، يتفقّدها `cloud-runtime.js` قبل أي `fetch` حقيقي) — بدون شبكة ولا مشروع Supabase حقيقي. `local-runtime.js` (النسخة المحلية القديمة، غير مستخدَمة بالتطبيق الفعلي بعد الآن لكنها باقية بالمستودع كمرجع) لسا تُختبر فوق [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) في `tests/local-runtime.test.mjs` وحده. تغطي أعلى المناطق التي ظهرت فيها أخطاء حقيقية هذا الفصل:
 
 ```bash
 cd masar-app
@@ -228,6 +230,7 @@ npm test
 - `tests/curriculum-gap-audit-service.test.mjs`: اكتشاف رموز مقررات ناجحة غير مدرجة بقالب أي مسار من صفوف `courseGrades` مباشرة (تجاهل غياب/حرمان/راسب، ترقيم الفصل من ترتيبها الزمني الفعلي لكل طالب، دمج نفس الرمز عبر عدة طلاب).
 - `tests/roster-changes-export-service.test.mjs` و`tests/roster-export-snapshot.test.mjs`: مقارنة/بناء صفوف تصدير التحديثات (`diffRoster`/`buildChangesSheetRows`)، وتخزين آخر نسخة مُصدَّرة محليًا (IndexedDB).
 - `tests/cloud-runtime-remove-many.test.mjs`: يثبّت إصلاح عطل حقيقي بالإنتاج (2026-09-24) — `removeMany()` يحذف دفعة بدفعة (`id=in.(...)`)، لا طلب DELETE واحد لكل معرّف؛ يشغّل `fetch` حقيقيًا (بلا `fake-cloud-backend.mjs`) ليتأكد فعليًا من عدد طلبات HTTP المُرسَلة، ويثبّت أيضًا ترميز URL لكل معرّف عربي/فيه مسافات داخل قائمة `in.()`.
+- `tests/cloud-runtime-list-ids.test.mjs`: يثبّت إصلاح عطل أداء حقيقي بالإنتاج (2026-09-24) — `listIds()` يطلب `select=id` فقط (بلا عمود `data`)، ويصفّح عبر كل المجموعة صفحة فصفحة، ويرجّع نصوص معرّفات مباشرة لا سجلات كاملة.
 - `tests/guidance-service.test.mjs`، `tests/support-service.test.mjs`، `tests/career-service.test.mjs`، `tests/followup-needs-service.test.mjs`: ترشيح الحالات/خطط الدعم/التوجيه المهني من الدرجات والمستوى، واستبعاد من له حالة/خطة/جلسة موجودة أصلًا؛ `followup-needs-service` يختبر دمج الترشيحات الأربعة (حالات، دعم، توجيه، مرفعين) لكل طالب.
 - `tests/reminders-service.test.mjs`: إضافة/تبديل حالة/حذف تذكير، ومنطق `isOverdue`/`isDueToday` بتوقيت البحرين.
 - `tests/students-service.test.mjs`: تصنيف المسار (صريح أو بالاستدلال من الشعبة)، بحث/تصفية/تصفّح سجل الطلبة، إحصائيات السجل، وتحديث بيانات طالب (تحقق الاسم، دمج الحقول، بلا مسح حقول غير مُرسَلة).
@@ -243,7 +246,7 @@ index.html
 manifest.webmanifest, sw.js, offline.html, icons/ (ملفات PWA والتثبيت)
 src/
   core/          config.js, events.js, store.js
-  services/      cloud-runtime.js (طبقة التخزين الفعلية — نفس دوال local-runtime.js بالضبط list/get/save/bulkPut/remove/count/clear، زائد removeMany (حذف دفعي id=in.(...)) للاستبدال الكامل بالاستيراد، لكن fetch مباشر على PostgREST تبع Supabase)
+  services/      cloud-runtime.js (طبقة التخزين الفعلية — نفس دوال local-runtime.js بالضبط list/get/save/bulkPut/remove/count/clear، زائد removeMany (حذف دفعي id=in.(...)) وlistIds (معرّفات فقط بلا data) للاستبدال الكامل بالاستيراد، لكن fetch مباشر على PostgREST تبع Supabase)
                  supabase-config.js (SB_URL/SB_KEY لمشروع مسار + إدارة access token بـ sessionStorage)
                  auth-service.js (تسجيل الدخول/الخروج، البروفايل الحالي، ونداءات admin-users لإدارة الحسابات)
                  local-runtime.js (محول IndexedDB القديم — غير مستخدَم بالتطبيق الفعلي بعد الآن، باقٍ فقط كمرجع تاريخي ولاختباره الخاص)
