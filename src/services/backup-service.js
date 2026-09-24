@@ -4,6 +4,21 @@ import { COLLECTIONS, DB_VERSION } from "../core/config.js";
 const BACKUP_CACHE_MS = 10 * 60_000;
 let backupCache = null;
 
+// نسخ تلقائية أسبوعية (pg_cron على Supabase، تُبنى وتُنظَّف بالكامل داخل
+// قاعدة البيانات — راجع migration 20260924_scheduled_backup_snapshots.sql)،
+// آخر 4 نسخ فقط. هذي مجرد قراءة/تنزيل لما هو موجود أصلًا، لا تُنشئ نسخة.
+export async function listBackupSnapshots() {
+  if (globalThis.__MASAR_TEST_BACKEND__) return [];
+  return rpc("masar_list_backup_snapshots");
+}
+
+export async function fetchBackupSnapshot(id) {
+  if (globalThis.__MASAR_TEST_BACKEND__) throw new Error("غير مدعوم في وضع الاختبار");
+  const data = await rpc("masar_get_backup_snapshot", { p_id: id });
+  if (!data) throw new Error("تعذّر إيجاد هذه النسخة — ربما حُذفت (يُحتفَظ بآخر 4 نسخ فقط).");
+  return data;
+}
+
 export async function buildBackup({ force = false } = {}) {
   if (!globalThis.__MASAR_TEST_BACKEND__) {
     if (!force && backupCache && backupCache.until > Date.now()) return backupCache.data;
