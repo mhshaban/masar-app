@@ -37,12 +37,12 @@ async function mountCourseGradesTable(root, student) {
 }
 
 // "فتح الشهادة الأصلية" يبقى الاستثناء الوحيد اللي يحتاج مجلد "مسار"
-// المحلي — فتح/طباعة/تنزيل نسخة PDF الرسمية نفسها، لا بياناتها (سجل
-// المقررات فوق كافٍ للبيانات). زر بسيط بأعلى بطاقة "سجل المقررات" (نفس
-// نمط "فتح الجدول الأصلي (PDF)" بجدول الطالب)، لا بطاقة مستقلة. يبقى أيضًا
-// يغذّي دمج المعدل الفصلي/التراكمي بالرسم البياني لو الشهادة المفتوحة تحمل
-// قيمة مختلفة عمّا هو مستورَد — راجع drawAcademic أدناه.
-function wireCertificateOriginal(root, student, onCertificates) {
+// المحلي — فتح/طباعة/تنزيل نسخة PDF الرسمية نفسها فقط، بلا أي أثر على
+// البيانات المعروضة (المعدل الفصلي/التراكمي بالأعلى يُقرآن دائمًا من ملف
+// كشف الطلاب المستورَد — termAverages/academicFlags — لا من الشهادة
+// المفتوحة، حتى لو حملت قيمة مختلفة). قراءة الشهادة هنا فقط للتحقق من
+// مطابقتها للطالب قبل عرض رابط التنزيل/الفتح.
+function wireCertificateOriginal(root, student) {
   const button = root.querySelector("#student-certificate-open");
   const status = root.querySelector("#student-certificate-status");
   const originalsRoot = root.querySelector("#student-certificate-originals");
@@ -76,7 +76,6 @@ function wireCertificateOriginal(root, student, onCertificates) {
           const url = URL.createObjectURL(file); urls.push(url);
           return `<span class="certificate-source">${sources.length > 1 ? `<small>${esc(file.name)}</small>` : ""}<a class="btn btn-ghost" href="${url}" download="${esc(file.name)}">تنزيل الأصل</a><a class="btn btn-ghost" href="${url}" target="_blank" rel="noopener">فتح / طباعة الأصل</a></span>`;
         }).join("");
-        onCertificates(certificates);
       }
       status.textContent = [certificates.length ? `تم فتح ${certificates.length} شهادة.` : "لم تُعرض شهادة مطابقة.", ...errors].join(" ");
     } catch (error) {
@@ -182,23 +181,21 @@ export async function renderAcademicPath(container, student) {
   `;
 
   const chartRoot = container.querySelector("#term-chart-root");
-  function drawAcademic(certificates = []) {
-    const merged = new Map(timeline.map(point => [point.term, point]));
-    for (const certificate of certificates) for (const term of certificate.terms) {
-      if (officialAverage(term.average) != null) merged.set(term.label, { term: term.label, averagePct: Number(term.average), rating: term.rating });
-    }
-    const slots = termSlots(student, [...merged.values()]);
+  // المعدل الفصلي/التراكمي هنا دائمًا من ملف كشف الطلاب المستورَد
+  // (timeline من termAverages، summary.finalCumulativeAverage من
+  // academicFlags) — بلا أي دمج مع الشهادة الأصلية المفتوحة اختياريًا
+  // (راجع wireCertificateOriginal أعلاه)، حفاظًا على مصدر واحد فقط.
+  function drawAcademic() {
+    const slots = termSlots(student, timeline);
     container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${esc(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">معدلات المرحلة الإعدادية بانتظار تزويدها.</p>';
     const points = slots.filter(p => officialAverage(p.averagePct) != null);
     chartRoot.innerHTML = renderTermLineChart(points);
     wireTermChart(chartRoot, points);
-    // Conflicting local official totals are surfaced, never averaged or guessed.
-    const values = [...new Set(certificates.map(c => officialAverage(c.finalCumulativeAverage)).filter(v => v != null))];
-    const cumulative = values.length === 1 ? values[0] : summary.finalCumulativeAverage;
+    const cumulative = summary.finalCumulativeAverage;
     container.querySelector("[data-cumulative]").textContent = cumulative == null ? "غير متوفر" : `${cumulative}٪`;
-    container.querySelector("[data-cumulative-note]").textContent = values.length > 1 ? "توجد قيم تراكمية مختلفة في الشهادات؛ المعروض هو المحفوظ، ويحتاج مراجعة الأصل." : cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "";
+    container.querySelector("[data-cumulative-note]").textContent = cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "";
   }
   drawAcademic();
-  wireCertificateOriginal(container, student, drawAcademic);
+  wireCertificateOriginal(container, student);
   await mountCourseGradesTable(container.querySelector("#student-course-grades"), student);
 }
