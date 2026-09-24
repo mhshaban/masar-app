@@ -23,7 +23,6 @@ const COURSE_HEADER_ALIASES = {
   studentId: ["رقم الطالب"],
   year: ["السنة الدراسية"],
   termName: ["الفصل الدراسي"],
-  level: ["المستوى", "المستوي"],
   subjectCode: ["رمز المقرر"],
   subjectName: ["اسم المقرر"],
   score: ["الدرجة"],
@@ -35,7 +34,6 @@ const TERM_AVERAGE_HEADER_ALIASES = {
   studentId: ["رقم الطالب"],
   year: ["السنة الدراسية"],
   termName: ["الفصل الدراسي"],
-  level: ["المستوى", "المستوي"],
   averagePct: ["المعدل الفصلي"],
   rating: ["التقدير"],
 };
@@ -78,13 +76,13 @@ function toPercentFromFraction(v) {
   return Number.isFinite(n) ? Math.round(n * 1000) / 10 : null;
 }
 
-// عنوان فصل يضم الفصل/المستوى/السنة صراحة — يبقى فريدًا عبر كل سنوات
-// الأرشيف (بعكس "الأول"/"الثاني" وحدها)، ومتوافق مع الصيغة اللي يتوقعها
+// عنوان فصل يضم الفصل/السنة صراحة — يبقى فريدًا عبر كل سنوات الأرشيف
+// (بعكس "الأول"/"الثاني" وحدها)، ومتوافق مع الصيغة اللي يتوقعها
 // certificateTermOrder (grades/curriculum-results.js) لفرز الجدول الزمني:
-// يحتاج "الفصل الدراسي <الاول|الثاني|الثالث|الصيفي>"، "المستوي <الاول|...>"،
-// وسنة أربع أرقام، بأي ترتيب بالنص.
-function buildTermLabel({ termName, level, year }) {
-  return `الفصل الدراسي ${termName || "غير محدد"} — ${level || "غير محدد"} — العام الدراسي ${year || "غير محدد"}`;
+// يحتاج "الفصل الدراسي <الاول|الثاني|الثالث|الصيفي>" وسنة أربع أرقام، بأي
+// ترتيب بالنص.
+function buildTermLabel({ termName, year }) {
+  return `الفصل الدراسي ${termName || "غير محدد"} - العام الدراسي ${year || "غير محدد"}`;
 }
 
 function parseScoreCell(raw) {
@@ -119,7 +117,6 @@ export function parseCourseGradeRows(rows) {
       notes: toText(row[columns.notes]),
       term: buildTermLabel({
         termName: toText(row[columns.termName]),
-        level: toText(row[columns.level]),
         year: toText(row[columns.year]),
       }),
       sourceFile: toText(row[columns.sourceFile]),
@@ -147,7 +144,6 @@ export function parseTermAverageRows(rows) {
       studentId,
       term: buildTermLabel({
         termName: toText(row[columns.termName]),
-        level: toText(row[columns.level]),
         year: toText(row[columns.year]),
       }),
       averagePct,
