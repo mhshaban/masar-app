@@ -3,7 +3,7 @@
 // (نفس القرار المتبع لاستيراد الدرجات، راجع
 // academic-averages-workbook-import-service.js وREADME). جزء من رفعة
 // "تحديث شامل" الواحدة — شيت اختياري، غيابه لا يوقف بقية التحديث.
-import { list, bulkPut, remove } from "./cloud-runtime.js";
+import { list, bulkPut, removeMany } from "./cloud-runtime.js";
 import { readWorkbook } from "./xlsx-parser.js";
 
 const CLASS_SCHEDULE_SHEET_HINT = "الجدول الدراسي";
@@ -94,6 +94,6 @@ export async function commitClassSchedules(records) {
   await bulkPut("classSchedules", records);
   const newIds = new Set(records.map((r) => r.id));
   const stale = existing.filter((r) => !newIds.has(r.id));
-  await Promise.all(stale.map((r) => remove("classSchedules", r.id)));
+  await removeMany("classSchedules", stale.map((r) => r.id));
   return { classSchedulesCount: records.length, removedClassSchedulesCount: stale.length };
 }
