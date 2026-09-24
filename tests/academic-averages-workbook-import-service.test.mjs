@@ -81,6 +81,17 @@ test('parseAnnualAverageRows keeps only each student\'s latest school year', () 
   assert.equal(rows[0].finalCumulativeAverage, 92.9);
 });
 
+// عطل حقيقي رُصد فعليًا (2026-09-24): ملف كشف طلاب حقيقي غيّر اسم هذا
+// العمود من "السنوي" لـ"النهائي"، فكان شيت المعدلات السنوية كاملًا يُقرأ
+// كصفر صفوف بصمت — يغيب المعدل التراكمي لكل الطلبة بعد الاستيراد بلا
+// أي خطأ ظاهر.
+test('parseAnnualAverageRows also recognizes the "النهائي" column header variant', () => {
+  const header = ['رقم الطالب', 'اسم الطالب', 'الشعبة (اسم الملف)', 'السنة الدراسية', 'المعدل التراكمي النهائي', 'التقدير'];
+  const rows = parseAnnualAverageRows([header, ['20241111', 'طالب', '2تجر1', '2025/2026', 0.929, 'ممتاز']]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].finalCumulativeAverage, 92.9);
+});
+
 test('buildAcademicAverages aggregates matched students only and computes overall/subject percentages', () => {
   const rows = parseCourseGradeRows([COURSE_HEADER,
     courseRow({ id: '20241111', code: 'ريض101', name: 'رياضيات', score: 80 }),
