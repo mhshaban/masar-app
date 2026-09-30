@@ -9,7 +9,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-30-candidate-sheet-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -470,22 +470,31 @@ function attendanceTimeRange({ startTime, endTime }) {
 // وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
 // وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
 // واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
-function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, students }) {
+function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, students, kind }) {
+  const isCandidates = kind === "candidates";
   const timeRange = attendanceTimeRange({ startTime, endTime });
+  const rosterHead = isCandidates
+    ? "<th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>اسم الطالب</th><th>الشعبة</th><th>أرقام التواصل</th>"
+    : "<th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th>";
+  const rosterRows = students.length
+    ? students.map((s, i) => isCandidates
+        ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
+        : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
+    : `<tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr>`;
   return `<div class="forms-print attendance-print" id="attendance-printable">
-    <div class="topbar"><div><h1>${esc(title) || "كشف حضور فعالية"}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
+    <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
     <div class="card"><h2>بيانات الفعالية</h2>
       <div class="tablewrap"><table>
         <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
         <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-        <tr><th>عدد الطلبة المشاركين</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
+        <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
         <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
       </table></div>
     </div>
-    <div class="card attendance-roster"><h2>قائمة الطلبة المشاركين</h2>
+    <div class="card attendance-roster"><h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
       <div class="tablewrap"><table>
-        <thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr></thead>
-        <tbody>${students.length ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("") : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}</tbody>
+        <thead><tr>${rosterHead}</tr></thead>
+        <tbody>${rosterRows}</tbody>
       </table></div>
     </div>
   </div>`;
@@ -520,15 +529,17 @@ async function printAttendanceSheetDirect(data) {
   } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الكشف."); }
 }
 
-async function renderAttendanceLog(root, onNew, onEdit) {
-  const sheets = await listAttendanceSheets();
+async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
+  const isCandidates = kind === "candidates";
+  const allSheets = await listAttendanceSheets();
+  const sheets = allSheets.filter((s) => (s.kind || "attendance") === kind);
   root.innerHTML = `<div class="card">
     <div class="card-head">
-      <h2>كشوف الحضور المحفوظة (${sheets.length})</h2>
-      <button class="btn btn-primary" id="attendance-new-btn" type="button">+ كشف حضور جديد</button>
+      <h2>${isCandidates ? "كشوف المرشحين المحفوظة" : "كشوف الحضور المحفوظة"} (${sheets.length})</h2>
+      <button class="btn btn-primary" id="attendance-new-btn" type="button">${isCandidates ? "+ كشف مرشحين جديد" : "+ كشف حضور جديد"}</button>
     </div>
     ${sheets.length ? `<div class="tablewrap"><table>
-        <thead><tr><th>العنوان</th><th>التاريخ</th><th>المكان</th><th>عدد المشاركين</th><th></th></tr></thead>
+        <thead><tr><th>العنوان</th><th>التاريخ</th><th>المكان</th><th>${isCandidates ? "عدد المرشحين" : "عدد المشاركين"}</th><th></th></tr></thead>
         <tbody>${sheets.map((s) => `
           <tr>
             <td>${esc(s.title)}</td>
@@ -538,22 +549,23 @@ async function renderAttendanceLog(root, onNew, onEdit) {
             <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(s.id)}" type="button">تعديل</button><button class="btn btn-ghost forms-danger" data-remove="${esc(s.id)}" type="button">حذف</button></div></td>
           </tr>
         `).join("")}</tbody>
-      </table></div>` : '<div class="empty">لا توجد كشوف حضور محفوظة بعد</div>'}
+      </table></div>` : `<div class="empty">${isCandidates ? "لا توجد كشوف مرشحين محفوظة بعد" : "لا توجد كشوف حضور محفوظة بعد"}</div>`}
   </div>`;
   root.querySelector("#attendance-new-btn").addEventListener("click", onNew);
   root.querySelectorAll("[data-edit]").forEach((btn) => btn.addEventListener("click", () => onEdit(btn.dataset.edit)));
   root.querySelectorAll("[data-remove]").forEach((btn) => btn.addEventListener("click", async () => {
-    if (!await confirmDialog("حذف كشف الحضور هذا نهائيًا؟")) return;
+    if (!await confirmDialog(isCandidates ? "حذف كشف المرشحين هذا نهائيًا؟" : "حذف كشف الحضور هذا نهائيًا؟")) return;
     await removeAttendanceSheet(btn.dataset.remove);
-    await renderAttendanceLog(root, onNew, onEdit);
+    await renderAttendanceLog(root, onNew, onEdit, kind);
   }));
 }
 
-async function renderAttendanceEditor(root, sheetId, onDone) {
+async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance") {
+  const isCandidates = kind === "candidates";
   const [schoolOptions, teachers, existing] = await Promise.all([
     getFilterOptions(), listTeachers(), sheetId ? getAttendanceSheet(sheetId) : Promise.resolve(null),
   ]);
-  if (sheetId && !existing) { notify("كشف الحضور غير موجود"); await onDone(); return; }
+  if (sheetId && !existing) { notify(isCandidates ? "كشف المرشحين غير موجود" : "كشف الحضور غير موجود"); await onDone(); return; }
   const teacherNames = teachers.map((t) => t.name).filter(Boolean);
 
   let mode = "section";
@@ -563,10 +575,10 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
 
   root.innerHTML = `<div class="card forms-card">
     <div class="card-head">
-      <h2>${sheetId ? "تعديل كشف الحضور" : "كشف حضور فعالية جديد"}</h2>
+      <h2>${sheetId ? (isCandidates ? "تعديل كشف المرشحين" : "تعديل كشف الحضور") : (isCandidates ? "كشف طلاب مرشحين لفعالية جديد" : "كشف حضور فعالية جديد")}</h2>
       <button class="btn btn-ghost" type="button" id="attendance-back">رجوع للسجل</button>
     </div>
-    <p class="hint">عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word.</p>
+    <p class="hint">${isCandidates ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ الكشف أو اطبعه أو صدّره Word." : "عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word."}</p>
     <form id="attendance-form" class="forms-grid">
       ${field("عنوان الفعالية", "title", "text", true, existing?.title || "", true)}
       ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
@@ -602,8 +614,14 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
 
   const renderPreview = () => {
     const list = currentStudents();
+    const previewHead = isCandidates
+      ? "<th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>الاسم</th><th>الشعبة</th><th>أرقام التواصل</th>"
+      : "<th>م</th><th>الرقم الأكاديمي</th><th>الاسم</th><th>الشعبة</th>";
+    const previewRows = list.map((s, i) => isCandidates
+      ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
+      : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td></tr>`).join("");
     previewRoot.innerHTML = list.length
-      ? `<p class="hint">عدد الطلبة المشاركين: ${list.length}</p><div class="tablewrap"><table><thead><tr><th>م</th><th>الرقم الأكاديمي</th><th>الاسم</th><th>الشعبة</th></tr></thead><tbody>${list.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td></tr>`).join("")}</tbody></table></div>`
+      ? `<p class="hint">${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}: ${list.length}</p><div class="tablewrap"><table><thead><tr>${previewHead}</tr></thead><tbody>${previewRows}</tbody></table></div>`
       : '<div class="empty">لم يتم اختيار طلبة بعد</div>';
   };
 
@@ -693,12 +711,13 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
       endTime: values.endTime || "",
       teachers: [values.teacher1 || "", values.teacher2 || ""],
       students,
+      kind,
     };
   };
 
   const validate = (data) => {
     if (!data.title) { notify("اكتب عنوان الفعالية أولًا"); return false; }
-    if (!data.students.length) { notify("اختر الطلبة المشاركين أولًا"); return false; }
+    if (!data.students.length) { notify(isCandidates ? "اختر الطلبة المرشحين أولًا" : "اختر الطلبة المشاركين أولًا"); return false; }
     return true;
   };
 
@@ -708,7 +727,7 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
     const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ الحفظ…";
     try {
       if (sheetId) { await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
-      else { await createAttendanceSheet(data); notify("تم حفظ كشف الحضور"); }
+      else { await createAttendanceSheet(data); notify(isCandidates ? "تم حفظ كشف المرشحين" : "تم حفظ كشف الحضور"); }
       await onDone();
     } catch (error) { notify(error.message || "تعذر حفظ الكشف"); }
     finally { button.disabled = false; button.textContent = original; }
@@ -718,7 +737,7 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
     const data = buildData();
     if (!validate(data)) return;
     const html = buildAttendanceSheetReportHtml(data, new Date().toLocaleString("ar-BH"));
-    downloadAsWordDoc(data.title, html, `كشف-حضور-${data.title}-${data.date || today()}`.replace(/[\\/:*?"<>|]/g, "-"));
+    downloadAsWordDoc(data.title, html, `${isCandidates ? "كشف-مرشحين" : "كشف-حضور"}-${data.title}-${data.date || today()}`.replace(/[\\/:*?"<>|]/g, "-"));
   });
 
   root.querySelector("#attendance-print").addEventListener("click", async () => {
@@ -728,9 +747,9 @@ async function renderAttendanceEditor(root, sheetId, onDone) {
   });
 }
 
-async function renderAttendanceSheet(root) {
-  const showLog = () => renderAttendanceLog(root, () => showEditor(null), (id) => showEditor(id));
-  const showEditor = (id) => renderAttendanceEditor(root, id, showLog);
+async function renderAttendanceSheet(root, kind = "attendance") {
+  const showLog = () => renderAttendanceLog(root, () => showEditor(null), (id) => showEditor(id), kind);
+  const showEditor = (id) => renderAttendanceEditor(root, id, showLog, kind);
   await showLog();
 }
 
@@ -739,7 +758,7 @@ async function renderAttendanceSheet(root) {
 // "استمارة جديدة" ليتنقل بنفسه لسجل الاستمارات ويبحث عن نفس الاستمارة.
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -752,7 +771,8 @@ export async function mountFormsView(container, options = {}) {
         const openEdit = (id) => renderEdit(content, id, back, openDetail);
         await renderLog(content, openDetail, openEdit);
       }
-      else if (tab === "attendance") await renderAttendanceSheet(content);
+      else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
+      else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
       else await renderTeachers(content);
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);

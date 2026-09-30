@@ -40,8 +40,19 @@ test("listStudentsWithPendingSubjects only surfaces students with at least one u
   const rows = await listStudentsWithPendingSubjects();
   assert.equal(rows.length, 1);
   assert.equal(rows[0].studentId, "111");
+  assert.equal(rows[0].id, "111");
   assert.deepEqual(rows[0].pendingSubjects, ["دين"]);
   assert.equal(rows[0].totalSubjects, 2);
+});
+
+test("listStudentsWithPendingSubjects carries the student's own roster id (not the academic number) for linking cases/support plans", async () => {
+  await bulkPut("students", [{ id: "uuid-abc", academicId: "20244001", name: "طالب معلّق" }]);
+  await bulkPut("promotedSubjects", [{ id: "p1", studentId: "20244001", subjectCode: "دين", cleared: false }]);
+
+  const rows = await listStudentsWithPendingSubjects();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].studentId, "20244001");
+  assert.equal(rows[0].id, "uuid-abc");
 });
 
 test("rollbackPromotedBatch removes only that batch's records and marks it rolled back", async () => {
