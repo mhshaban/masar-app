@@ -211,6 +211,7 @@ export async function listStudentsWithPendingSubjects() {
     const student = studentById.get(String(studentId));
     rows.push({
       studentId,
+      id: student ? student.id : null,
       studentName: student ? student.name : null,
       matched: !!student,
       level: student ? student.level : null,

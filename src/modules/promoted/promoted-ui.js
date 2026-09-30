@@ -1,8 +1,10 @@
 import { confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   parsePromotedFile, commitPromotedBatch, listPromotedBatches, rollbackPromotedBatch, listStudentsWithPendingSubjects,
-} from "./promoted-service.js?v=2026-09-07-academic-fix-1";
+} from "./promoted-service.js?v=2026-09-30-followup-status-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
+import { listCaseStudentIds } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { listActivePlanStudentIds } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -148,8 +150,20 @@ export async function renderBatchHistory(root) {
   });
 }
 
+// عمود "المتابعة" لكل طالب مرفَّع: هل لديه حالة إرشادية مفتوحة أو خطة دعم
+// نشطة بالفعل (بادج أخضر)، أو لا (زر "فتح جلسة"/"فتح دعم" ينتقل مباشرة
+// لشاشتها مع تعبئة الطالب مسبقًا — نفس آلية deep-link المستخدمة أصلًا
+// بلوحة أولويات اليوم وملف الطالب، بلا حاجة لإعادة البحث عن الطالب هناك).
+function followUpCell(hasIt, activeLabel, gotoView, studentId) {
+  if (hasIt) return `<span class="pill pill-success">${esc(activeLabel)}</span>`;
+  if (!studentId) return '<span class="pill pill-neutral">—</span>';
+  return `<button class="btn btn-ghost" data-goto-view="${esc(gotoView)}" data-goto-student="${esc(studentId)}">${gotoView === "cases" ? "فتح جلسة" : "فتح دعم"}</button>`;
+}
+
 async function renderPendingList(root, onGoto) {
-  const allRows = await listStudentsWithPendingSubjects();
+  const [allRows, openCaseIds, activePlanIds] = await Promise.all([
+    listStudentsWithPendingSubjects(), listCaseStudentIds(), listActivePlanStudentIds(),
+  ]);
   const rows = allRows.filter((row) => row.matched);
   const unmatched = allRows.filter((row) => !row.matched);
   const unmatchedHtml = unmatched.length ? `<details class="card" style="margin-top:16px;"><summary>سجلات تحتاج مطابقة مع الكشف الحالي (${unmatched.length})</summary><p class="hint">هذه الأرقام غير مرتبطة بطالب في الكشف الحالي؛ السجلات محفوظة ولا تدخل في إجمالي الطلبة الحاليين.</p><div class="tablewrap"><table><thead><tr><th>الرقم الأكاديمي</th><th>المقررات المتبقية</th></tr></thead><tbody>${unmatched.map((row) => `<tr><td>${esc(row.studentId)}</td><td>${row.pendingSubjects.map(esc).join("، ")}</td></tr>`).join("")}</tbody></table></div></details>` : "";
@@ -171,8 +185,9 @@ async function renderPendingList(root, onGoto) {
   root.innerHTML = `
     <div class="card">
       <h2>طلاب لديهم مقررات لم تُجتَز بعد (${rows.length})</h2>
+      <p class="hint">عمودا "متابعة إرشادية" و"خطة دعم" يعرضان وضع الطالب الحالي فورًا — بادج أخضر لمن لديه بالفعل، أو زر لفتح واحدة جديدة له مباشرة.</p>
       <div class="tablewrap"><table>
-        <thead><tr><th>الرقم الأكاديمي</th><th>الطالب</th><th>الصف</th><th>المقررات المتبقية</th></tr></thead>
+        <thead><tr><th>الرقم الأكاديمي</th><th>الطالب</th><th>الصف</th><th>المقررات المتبقية</th><th>متابعة إرشادية</th><th>خطة دعم</th></tr></thead>
         <tbody>
           ${rows.map((r) => `
             <tr>
@@ -180,12 +195,19 @@ async function renderPendingList(root, onGoto) {
               <td>${esc(r.studentName) || esc(r.studentId)}</td>
               <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
               <td>${r.pendingSubjects.map(esc).join("، ")}</td>
+              <td>${followUpCell(r.id && openCaseIds.has(r.id), "لديه متابعة", "cases", r.id)}</td>
+              <td>${followUpCell(r.id && activePlanIds.has(r.id), "لديه خطة دعم", "support", r.id)}</td>
             </tr>
           `).join("")}
         </tbody>
       </table></div>
     </div>${unmatchedHtml}
   `;
+  if (onGoto) {
+    root.querySelectorAll("[data-goto-view]").forEach((btn) => {
+      btn.addEventListener("click", () => onGoto(btn.dataset.gotoView, { studentId: btn.dataset.gotoStudent }));
+    });
+  }
 }
 
 export async function mountPromotedView(container, { onGoto } = {}) {

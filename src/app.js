@@ -20,7 +20,7 @@ const VIEW_LOADERS = {
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-09-22-case-edit-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-09-22-print-buttons-1")).mountSupportView,
   career: async () => (await import("./modules/career/career-ui.js?v=2026-09-22-print-buttons-1")).mountCareerView,
-  promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-07-review-1")).mountPromotedView,
+  promoted: async () => (await import("./modules/promoted/promoted-ui.js?v=2026-09-30-followup-status-1")).mountPromotedView,
   forms: async () => (await import("./modules/forms/forms-ui.js?v=2026-09-30-candidate-sheet-1")).mountFormsView,
   backup: async () => (await import("./modules/backup/backup-ui.js?v=2026-09-24-scheduled-snapshots-1")).mountBackupView,
   users: async () => (await import("./modules/users/users-ui.js?v=2026-09-06-polish-1")).mountUsersView,
