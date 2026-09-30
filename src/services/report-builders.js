@@ -337,24 +337,30 @@ function formatTimeRange(startTime, endTime) {
 }
 
 export function buildAttendanceSheetReportHtml(data, exportedAt) {
-  const { title, location, day, date, startTime, endTime, teachers = [], students = [] } = data;
+  const { title, location, day, date, startTime, endTime, teachers = [], students = [], kind } = data;
+  const isCandidates = kind === "candidates";
   const teacherNames = teachers.filter((t) => String(t || "").trim());
   const timeRange = formatTimeRange(startTime, endTime);
   return `
-    <h1>${esc(title || "كشف حضور فعالية")}</h1>
+    <h1>${esc(title || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية"))}</h1>
     <p class="meta">تاريخ التصدير: ${esc(exportedAt)}</p>
     <table>
       <tr><th>اليوم</th><td>${esc(day) || "—"}</td><th>التاريخ</th><td>${esc(date) || "—"}</td></tr>
       <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-      <tr><th>عدد الطلبة المشاركين</th><td colspan="3">${students.length}</td></tr>
+      <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
       <tr><th>المعلمون المرافقون</th><td colspan="3">${teacherNames.length ? teacherNames.map(esc).join("، ") : "—"}</td></tr>
     </table>
-    <h2>قائمة الطلبة المشاركين</h2>
+    <h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
     <table>
-      <tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr>
+      ${isCandidates
+        ? `<tr><th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>اسم الطالب</th><th>الشعبة</th><th>أرقام التواصل</th></tr>
+      ${students.length
+        ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`).join("")
+        : '<tr><td colspan="6">لا يوجد طلبة مختارون</td></tr>'}`
+        : `<tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr>
       ${students.length
         ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
-        : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}
+        : '<tr><td colspan="5">لا يوجد طلبة مختارون</td></tr>'}`}
     </table>
   `;
 }

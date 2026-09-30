@@ -250,3 +250,28 @@ test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers, 
   assert.match(html, /<th>المعلمون المرافقون<\/th><td colspan="3">—<\/td>/);
   assert.match(html, /<th>مكان الفعالية<\/th><td>—<\/td><th>الفترة<\/th><td>—<\/td>/);
 });
+
+test('buildAttendanceSheetReportHtml with kind "candidates" adds civil ID and phone columns instead of a signature column', () => {
+  const html = buildAttendanceSheetReportHtml({
+    title: "معرض عالم المهن",
+    date: "2026-09-17",
+    kind: "candidates",
+    students: [
+      { academicId: "2026001", civilId: "990101234", name: "طالب أول", section: "١تلم١", phones: ["36000001", "36000002"] },
+    ],
+  }, "2026-09-17");
+
+  assert.match(html, /قائمة الطلبة المرشحين/);
+  assert.match(html, /<th>الرقم الشخصي<\/th>/);
+  assert.match(html, /<th>أرقام التواصل<\/th>/);
+  assert.doesNotMatch(html, /<th>التوقيع<\/th>/);
+  assert.match(html, /990101234/);
+  assert.match(html, /36000001 · 36000002/);
+  assert.match(html, /عدد الطلبة المرشحين/);
+});
+
+test('buildAttendanceSheetReportHtml with kind "candidates" falls back to a candidates-specific title and placeholders', () => {
+  const html = buildAttendanceSheetReportHtml({ title: "", date: "", kind: "candidates", students: [] }, "2026-09-17");
+  assert.match(html, /كشف طلاب مرشحين لفعالية/);
+  assert.match(html, /لا يوجد طلبة مختارون/);
+});
