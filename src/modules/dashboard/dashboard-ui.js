@@ -215,7 +215,7 @@ export async function mountDashboardView(container, { onGoto }) {
         <div class="card-head"><h2>مصدر الحاجة للمتابعة — ${attentionCount} طالبًا</h2></div>
         <p class="hint">قد يظهر الطالب في أكثر من إشارة؛ التجميع يمنع تكراره في العدد الإجمالي.</p>
         <div class="daily-bars">
-          ${[["case", "مؤشر أكاديمي / حالة"], ["career", "بلا جلسة توجيه مهني"], ["promoted", "مقررات مرفّع لم تُجتز"], ["support", "يحتاج خطة دعم"]].map(([key, label]) => `<div class="daily-bar-row"><span>${label}</span><div><i style="width:${Math.max(2, breakdown[key] / maxBreakdown * 100)}%"></i></div><b>${breakdown[key]}</b></div>`).join("")}
+          ${[["case", "مؤشر أكاديمي / حالة"], ["career", "بلا جلسة توجيه مهني"], ["promoted", "مقررات مرفّع لم تُجتز"], ["support", "يحتاج خطة دعم"]].map(([key, label]) => `<button type="button" class="daily-bar-row" data-goto="${NEED_TARGET_VIEW[key]}" title="فتح ${esc(label)}"><span>${label}</span><div><i style="width:${Math.max(2, breakdown[key] / maxBreakdown * 100)}%"></i></div><b>${breakdown[key]}</b></button>`).join("")}
         </div>
         ${breakdown.career ? `<div class="daily-note daily-note-info"><b>ملاحظة تفسيرية:</b> طلاب السنة النهائية بلا جلسة يظهرون كمرشحين للتخطيط المبكر، ولا يعني الرقم وحده وجود تعثر عاجل.</div>` : ""}
       </div>

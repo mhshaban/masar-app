@@ -12,7 +12,7 @@ import {
 } from "./services/auth-service.js";
 
 const VIEW_LOADERS = {
-  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-22-student-context-1")).mountDashboardView,
+  dashboard: async () => (await import("./modules/dashboard/dashboard-ui.js?v=2026-09-30-clickable-breakdown-1")).mountDashboardView,
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-09-22-unified-action-editor-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-09-24-tab-order-1")).mountAgendaView,
   students: async () => (await import("./modules/students/students-ui.js?v=2026-09-24-no-synthetic-terms-1")).mountStudentsView,

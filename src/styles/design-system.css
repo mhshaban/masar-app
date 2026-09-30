@@ -433,7 +433,9 @@
   .daily-student-panel .row-item .meta { line-height: 1.75; }
   .daily-analysis-grid { grid-template-columns: .92fr 1.08fr; gap: 20px; }
   .daily-bars { display: flex; flex-direction: column; gap: 13px; margin: 18px 0; }
-  .daily-bar-row { display: grid; grid-template-columns: minmax(145px, .9fr) minmax(100px, 1.35fr) 44px; gap: 12px; align-items: center; font-size: 12px; }
+  .daily-bar-row { display: grid; grid-template-columns: minmax(145px, .9fr) minmax(100px, 1.35fr) 44px; gap: 12px; align-items: center; font-size: 12px; width: 100%; border: 0; background: none; padding: 6px 4px; margin: 0; font-family: inherit; color: inherit; text-align: inherit; border-radius: 8px; cursor: pointer; transition: background-color .15s; }
+  .daily-bar-row:hover, .daily-bar-row:focus-visible { background: color-mix(in srgb, var(--teal-600) 7%, transparent); }
+  .daily-bar-row:focus-visible { outline: 2px solid var(--teal-600); outline-offset: 1px; }
   .daily-bar-row > span { color: var(--ink-600); }
   .daily-bar-row > div { height: 8px; overflow: hidden; border-radius: 999px; background: var(--paper-100); }
   .daily-bar-row i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--clay-500), var(--clay-600)); }
