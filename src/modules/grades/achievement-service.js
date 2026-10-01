@@ -50,14 +50,16 @@ export async function computeStudentAchievement() {
     if (!f.studentId || overallSource == null) continue;
     const student = studentById.get(String(f.studentId));
     if (!student) continue;
-    const avgPct = Math.round(Number(overallSource));
+    const avgPct = Number(overallSource);
     const subjects = f.subjects || [];
     const weakSubjects = subjects
       .filter((s) => s.pct != null && Math.round(Number(s.pct)) < 50)
       .map((s) => ({ subject: s.subject, pct: Math.round(Number(s.pct)) }))
       .sort((a, b) => a.pct - b.pct);
 
-    const rating = ratingForPct(avgPct);
+    // The rating keeps classifying the rounded average, exactly as before;
+    // only the displayed number gained its decimals.
+    const rating = ratingForPct(Math.round(avgPct));
     rows.push({
       studentId: f.studentId,
       studentName: student ? student.name : null,

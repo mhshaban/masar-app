@@ -307,20 +307,37 @@ export async function remove(collection, id) {
 // علاقة فعلية بشبكة المستخدم — رُصد هذا فعليًا بعد تغيير صيغة id لـ
 // termAverages/courseGrades (حذف "المستوى" من نص الفصل) جعل كل الصفوف
 // القديمة "بلا مصدر" دفعة واحدة.
+// A DELETE's id list travels in the URL. Composite grade ids are ~63 Arabic
+// characters, ~237 once URL-encoded, so 500 of them made a ~100KB URL that
+// the CDN in front of Supabase rejects without CORS headers — the browser
+// only sees "Failed to fetch", and every retry fails identically. That was
+// the real cause of the recurring "تعذّر الاتصال" during تحديث شامل.
+const MAX_ID_LIST_URL_CHARS = 6000;
+
 export async function removeMany(collection, ids) {
   const backend = testBackend();
   if (backend) {
     for (const id of ids) await backend.remove(collection, id);
     return;
   }
-  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-    const idList = ids.slice(i, i + CHUNK_SIZE).map((id) => encodeURIComponent(id)).join(",");
-    if (!idList) continue;
-    await request(`${collection}?id=in.(${idList})`, {
+  let batch = [];
+  let batchChars = 0;
+  const flush = async () => {
+    if (!batch.length) return;
+    await request(`${collection}?id=in.(${batch.join(",")})`, {
       method: "DELETE",
       headers: { Prefer: "return=minimal" },
     });
+    batch = [];
+    batchChars = 0;
+  };
+  for (const id of ids) {
+    const encoded = encodeURIComponent(id);
+    if (batch.length && (batch.length >= CHUNK_SIZE || batchChars + encoded.length + 1 > MAX_ID_LIST_URL_CHARS)) await flush();
+    batch.push(encoded);
+    batchChars += encoded.length + 1;
   }
+  await flush();
   invalidateCollection(collection);
 }
 

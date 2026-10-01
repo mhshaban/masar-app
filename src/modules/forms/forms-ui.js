@@ -1,5 +1,6 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
+import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-10-01-avg-decimals-1";
 import { getFilterOptions, listStudentsForSection } from "../students/students-service.js";
 import {
   createAttendanceSheet, updateAttendanceSheet, listAttendanceSheets, getAttendanceSheet, removeAttendanceSheet,
@@ -9,7 +10,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-09-30-candidate-sheet-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-10-01-avg-decimals-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -114,7 +115,7 @@ function studentCard(student, hideSpecializationOnPrint = false) {
   if (!student) return '<div class="forms-student empty">لم يتم اختيار طالب بعد</div>';
   const average = student.finalCumulativeAverage;
   const specializationSpans = `<span${hideSpecializationOnPrint ? ' class="print-hide"' : ""}>رغبة التخصص: ${esc(student.specializationPreference ?? "") || "—"}</span><span${hideSpecializationOnPrint ? ' class="print-hide"' : ""}>الحد الأدنى للتخصص: ${esc(student.minSpecializationThreshold ?? "") || "—"}</span>`;
-  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span>${specializationSpans}<span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${esc(average)}٪`}</span></div>`;
+  return `<div class="forms-student"><strong>${esc(student.name)}</strong><span>الرقم الأكاديمي: ${esc(student.academicId) || "—"}</span><span>الرقم الشخصي: ${esc(student.civilId) || "—"}</span><span>المستوى: ${esc(student.level) || "—"}</span><span>الشعبة: ${esc(student.section) || "—"}</span><span>المسار/التخصص: ${esc(student.track || student.specialization) || "—"}</span>${specializationSpans}<span>المعدل التراكمي النهائي: ${average == null || average === "" ? "—" : `${formatPct(average)}٪`}</span></div>`;
 }
 
 function typeFields(type, values = {}, student = null, options = { sections: [], departments: [] }) {

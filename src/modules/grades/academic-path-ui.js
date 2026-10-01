@@ -2,6 +2,7 @@ import { renderCurriculumResults, curriculumTrack } from "./curriculum-results.j
 import { getStudentTermTimeline, getStudentAcademicSummary, officialAverage } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 import { listWhere } from "../../services/cloud-runtime.js";
+import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const statusLabels = { absent: "غائب", barred: "محروم" };
@@ -119,7 +120,7 @@ function renderTermLineChart(points) {
           <circle cx="${x(i).toFixed(1)}" cy="${y(p.averagePct).toFixed(1)}" r="4.5" fill="var(--teal-600)" stroke="var(--surface)" stroke-width="2"/>
           <circle data-hit="${i}" cx="${x(i).toFixed(1)}" cy="${y(p.averagePct).toFixed(1)}" r="14" fill="transparent" tabindex="0" style="cursor:pointer;"/>
         `).join("")}
-        <text x="${x(n - 1).toFixed(1)}" y="${(y(last.averagePct) - 12).toFixed(1)}" font-size="12" font-weight="700" fill="var(--ink-800)" text-anchor="middle" font-family="var(--font-ui)">${last.averagePct}٪</text>
+        <text x="${x(n - 1).toFixed(1)}" y="${(y(last.averagePct) - 12).toFixed(1)}" font-size="12" font-weight="700" fill="var(--ink-800)" text-anchor="middle" font-family="var(--font-ui)">${formatPct(last.averagePct)}٪</text>
       </svg>
       <div id="term-chart-tooltip" style="position:absolute; display:none; pointer-events:none; background:var(--teal-900); color:var(--paper-50); font-size:11.5px; padding:6px 10px; border-radius:7px; white-space:nowrap; transform:translate(-50%,-100%); z-index:5; box-shadow:var(--shadow);"></div>
     </div>
@@ -140,7 +141,7 @@ function wireTermChart(root, points) {
       tooltip.style.left = `${cx}px`;
       tooltip.style.top = `${cy - 10}px`;
       tooltip.style.display = "block";
-      const bits = [`${p.term}`, `${p.averagePct}٪`];
+      const bits = [`${p.term}`, `${formatPct(p.averagePct)}٪`];
       if (p.rating) bits.push(p.rating);
       tooltip.textContent = bits.join(" — ");
     };
@@ -191,12 +192,12 @@ export async function renderAcademicPath(container, student) {
     // termSlots يضيف بطاقة "غير متوفر" لكل فصل حتى مستوى الطالب حتى لو
     // لم يظهر بأي شهادة، تسمية اصطناعية لا تطابق شيء بالسجل الرسمي).
     const slots = timeline;
-    container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${esc(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">لا توجد معدلات فصلية مستوردة لهذا الطالب بعد.</p>';
+    container.querySelector("[data-term-slots]").innerHTML = slots.length ? slots.map(point => `<div class="term-average-card"><span>${esc(point.term)}</span><strong>${officialAverage(point.averagePct) == null ? "غير متوفر" : `${formatPct(point.averagePct)}٪`}</strong></div>`).join("") : '<p class="hint">لا توجد معدلات فصلية مستوردة لهذا الطالب بعد.</p>';
     const points = slots.filter(p => officialAverage(p.averagePct) != null);
     chartRoot.innerHTML = renderTermLineChart(points);
     wireTermChart(chartRoot, points);
     const cumulative = summary.finalCumulativeAverage;
-    container.querySelector("[data-cumulative]").textContent = cumulative == null ? "غير متوفر" : `${cumulative}٪`;
+    container.querySelector("[data-cumulative]").textContent = cumulative == null ? "غير متوفر" : `${formatPct(cumulative)}٪`;
     container.querySelector("[data-cumulative-note]").textContent = cumulative == null ? "يظهر عند توفر المعدل الرسمي." : "";
   }
   drawAcademic();

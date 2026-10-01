@@ -1,8 +1,8 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { SESSION_TOPICS, listStudentsWithSessions, getStudentSessions, addSession, removeSession, listCandidates } from "./career-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-10-01-avg-decimals-1";
 import { getStudent } from "../students/students-service.js";
-import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js?v=2026-10-01-avg-decimals-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

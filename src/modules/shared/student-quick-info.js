@@ -1,4 +1,5 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
+import { formatPct } from "./format-pct.js?v=2026-10-01-avg-decimals-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -47,7 +48,7 @@ export function studentQuickInfo(student, flagsMap) {
 export function studentQuickInfoLine(info) {
   return [
     info.phone || null,
-    info.finalCumulativeAverage != null ? `المعدل ${info.finalCumulativeAverage}٪` : null,
+    info.finalCumulativeAverage != null ? `المعدل ${formatPct(info.finalCumulativeAverage)}٪` : null,
     info.reasons.length ? info.reasons.join(" · ") : null,
   ].filter(Boolean).join(" · ");
 }
@@ -64,7 +65,7 @@ export function studentQuickCard(student, info) {
     <span>المستوى: ${esc(student.level) || "—"}</span>
     <span>الشعبة: ${esc(student.section) || "—"}</span>
     <span>رقم التواصل: ${esc(info?.phone) || "—"}</span>
-    <span>المعدل التراكمي: ${avg == null ? "—" : `${esc(avg)}٪`}</span>
+    <span>المعدل التراكمي: ${avg == null ? "—" : `${formatPct(avg)}٪`}</span>
     ${info?.reasons?.length ? `<span class="forms-student-flag">${esc(info.reasons.join(" · "))}</span>` : ""}
   </div>`;
 }
