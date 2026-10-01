@@ -1,4 +1,4 @@
-const CACHE_VERSION = "masar-static-v55";
+const CACHE_VERSION = "masar-static-v56";
 const STATIC_CACHE = CACHE_VERSION;
 const APP_SCOPE = new URL(self.registration.scope);
 const staticUrl = (path) => new URL(path, APP_SCOPE).href;
@@ -49,9 +49,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(caches.open(STATIC_CACHE).then(async (cache) => {
     // JavaScript is network-first so a newly published data-access fix is not
     // hidden behind an older cached module. Other assets stay fast/offline.
+    // cache: "no-cache" makes the browser revalidate with the server (a cheap
+    // 304 when unchanged) instead of reusing its HTTP-cached copy: GitHub
+    // Pages lets that copy live 10 minutes, so a fix in an unversioned module
+    // (cloud-runtime.js) kept running the old code right after deploy.
     if (url.pathname.endsWith(".js")) {
       try {
-        const response = await fetch(request);
+        const response = await fetch(request, { cache: "no-cache" });
         if (response.ok && response.type === "basic") cache.put(request, response.clone());
         return response;
       } catch {

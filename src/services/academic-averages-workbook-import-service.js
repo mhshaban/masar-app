@@ -12,7 +12,7 @@
 import { subjectKeyForGrade } from "../../scripts/lib/subject-groups.mjs";
 import { gradeRowPct, isEncodedAbsenceScore } from "../../scripts/lib/score-conventions.mjs";
 import { readWorkbook } from "./xlsx-parser.js";
-import { listIds, bulkPut, removeMany } from "./cloud-runtime.js";
+import { listIds, bulkPut, clearAll } from "./cloud-runtime.js";
 import { logAuditEvent } from "../modules/audit/audit-service.js?v=2026-09-11-academic-averages-1";
 
 const COURSE_GRADES_SHEET_HINT = "درجات المقررات";
@@ -312,6 +312,15 @@ export async function commitAcademicAverages({ academicFlagsRecords, termAverage
     listIds("academicFlags"), listIds("termAverages"), listIds("courseGrades"),
   ]);
 
+  // الجداول الثلاثة مصدرها الملف بالكامل، فكل استيراد يمسحها ثم يعيد
+  // تحميلها: طلب DELETE واحد مفلتَر لكل جدول بدل مقارنة المعرّفات وحذف
+  // الباقي بقائمة معرّفات (قائمة معرّفات عربية طويلة هي اللي تجاوزت حد
+  // طول الرابط وأفشلت "تحديث شامل"). لا شيء مُدخل من التطبيق هنا، والنسخة
+  // الاحتياطية المنزَّلة قبل الحفظ تعيدها لو انقطعت العملية بالمنتصف.
+  await clearAll("academicFlags");
+  await clearAll("termAverages");
+  await clearAll("courseGrades");
+
   await bulkPut("academicFlags", academicFlagsRecords);
   await bulkPut("termAverages", termAveragesRecords);
   await bulkPut("courseGrades", courseGradesRecords);
@@ -322,11 +331,6 @@ export async function commitAcademicAverages({ academicFlagsRecords, termAverage
   const staleFlags = existingFlagIds.filter((id) => !newFlagIds.has(id));
   const staleTerms = existingTermIds.filter((id) => !newTermIds.has(id));
   const staleCourseGrades = existingCourseGradeIds.filter((id) => !newCourseGradeIds.has(id));
-  await Promise.all([
-    removeMany("academicFlags", staleFlags),
-    removeMany("termAverages", staleTerms),
-    removeMany("courseGrades", staleCourseGrades),
-  ]);
 
   await logAuditEvent("import_academic_averages", { tableName: "academicFlags", count: academicFlagsRecords.length });
 
