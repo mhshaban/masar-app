@@ -31,6 +31,22 @@ function buildHeaders(extra = {}) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// عملية "تحديث شامل" الواحدة تطلق عشرات أو مئات طلبات REST متتالية على
+// مدى دقائق (دفعات bulkPut/removeMany لآلاف صفوف الدرجات) — عطل شبكة
+// عابر واحد وسط هذا العدد الكبير من الطلبات كان يُسقط العملية كاملة
+// برسالة "تعذّر الاتصال" رغم نجاح كل الطلبات الأخرى فعليًا (تحقَّق هذا من
+// سجلات Supabase: لا أخطاء خادم إطلاقًا، فقط fetch نفسها فشلت مرة واحدة
+// لحظيًا). إعادة محاولة قصيرة هنا (3 محاولات، تأخير متصاعد بسيط) تمتص
+// هذا النوع تحديدًا — فشل اتصال فعلي حقيقي (لا إنترنت إطلاقًا) لسا يفشل
+// بنفس الرسالة بعد استنفاد المحاولات، بلا أي تغيير بسلوك أخطاء 4xx/5xx
+// (تلك ليست مشكلة شبكة، فلا تُعاد محاولتها).
+const NETWORK_RETRY_ATTEMPTS = 3;
+const NETWORK_RETRY_DELAY_MS = 400;
+
 // نقطة العبور الوحيدة لكل طلبات REST (كل الـ18 ملف خدمة تمر من هنا) — أفضل
 // مكان مركزي للتعامل مع انتهاء الجلسة: 401 يعني التوكن رفضه الخادم فعليًا
 // (منتهي فعلًا، أو الحساب عُطِّل بالمنتصف)، مو بالضرورة نفس حالة الانتهاء
@@ -39,12 +55,21 @@ function buildHeaders(extra = {}) {
 // بدل شاشة دخول عادية بلا سياق، بدل ما يشوف المستخدم خطأ REST خام.
 async function request(path, options = {}) {
   let res;
-  try {
-    res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-      ...options,
-      headers: { ...buildHeaders(), ...(options.headers || {}) },
-    });
-  } catch {
+  let networkError;
+  for (let attempt = 1; attempt <= NETWORK_RETRY_ATTEMPTS; attempt++) {
+    try {
+      res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: { ...buildHeaders(), ...(options.headers || {}) },
+      });
+      networkError = null;
+      break;
+    } catch (error) {
+      networkError = error;
+      if (attempt < NETWORK_RETRY_ATTEMPTS) await sleep(NETWORK_RETRY_DELAY_MS * attempt);
+    }
+  }
+  if (networkError) {
     throw new Error("تعذّر الاتصال بالخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.");
   }
   if (res.status === 401) {
