@@ -37,12 +37,11 @@ test('buildClassScheduleRecords keeps different sections/days/periods as distinc
   assert.equal(records.length, 3);
 });
 
-test('commitClassSchedules replaces the collection fully and prunes stale rows', async () => {
+test('commitClassSchedules replaces the collection fully (stale rows gone, no stale-id comparison needed)', async () => {
   await bulkPut('classSchedules', [{ id: 'stale--الأحد--1', section: 'stale', day: 'الأحد', period: '1' }]);
   const records = buildClassScheduleRecords(parseClassScheduleRows([HEADER, row()]));
   const result = await commitClassSchedules(records);
   assert.equal(result.classSchedulesCount, 1);
-  assert.equal(result.removedClassSchedulesCount, 1);
   const stored = await list('classSchedules');
   assert.deepEqual(stored.map((r) => r.id), ['1تجر1--الأحد--1']);
 });
