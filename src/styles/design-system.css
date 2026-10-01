@@ -590,7 +590,7 @@
     .main { width: 100% !important; padding: 0 !important; margin: 0 !important; }
     body * { visibility: hidden !important; }
     .forms-print, .forms-print * { visibility: visible !important; }
-    .forms-print { position: absolute; inset: 0 0 auto 0; box-sizing: border-box; width: 210mm; min-height: 0; padding: 5mm 9mm 7mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.3; display: table !important; border-collapse: collapse; }
+    .forms-print { position: absolute; inset: 0 0 auto 0; box-sizing: border-box; width: 210mm; min-height: 0; padding: 0; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.3; display: table !important; border-collapse: collapse; }
     /* A real <thead> (table-header-group) is what makes browsers repeat this
        block — department line + title + the page's context card — on every
        physical printed page; <tbody> is the flowing part that may split. */
@@ -603,7 +603,13 @@
        content, and forcing either to avoid a break is what was producing a
        spurious trailing blank page even for short, single-page content
        (confirmed by rendering to PDF before adding this override). */
-    .forms-print > thead > tr > td, .forms-print > tbody > tr > td { display: table-cell !important; padding: 0 !important; border: 0 !important; break-inside: auto !important; }
+    .forms-print > thead > tr > td, .forms-print > tbody > tr > td { display: table-cell !important; border: 0 !important; break-inside: auto !important; }
+    /* The page margins live on these two cells, not on .forms-print: a
+       border-collapse table ignores its own padding entirely (that is what
+       left content flush against the paper edges). Padding on the <thead>
+       cell also repeats with it, so page 2+ get the same top margin. */
+    .forms-print > thead > tr > td { padding: 5mm 9mm 0 !important; }
+    .forms-print > tbody > tr > td { padding: 0 9mm 7mm !important; }
     .forms-print .print-dept-line { display: block !important; visibility: visible !important; padding-bottom: 1.5mm; margin-bottom: 2.5mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
     .forms-print .forms-actions, .forms-print form select, .forms-print form input, .forms-print form textarea, .backlink { display: none !important; }
     .forms-print .forms-print-feedback { display: block !important; }
