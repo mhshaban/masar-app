@@ -125,15 +125,20 @@ async function renderStudentsTable(root, onOpen) {
 // طباعة سجل جلسات التوجيه المهني لطالب واحد — نفس تقنية الطباعة المباشرة
 // المعتمدة بالاستمارات وكشف حضور الفعالية (forms-ui.js).
 function careerSessionsPrintMarkup(studentName, sessions) {
-  return `<div class="forms-print" id="career-printable">
-    <div class="topbar"><div><h1>${esc(studentName) || "جلسات التوجيه المهني"}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div></div>
-    <div class="card"><h2>سجل الجلسات</h2>
-      <div class="tablewrap"><table>
-        <thead><tr><th>التاريخ</th><th>الموضوع</th><th>الملاحظات</th><th>التوصية</th></tr></thead>
-        <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.topic)}</td><td>${esc(s.notes) || "—"}</td><td>${esc(s.recommendation) || "—"}</td></tr>`).join("") : '<tr><td colspan="4">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
-      </table></div>
-    </div>
-  </div>`;
+  return `<table class="forms-print" id="career-printable">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>${esc(studentName) || "جلسات التوجيه المهني"}</h1><div class="sub">${sessions.length} جلسة توجيه مهني مسجَّلة</div></div></div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      <div class="card"><h2>سجل الجلسات</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>التاريخ</th><th>الموضوع</th><th>الملاحظات</th><th>التوصية</th></tr></thead>
+          <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.topic)}</td><td>${esc(s.notes) || "—"}</td><td>${esc(s.recommendation) || "—"}</td></tr>`).join("") : '<tr><td colspan="4">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </td></tr></tbody>
+  </table>`;
 }
 
 async function printCareerSessionsDirect(studentName, sessions) {

@@ -243,23 +243,28 @@ const PLAN_ACTION_STATUS_LABELS = { not_started: "لم يبدأ", ongoing: "قي
 // طباعة خطة دعم واحدة (بياناتها + إجراءاتها) — نفس تقنية الطباعة المباشرة
 // المعتمدة بالاستمارات وكشف حضور الفعالية (forms-ui.js).
 function planDetailPrintMarkup(plan, actions) {
-  return `<div class="forms-print" id="plan-printable">
-    <div class="topbar"><div><h1>${esc(plan.domain) || "خطة دعم فردية"}</h1><div class="sub">${esc(plan.studentName) || esc(plan.studentId)}</div></div></div>
-    <div class="card"><h2>بيانات الخطة</h2>
-      <div class="tablewrap"><table>
-        <tr><th>الطالب</th><td>${esc(plan.studentName) || esc(plan.studentId)}</td><th>المجال</th><td>${esc(plan.domain) || "—"}</td></tr>
-        <tr><th>الحالة</th><td>${esc(PLAN_STATUS_LABELS[plan.status] || plan.status)}</td><th>تاريخ البدء</th><td>${esc(plan.startDate) || "—"}</td></tr>
-        ${plan.completedDate ? `<tr><th>تاريخ الإكمال</th><td colspan="3">${esc(plan.completedDate)}</td></tr>` : ""}
-      </table></div>
-    </div>
-    ${plan.goal ? `<div class="card"><h2>الهدف</h2><p>${esc(plan.goal)}</p></div>` : ""}
-    <div class="card"><h2>إجراءات الخطة</h2>
-      <div class="tablewrap"><table>
-        <thead><tr><th>الإجراء</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
-        <tbody>${actions.length ? actions.map((a) => `<tr><td>${esc(a.action)}</td><td>${esc(a.dueDate) || "—"}</td><td>${esc(PLAN_ACTION_STATUS_LABELS[a.status] || a.status)}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد إجراءات مسجَّلة</td></tr>'}</tbody>
-      </table></div>
-    </div>
-  </div>`;
+  return `<table class="forms-print" id="plan-printable">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>${esc(plan.domain) || "خطة دعم فردية"}</h1><div class="sub">${esc(plan.studentName) || esc(plan.studentId)}</div></div></div>
+      <div class="card"><h2>بيانات الخطة</h2>
+        <div class="tablewrap"><table>
+          <tr><th>الطالب</th><td>${esc(plan.studentName) || esc(plan.studentId)}</td><th>المجال</th><td>${esc(plan.domain) || "—"}</td></tr>
+          <tr><th>الحالة</th><td>${esc(PLAN_STATUS_LABELS[plan.status] || plan.status)}</td><th>تاريخ البدء</th><td>${esc(plan.startDate) || "—"}</td></tr>
+          ${plan.completedDate ? `<tr><th>تاريخ الإكمال</th><td colspan="3">${esc(plan.completedDate)}</td></tr>` : ""}
+        </table></div>
+      </div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      ${plan.goal ? `<div class="card"><h2>الهدف</h2><p>${esc(plan.goal)}</p></div>` : ""}
+      <div class="card"><h2>إجراءات الخطة</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>الإجراء</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
+          <tbody>${actions.length ? actions.map((a) => `<tr><td>${esc(a.action)}</td><td>${esc(a.dueDate) || "—"}</td><td>${esc(PLAN_ACTION_STATUS_LABELS[a.status] || a.status)}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد إجراءات مسجَّلة</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </td></tr></tbody>
+  </table>`;
 }
 
 async function printPlanDirect(plan, actions) {

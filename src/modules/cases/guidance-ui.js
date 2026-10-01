@@ -258,23 +258,28 @@ async function renderSessions(root, caseId, refreshDetail) {
 // استنساخ أوراق أنماط الصفحة الحالية (بما فيها .forms-print)، انتظار خط
 // Cairo، ثم طباعة — فيخرج بنفس تنسيق وألوان بقية مستندات القسم.
 function caseDetailPrintMarkup(item, sessions) {
-  return `<div class="forms-print" id="case-printable">
-    <div class="topbar"><div><h1>${esc(item.title) || esc(item.category) || "حالة إرشادية"}</h1><div class="sub">${esc(item.studentName) || esc(item.studentId)}${item.category ? ` — ${esc(item.category)}` : ""}</div></div></div>
-    <div class="card"><h2>بيانات الحالة</h2>
-      <div class="tablewrap"><table>
-        <tr><th>الطالب</th><td>${esc(item.studentName) || esc(item.studentId)}</td><th>الفئة</th><td>${esc(item.category) || "—"}</td></tr>
-        <tr><th>الحالة</th><td>${esc(CASE_STATUS_LABELS[item.status] || item.status)}</td><th>تاريخ الفتح</th><td>${esc(item.openedDate) || "—"}</td></tr>
-        ${item.closedDate ? `<tr><th>تاريخ الإغلاق</th><td colspan="3">${esc(item.closedDate)}</td></tr>` : ""}
-      </table></div>
-    </div>
-    ${item.notes ? `<div class="card"><h2>ملاحظات</h2><p>${esc(item.notes)}</p></div>` : ""}
-    <div class="card"><h2>جلسات المتابعة</h2>
-      <div class="tablewrap"><table>
-        <thead><tr><th>التاريخ</th><th>ملاحظة الجلسة</th><th>الخطوة التالية</th></tr></thead>
-        <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.note)}</td><td>${esc(s.nextStep) || "—"}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
-      </table></div>
-    </div>
-  </div>`;
+  return `<table class="forms-print" id="case-printable">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>${esc(item.title) || esc(item.category) || "حالة إرشادية"}</h1><div class="sub">${esc(item.studentName) || esc(item.studentId)}${item.category ? ` — ${esc(item.category)}` : ""}</div></div></div>
+      <div class="card"><h2>بيانات الحالة</h2>
+        <div class="tablewrap"><table>
+          <tr><th>الطالب</th><td>${esc(item.studentName) || esc(item.studentId)}</td><th>الفئة</th><td>${esc(item.category) || "—"}</td></tr>
+          <tr><th>الحالة</th><td>${esc(CASE_STATUS_LABELS[item.status] || item.status)}</td><th>تاريخ الفتح</th><td>${esc(item.openedDate) || "—"}</td></tr>
+          ${item.closedDate ? `<tr><th>تاريخ الإغلاق</th><td colspan="3">${esc(item.closedDate)}</td></tr>` : ""}
+        </table></div>
+      </div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      ${item.notes ? `<div class="card"><h2>ملاحظات</h2><p>${esc(item.notes)}</p></div>` : ""}
+      <div class="card"><h2>جلسات المتابعة</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>التاريخ</th><th>ملاحظة الجلسة</th><th>الخطوة التالية</th></tr></thead>
+          <tbody>${sessions.length ? sessions.map((s) => `<tr><td>${esc(s.date) || "—"}</td><td>${esc(s.note)}</td><td>${esc(s.nextStep) || "—"}</td></tr>`).join("") : '<tr><td colspan="3">لا توجد جلسات مسجَّلة</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </td></tr></tbody>
+  </table>`;
 }
 
 async function printCaseDirect(item, sessions) {

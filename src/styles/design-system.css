@@ -532,6 +532,18 @@
   .forms-detail-row span { color: var(--ink-500); }
   .forms-detail-row strong { white-space: pre-wrap; font-weight: 600; }
   .forms-danger { color: var(--critical) !important; }
+  /* .forms-print is a literal <table> (not <div>) so that the header block
+     placed in its <thead> repeats natively on every printed page — browsers
+     only repeat a *real* table's <thead> content per page; a div styled with
+     display:table loses that behavior entirely. On screen (and inside the
+     popups before print fires) every table role below is neutralized back to
+     plain block flow so it looks and behaves exactly like the old div stack;
+     @media print further down restores the real table/thead/tbody roles. */
+  .forms-print { display: block; width: auto; border-collapse: collapse; }
+  .forms-print > thead, .forms-print > tbody { display: block; }
+  .forms-print > thead > tr, .forms-print > tbody > tr { display: block; }
+  .forms-print > thead > tr > td, .forms-print > tbody > tr > td { display: block; padding: 0; border: 0; }
+  .print-dept-line { display: none; }
   .forms-print-feedback { display: none; }
   .print-approval { display: none; }
   .forms-empty-print { display: none; }
@@ -548,19 +560,51 @@
   .teachers-table a { color: var(--teal-700); text-decoration: none; font-size: 12px; }
   @media (max-width: 650px) { .forms-grid { grid-template-columns: 1fr; } .forms-wide { grid-column: auto; } .forms-detail-row { grid-template-columns: 1fr; gap: 3px; } }
 
-  /* Zero browser margin suppresses Chrome's automatic title/URL header and footer.
-     The printable form supplies its own controlled A4 padding and department header. */
-  @page { size: A4 portrait; margin: 0; }
+  /* Zero top/side browser margin suppresses Chrome's automatic title/URL
+     header (the printable form supplies its own controlled A4 padding and
+     department header); the bottom margin is reserved for the "صفحة ١ من ٢"
+     counter below, which every major print engine (confirmed: Chromium's,
+     the same Skia/PDF engine Chrome's own "طباعة" / "حفظ كـPDF" use) renders
+     via a @page margin box — verified empirically, not assumed. */
+  @page { size: A4 portrait; margin: 0 0 8mm; }
+  @page {
+    @bottom-center {
+      content: "صفحة " counter(page, arabic-indic) " من " counter(pages, arabic-indic);
+      font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #666;
+    }
+  }
 
   @media print {
-    html, body { width: 210mm; min-height: 297mm; background: #fff !important; color: #000 !important; }
+    /* No min-height here (confirmed by rendering to PDF, not assumed): forcing
+       html/body to a full A4 height while .forms-print's own content is an
+       absolutely positioned, table-based repeating-header element made
+       Chromium's print engine miscount and always append one extra blank
+       page, even for content far short of a single page. @page{size:A4}
+       below already fixes every physical output page at A4 regardless of
+       this element's height, so the min-height was never load-bearing. */
+    html, body { width: 210mm; background: #fff !important; color: #000 !important; }
     .app { display: block !important; min-height: 0; }
     .nav, .toast-region { display: none !important; }
     .main { width: 100% !important; padding: 0 !important; margin: 0 !important; }
     body * { visibility: hidden !important; }
     .forms-print, .forms-print * { visibility: visible !important; }
-    .forms-print { position: absolute; inset: 0 0 auto 0; box-sizing: border-box; width: 210mm; min-height: 0; padding: 5mm 9mm 7mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.3; }
-    .forms-print::before { content: "قسم الإرشاد الأكاديمي والتوجيه المهني"; display: block; visibility: visible !important; padding-bottom: 1.5mm; margin-bottom: 2.5mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
+    .forms-print { position: absolute; inset: 0 0 auto 0; box-sizing: border-box; width: 210mm; min-height: 0; padding: 5mm 9mm 7mm; margin: 0; color: #000 !important; background: #fff !important; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif !important; font-size: 9.5pt; line-height: 1.3; display: table !important; border-collapse: collapse; }
+    /* A real <thead> (table-header-group) is what makes browsers repeat this
+       block — department line + title + the page's context card — on every
+       physical printed page; <tbody> is the flowing part that may split. */
+    .forms-print > thead { display: table-header-group !important; }
+    .forms-print > tbody { display: table-row-group !important; }
+    .forms-print > thead > tr, .forms-print > tbody > tr { display: table-row !important; }
+    /* break-inside must stay auto on these two structural cells specifically
+       (unlike the generic "th, td { break-inside: avoid }" rule below, meant
+       for small data cells) — each one wraps a whole page's worth of flowing
+       content, and forcing either to avoid a break is what was producing a
+       spurious trailing blank page even for short, single-page content
+       (confirmed by rendering to PDF before adding this override). */
+    .forms-print > thead > tr > td, .forms-print > tbody > tr > td { display: table-cell !important; padding: 0 !important; border: 0 !important; break-inside: auto !important; }
+    .forms-print .print-dept-line { display: block !important; visibility: visible !important; padding-bottom: 1.5mm; margin-bottom: 2.5mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 11pt; font-weight: 700; text-align: right; }
     .forms-print .forms-actions, .forms-print form select, .forms-print form input, .forms-print form textarea, .backlink { display: none !important; }
     .forms-print .forms-print-feedback { display: block !important; }
     .forms-print .print-hide-empty-feedback { display: none !important; }
