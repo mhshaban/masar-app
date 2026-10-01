@@ -149,13 +149,15 @@ export async function list(collection) {
   }
 }
 
-// "استبدال كامل لا تراكم" بالاستيراد (termAverages/courseGrades/
-// classSchedules) يحتاج فقط معرّفات الصفوف الحالية لمقارنتها بمعرّفات
-// الملف الجديد (أيها لم يعد له مصدر)، لا محتوى data الكامل. list() كان
-// يُستخدم لهذا الغرض فيسحب jsonb كل صف (حمولة ضخمة بلا داعٍ لجدول بـ٢٠
-// ألف+ صف) — رُصد فعليًا: هذا وحده كان يأخذ ٤٠+ ثانية من صفحات القراءة
-// المتتالية بـcourseGrades، يمدّد "تحديث شامل" لدقائق ويزيد فرصة انقطاع
-// عابر بالشبكة يُظهر خطأ اتصال عام بلا علاقة بالسبب الحقيقي.
+// "استبدال كامل لا تراكم" بالاستيراد (termAverages/courseGrades) يحتاج
+// فقط معرّفات الصفوف الحالية لمقارنتها بمعرّفات الملف الجديد (أيها لم
+// يعد له مصدر)، لا محتوى data الكامل. list() كان يُستخدم لهذا الغرض
+// فيسحب jsonb كل صف (حمولة ضخمة بلا داعٍ لجدول بـ٢٠ ألف+ صف) — رُصد
+// فعليًا: هذا وحده كان يأخذ ٤٠+ ثانية من صفحات القراءة المتتالية
+// بـcourseGrades، يمدّد "تحديث شامل" لدقائق ويزيد فرصة انقطاع عابر
+// بالشبكة يُظهر خطأ اتصال عام بلا علاقة بالسبب الحقيقي. classSchedules
+// لا تستخدمها بعد الآن — حجمها أصغر بكثير، فـclearAll() (مسح بطلب واحد)
+// أبسط وأقل طلبات من مقارنة معرّفات (راجع class-schedule-import-service.js).
 export async function listIds(collection) {
   const backend = testBackend();
   if (backend) return (await backend.list(collection)).map((r) => r.id);
@@ -341,4 +343,22 @@ export async function clear(collection) {
   if (backend) return backend.clear(collection);
   const all = await list(collection);
   await removeMany(collection, all.map((r) => r.id));
+}
+
+// مسح الجدول كاملًا بطلب DELETE واحد فقط — id=not.is.null فلتر يطابق كل
+// صف (يحقق شرط PostgREST بوجود فلتر) بلا حاجة لجلب المعرّفات أولًا أو
+// مقارنتها. يفيد خطوة "استبدال كامل" لمجموعة صغيرة/متوسطة الحجم (الجدول
+// الدراسي مثلًا) حيث فحص المعرّفات القديمة مقابل الجديدة خطوة إضافية
+// بلا داعٍ طالما الاستبدال كامل أصلًا؛ غير مناسب لمجموعة ضخمة (الدرجات)
+// لأن الجدول يصير فارغًا تمامًا لحظيًا بين الحذف وإعادة الإدخال، وأي شاشة
+// تقرأ بالمنتصف تشوف بيانات فارغة.
+export async function clearAll(collection) {
+  const backend = testBackend();
+  if (backend) {
+    const all = await backend.list(collection);
+    for (const row of all) await backend.remove(collection, row.id);
+    return;
+  }
+  await request(`${collection}?id=not.is.null`, { method: "DELETE" });
+  invalidateCollection(collection);
 }
