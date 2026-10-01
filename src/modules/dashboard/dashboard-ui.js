@@ -50,17 +50,45 @@ function dailyReportHtml(snapshot, generatedAt, reminders = []) {
   const rows = attentionRows.filter((r) => isVisiblePriority(`student:${r.studentId}`)).map((r) => `<tr><td>${esc(r.student?.name || r.studentId)}</td><td>${priorityScore(r.needs)}</td><td>${esc(r.needs.flatMap((n) => n.reasons || []).join("؛ "))}</td></tr>`).join("");
   const planRows = [...(planPriorities.overdue || []), ...(planPriorities.upcoming || [])].filter((r) => isVisiblePriority(`plan:${r.id}`)).map((r) => `<tr><td>${esc(r.project_title || r.program_name || r.pillar)}</td><td>${esc(r.action)}</td><td>${esc(r.period_end || r.periodEnd || r.period_start || r.periodStart || "—")}</td></tr>`).join("");
   return `<h1>تقرير أولويات اليوم</h1><p class="meta">تاريخ الإنشاء: ${esc(generatedAt)} — المصدر: GUIDE / Supabase (استعلام مخفف)</p>
-    <h2>الطلاب الأعلى أولوية</h2><table><tr><th>الطالب</th><th>الدرجة</th><th>الأسباب</th></tr>${rows || '<tr><td colspan="3">لا توجد أولويات ظاهرة</td></tr>'}</table>
-    <h2>الحالات الإرشادية المتأخرة</h2><table><tr><th>الطالب</th><th>الفئة</th><th>آخر متابعة</th></tr>${staleCases.filter((r) => isVisiblePriority(`case:${r.id}`)).map((r) => `<tr><td>${esc(r.studentName || r.studentId)}</td><td>${esc(r.category)}</td><td>${esc(r.lastActivity)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
-    <h2>إجراءات الدعم المتأخرة</h2><table><tr><th>الطالب</th><th>الإجراء</th><th>الاستحقاق</th></tr>${overdueSupportActions.filter((r) => isVisiblePriority(`support:${r.id}`)).map((r) => `<tr><td>${esc(r.plan?.studentName || r.plan?.studentId)}</td><td>${esc(r.action)}</td><td>${esc(r.dueDate)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
-    <h2>إجراءات خطة القسم</h2><table><tr><th>المشروع</th><th>الإجراء</th><th>التاريخ</th></tr>${planRows || '<tr><td colspan="3">لا توجد</td></tr>'}</table>
-    <h2>تذكيرات اليوم والمتأخرة</h2><table><tr><th>التذكير</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr>${reminders.map((r) => `<tr><td>${esc(r.title)}</td><td>${esc(r.dueDate || "—")}</td><td>${isOverdue(r) ? "متأخر" : "اليوم"}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</table>`;
+    <h2>الطلاب الأعلى أولوية</h2><table><thead><tr><th>الطالب</th><th>الدرجة</th><th>الأسباب</th></tr></thead><tbody>${rows || '<tr><td colspan="3">لا توجد أولويات ظاهرة</td></tr>'}</tbody></table>
+    <h2>الحالات الإرشادية المتأخرة</h2><table><thead><tr><th>الطالب</th><th>الفئة</th><th>آخر متابعة</th></tr></thead><tbody>${staleCases.filter((r) => isVisiblePriority(`case:${r.id}`)).map((r) => `<tr><td>${esc(r.studentName || r.studentId)}</td><td>${esc(r.category)}</td><td>${esc(r.lastActivity)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</tbody></table>
+    <h2>إجراءات الدعم المتأخرة</h2><table><thead><tr><th>الطالب</th><th>الإجراء</th><th>الاستحقاق</th></tr></thead><tbody>${overdueSupportActions.filter((r) => isVisiblePriority(`support:${r.id}`)).map((r) => `<tr><td>${esc(r.plan?.studentName || r.plan?.studentId)}</td><td>${esc(r.action)}</td><td>${esc(r.dueDate)}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</tbody></table>
+    <h2>إجراءات خطة القسم</h2><table><thead><tr><th>المشروع</th><th>الإجراء</th><th>التاريخ</th></tr></thead><tbody>${planRows || '<tr><td colspan="3">لا توجد</td></tr>'}</tbody></table>
+    <h2>تذكيرات اليوم والمتأخرة</h2><table><thead><tr><th>التذكير</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead><tbody>${reminders.map((r) => `<tr><td>${esc(r.title)}</td><td>${esc(r.dueDate || "—")}</td><td>${isOverdue(r) ? "متأخر" : "اليوم"}</td></tr>`).join("") || '<tr><td colspan="3">لا توجد</td></tr>'}</tbody></table>`;
 }
 
+// نفس تقنية الطباعة المباشرة المعتمدة بالاستمارات وكشف حضور الفعالية
+// (forms-ui.js): العنوان الرئيسي (h1+meta) يوضع بـ<thead> جدول غلاف فيتكرر
+// تلقائيًا أعلى كل صفحة مطبوعة، وبقية الأقسام (h2+جدول لكل قسم) بـ<tbody>
+// فتتدفق بحرية بين الصفحات — بلا حاجة لقياس أو تقسيم يدوي بجافاسكربت.
 function printDailyReport(html) {
   const w = window.open("", "_blank");
   if (!w) return notify("اسمح بالنوافذ المنبثقة لإتمام الطباعة");
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسم الإرشاد الأكاديمي والتوجيه المهني</title><style>@page{size:A4 portrait;margin:0}body{font-family:Cairo,Arial,sans-serif;padding:8mm 9mm;direction:rtl;font-size:9pt;line-height:1.3}body:before{content:"قسم الإرشاد الأكاديمي والتوجيه المهني";display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}th,td{border:1px solid #999;padding:3px 5px;text-align:right}th{background:#1a2744;color:#fff}tr,h1,h2{page-break-inside:avoid;page-break-after:auto}h1{font-size:16pt;margin:0 0 6px}h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}.meta{color:#666;font-size:8pt}.document-approval{margin-top:7mm;padding-top:3mm;border-top:.25mm solid #999;page-break-inside:avoid}.document-approval strong{display:block;margin-bottom:3mm;color:#1a2744}.document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}</style></head><body>${html}<div class="document-approval"><strong>الاعتماد</strong><div><span>يعتمد من: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div></body></html>`);
+  const splitAt = html.indexOf("<h2>");
+  const head = splitAt === -1 ? html : html.slice(0, splitAt);
+  const body = splitAt === -1 ? "" : html.slice(splitAt);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسم الإرشاد الأكاديمي والتوجيه المهني</title><style>
+    @page{size:A4 portrait;margin:0 0 8mm}
+    @page{@bottom-center{content:"صفحة " counter(page,arabic-indic) " من " counter(pages,arabic-indic);font-family:Cairo,Arial,sans-serif;font-size:8.5pt;color:#666}}
+    html,body{margin:0;padding:0}
+    body{font-family:Cairo,Arial,sans-serif;direction:rtl;font-size:9pt;line-height:1.3}
+    table.report-page{width:100%;border-collapse:collapse}
+    table.report-page>thead>tr>td,table.report-page>tbody>tr>td{display:block;padding:8mm 9mm 0}
+    .dept-line{display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}
+    th,td{border:1px solid #999;padding:3px 5px;text-align:right}
+    th{background:#1a2744;color:#fff}
+    tr,h1,h2{page-break-inside:avoid;page-break-after:auto}
+    h1{font-size:16pt;margin:0 0 6px}
+    h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}
+    .meta{color:#666;font-size:8pt}
+    .document-approval{margin-top:7mm;padding-top:3mm;border-top:.25mm solid #999;page-break-inside:avoid}
+    .document-approval strong{display:block;margin-bottom:3mm;color:#1a2744}
+    .document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+  </style></head><body><table class="report-page">
+    <thead><tr><td><div class="dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${head}</td></tr></thead>
+    <tbody><tr><td>${body}<div class="document-approval"><strong>الاعتماد</strong><div><span>يعتمد من: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div></td></tr></tbody>
+  </table></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
 }
 

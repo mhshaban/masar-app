@@ -323,15 +323,21 @@ function workflowBlock(item) {
 }
 
 export function formDetailMarkup(item) {
-  return `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><div class="forms-print" id="form-printable">
-    <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub${item.kind === "consent" ? " print-hide" : ""}">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
-    <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student, item.kind === "consent")}</div>
-    <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
-    <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
-      <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
-      ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
-      <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button>${item.student?.id ? '<button class="btn btn-ghost" type="button" id="forms-open-profile">فتح ملف الطالب</button>' : ""}<button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
-    </form></div>${workflowBlock(item)}${entryFooter(item)}</div>`;
+  return `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><table class="forms-print" id="form-printable">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub${item.kind === "consent" ? " print-hide" : ""}">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
+      <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student, item.kind === "consent")}</div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
+      <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
+        <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
+        ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
+        <div class="forms-actions forms-wide"><button class="btn btn-primary" type="submit">حفظ المتابعة</button><button class="btn btn-ghost" type="button" id="forms-word">تصدير Word</button><button class="btn btn-ghost" type="button" id="forms-print">طباعة</button>${item.student?.id ? '<button class="btn btn-ghost" type="button" id="forms-open-profile">فتح ملف الطالب</button>' : ""}<button class="btn btn-ghost forms-danger" type="button" id="forms-delete">حذف</button></div>
+      </form></div>${workflowBlock(item)}${entryFooter(item)}
+    </td></tr></tbody>
+  </table>`;
 }
 
 async function printFormDirect(id) {
@@ -481,23 +487,28 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
         ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
         : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
     : `<tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr>`;
-  return `<div class="forms-print attendance-print" id="attendance-printable">
-    <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
-    <div class="card"><h2>بيانات الفعالية</h2>
-      <div class="tablewrap"><table>
-        <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
-        <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-        <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
-        <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
-      </table></div>
-    </div>
-    <div class="card attendance-roster"><h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
-      <div class="tablewrap"><table>
-        <thead><tr>${rosterHead}</tr></thead>
-        <tbody>${rosterRows}</tbody>
-      </table></div>
-    </div>
-  </div>`;
+  return `<table class="forms-print attendance-print" id="attendance-printable">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
+      <div class="card"><h2>بيانات الفعالية</h2>
+        <div class="tablewrap"><table>
+          <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
+          <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
+          <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
+          <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
+        </table></div>
+      </div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      <div class="card attendance-roster"><h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
+        <div class="tablewrap"><table>
+          <thead><tr>${rosterHead}</tr></thead>
+          <tbody>${rosterRows}</tbody>
+        </table></div>
+      </div>
+    </td></tr></tbody>
+  </table>`;
 }
 
 async function printAttendanceSheetDirect(data) {
