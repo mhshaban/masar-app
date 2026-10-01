@@ -51,6 +51,23 @@ test("removeMany() URL-encodes each id (Arabic/spaces/dashes) inside the in.() l
   assert.ok(url.includes(`${encodeURIComponent(ids[0])},${encodeURIComponent(ids[1])}`));
 });
 
+test("removeMany() keeps every DELETE URL short even for long Arabic composite ids (production 2026-10-01)", async () => {
+  // تحديث شامل كان يفشل بـ"تعذّر الاتصال" عند حذف 411 صف درجات قديمًا:
+  // 500 معرّف عربي مشفَّر بطلب واحد = رابط ~98 ألف حرف يرفضه الـCDN قبل
+  // الخادم. كل طلب يجب أن يبقى تحت حد آمن، وكل معرّف يُحذف مرة واحدة.
+  requests.length = 0;
+  const ids = Array.from({ length: 411 }, (_, i) => `2022${String(4000 + i)}--الفصل الدراسي الأول - العام الدراسي 2025/2026--انج809`);
+  await removeMany("courseGrades", ids);
+  assert.ok(requests.length > 1);
+  const sent = [];
+  for (const r of requests) {
+    assert.ok(r.url.length < 8000, `URL too long: ${r.url.length}`);
+    const list = r.url.slice(r.url.indexOf("in.(") + 4, -1);
+    sent.push(...list.split(",").map(decodeURIComponent));
+  }
+  assert.deepEqual(sent, ids);
+});
+
 test("removeMany() with an empty id list sends no requests", async () => {
   requests.length = 0;
   await removeMany("courseGrades", []);
