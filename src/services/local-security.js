@@ -2,6 +2,8 @@
 // OneDrive. تُمسح عند تسجيل الخروج، بينما تبقى تفضيلات الواجهة غير الحساسة.
 export const DAILY_PRIORITY_DECISIONS_KEY = "masar-daily-priority-decisions-v1";
 export const LOCAL_FOLDER_HANDLE_DB = "masar-folder-access";
+// ميزة "تصدير التحديثات" المحذوفة كانت تحفظ نسخة من سجل الطلبة هنا؛ يبقى
+// حذفها عند الخروج لتنظيف المتصفحات التي استخدمتها سابقًا.
 export const ROSTER_EXPORT_SNAPSHOT_DB = "masar-roster-export-snapshots";
 
 function removeLocalValue(key) {
