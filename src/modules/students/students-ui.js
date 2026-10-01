@@ -1,7 +1,7 @@
 import { scheduleFromClassScheduleRecords, renderScheduleTable } from "./student-schedule-parser.js?v=2026-09-23-class-schedules-2";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { STUDENT_LEVEL_ORDER, getRosterStatus, getRosterMeta, getLevelTrackBreakdown, searchStudentsPage, listStudentsForSection, getStudent, updateStudent } from "./students-service.js?v=2026-09-06-student-experience-1";
-import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-09-24-no-synthetic-terms-1";
+import { renderAcademicPath } from "../grades/academic-path-ui.js?v=2026-10-01-avg-decimals-1";
 import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=2026-09-07-academic-fix-1";
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-24-batch-remove-fix-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
@@ -9,12 +9,12 @@ import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-l
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-09-22-prep-rating-1";
+import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-10-01-avg-decimals-1";
 import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
 import { listFormsForStudent } from "../forms/forms-service.js?v=2026-09-08-form-fields-1";
-import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
+import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-10-01-avg-decimals-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 
 function esc(str) {

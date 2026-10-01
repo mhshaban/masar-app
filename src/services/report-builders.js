@@ -3,6 +3,8 @@
 // data (fetching sessions/actions per case/plan) and hands it in already
 // shaped; these functions only decide what the document looks like.
 
+import { formatPct } from "../modules/shared/format-pct.js?v=2026-10-01-avg-decimals-1";
+
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -93,7 +95,7 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
       <tr><th>الرقم الشخصي</th><td>${esc(student.civilId || "—")}</td><th>المستوى والشعبة</th><td>${esc(student.level || "—")} / ${esc(student.section || "—")}</td></tr>
       <tr><th>المسار/التخصص</th><td colspan="3">${esc(student.track || student.specialization || "—")}</td></tr>
       ${isConsent ? "" : `<tr><th>رغبة التخصص</th><td>${esc(student.specializationPreference ?? "") || "—"}</td><th>الحد الأدنى للتخصص</th><td>${esc(student.minSpecializationThreshold ?? "") || "—"}</td></tr>`}
-      <tr><th>المعدل التراكمي النهائي</th><td colspan="3">${student.finalCumulativeAverage == null ? "—" : `${esc(student.finalCumulativeAverage)}٪`}</td></tr>
+      <tr><th>المعدل التراكمي النهائي</th><td colspan="3">${student.finalCumulativeAverage == null ? "—" : `${formatPct(student.finalCumulativeAverage)}٪`}</td></tr>
     </table>
     <h2>بيانات الاستمارة</h2><table>${rows || '<tr><td>لا توجد بيانات إضافية</td></tr>'}</table>
     ${item.feedback || item.feedbackDate ? `<h2>الإجراء والتغذية الراجعة</h2><table><tr><th>الحالة</th><td>${esc(statuses[item.status] || item.status || "—")}</td><th>تاريخ الرد</th><td>${esc(item.feedbackDate || "—")}</td></tr><tr><th>التغذية الراجعة</th><td colspan="3">${esc(item.feedback || "—")}</td></tr></table>` : ""}
@@ -263,11 +265,11 @@ export function buildStudentProfileReportHtml(data, exportedAt) {
     </table>` : ""}
 
     <h2>المسار الأكاديمي</h2>
-    <table><tr><th>المعدل التراكمي النهائي</th><td>${academicSummary.finalCumulativeAverage == null ? "—" : `${esc(academicSummary.finalCumulativeAverage)}٪`}</td></tr></table>
+    <table><tr><th>المعدل التراكمي النهائي</th><td>${academicSummary.finalCumulativeAverage == null ? "—" : `${formatPct(academicSummary.finalCumulativeAverage)}٪`}</td></tr></table>
     ${termTimeline.length ? `
       <table>
         <tr><th>الفصل</th><th>المعدل</th><th>التقدير</th></tr>
-        ${termTimeline.map((t) => `<tr><td>${esc(t.term)}</td><td>${t.averagePct == null ? "—" : `${esc(t.averagePct)}٪`}</td><td>${esc(t.rating || "—")}</td></tr>`).join("")}
+        ${termTimeline.map((t) => `<tr><td>${esc(t.term)}</td><td>${t.averagePct == null ? "—" : `${formatPct(t.averagePct)}٪`}</td><td>${esc(t.rating || "—")}</td></tr>`).join("")}
       </table>` : '<p class="meta">لا توجد معدلات فصلية رسمية بعد.</p>'}
     ${academicSummary.subjects.length ? `
       <table>

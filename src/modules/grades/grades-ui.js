@@ -1,6 +1,7 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-09-22-prep-rating-1";
-import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-09-14-cumulative-average-fix-1";
+import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-10-01-avg-decimals-1";
+import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
+import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-10-01-avg-decimals-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 
 function esc(str) {
@@ -22,7 +23,7 @@ async function getAcademicStats() {
   // له سوى مواد قليلة من شهادته.
   const overallValues = flags.map((f) => f.finalCumulativeAverage ?? f.overallPct).filter((v) => v != null);
   const overallAvg = overallValues.length
-    ? Math.round(overallValues.reduce((sum, v) => sum + Number(v), 0) / overallValues.length)
+    ? overallValues.reduce((sum, v) => sum + Number(v), 0) / overallValues.length
     : 0;
 
   const bySubject = new Map();
@@ -34,7 +35,7 @@ async function getAcademicStats() {
     }
   }
   const subjectStats = [...bySubject.entries()]
-    .map(([subject, pcts]) => ({ subject, count: pcts.length, avgPct: Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) }))
+    .map(([subject, pcts]) => ({ subject, count: pcts.length, avgPct: pcts.reduce((a, b) => a + b, 0) / pcts.length }))
     .sort((a, b) => a.avgPct - b.avgPct);
 
   return { studentCount: flags.length, overallAvg, subjectStats };
@@ -49,7 +50,7 @@ async function renderAnalyticsTab(root) {
   root.innerHTML = `
     <div class="grid g4" style="margin-bottom:16px;">
       <div class="card stat"><div class="label">طلاب لديهم بيانات أكاديمية</div><div class="value">${stats.studentCount}</div></div>
-      <div class="card stat"><div class="label">المعدل العام</div><div class="value">${stats.overallAvg}٪</div></div>
+      <div class="card stat"><div class="label">المعدل العام</div><div class="value">${formatPct(stats.overallAvg)}٪</div></div>
     </div>
     <div class="card">
       <h2>المعدل حسب المقرر</h2>
@@ -58,7 +59,7 @@ async function renderAnalyticsTab(root) {
         <thead><tr><th>المقرر</th><th>عدد الطلاب</th><th>المعدل</th></tr></thead>
         <tbody>
           ${stats.subjectStats.map((s) => `
-            <tr><td>${esc(s.subject)}</td><td class="num">${s.count}</td><td class="num">${s.avgPct}٪</td></tr>
+            <tr><td>${esc(s.subject)}</td><td class="num">${s.count}</td><td class="num">${formatPct(s.avgPct)}٪</td></tr>
           `).join("")}
         </tbody>
       </table></div>
@@ -119,7 +120,7 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
               <tr data-goto-student="${esc(r.studentId)}">
                 <td>${esc(r.studentName) || esc(r.studentId)}</td>
                 <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
-                <td class="num" style="font-weight:700;">${r.avgPct}٪</td>
+                <td class="num" style="font-weight:700;">${formatPct(r.avgPct)}٪</td>
                 <td><span class="pill ${tierPill(r.tier)}">${esc(r.rating)}</span></td>
                 <td>${r.weakSubjects.length ? esc(r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ")) : "—"}</td>
               </tr>

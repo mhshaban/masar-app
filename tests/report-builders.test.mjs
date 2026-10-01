@@ -177,7 +177,7 @@ test("buildStudentProfileReportHtml includes every section with real data", () =
   assert.match(html, /2026001/);
   assert.match(html, /مدرسة الرفاع الإعدادية للبنين/);
   assert.match(html, /94\.25٪/);
-  assert.match(html, /88\.5٪/);
+  assert.match(html, /88\.50٪/);
   assert.match(html, /جيد جدًا/);
   assert.match(html, /متابعة معدل/);
   assert.match(html, /جلسة أولى/);

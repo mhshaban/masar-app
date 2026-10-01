@@ -76,7 +76,7 @@ function toText(v) {
 function toPercentFromFraction(v) {
   if (v == null || v === "") return null;
   const n = Number(v);
-  return Number.isFinite(n) ? Math.round(n * 1000) / 10 : null;
+  return Number.isFinite(n) ? Math.round(n * 10000) / 100 : null;
 }
 
 // عنوان فصل يضم الفصل/السنة صراحة — يبقى فريدًا عبر كل سنوات الأرشيف

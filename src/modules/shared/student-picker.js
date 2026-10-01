@@ -1,5 +1,5 @@
 import { searchStudents } from "../students/students-service.js";
-import { loadAcademicFlagsMap, studentQuickInfo, studentQuickInfoLine } from "./student-quick-info.js";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickInfoLine } from "./student-quick-info.js?v=2026-10-01-avg-decimals-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

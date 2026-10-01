@@ -4,9 +4,9 @@ import {
   listActions, addAction, cycleActionStatus, removeAction, listCandidates,
 } from "./support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudent } from "../students/students-service.js";
-import { mountStudentPicker } from "../shared/student-picker.js?v=2026-09-22-student-context-1";
-import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js";
-import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-09-17-attendance-checkbox-1";
+import { mountStudentPicker } from "../shared/student-picker.js?v=2026-10-01-avg-decimals-1";
+import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js?v=2026-10-01-avg-decimals-1";
+import { buildSupportPlansReportHtml } from "../../services/report-builders.js?v=2026-10-01-avg-decimals-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
