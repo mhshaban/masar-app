@@ -62,6 +62,18 @@ export async function listSessions(caseId) {
   return sessions.filter((s) => s.caseId === caseId).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
 
+// إحصائية أعلى شاشة الجلسات والمقابلات: مجموع الجلسات المسجَّلة بكل الحالات
+// (جلسات حالة محذوفة لا تُحسب).
+export async function getCaseStats() {
+  const [cases, sessions] = await Promise.all([listAll("guidanceCases"), listAll("caseSessions")]);
+  const caseIds = new Set(cases.map((c) => c.id));
+  return {
+    sessionsCount: sessions.filter((s) => caseIds.has(s.caseId)).length,
+    casesCount: cases.length,
+    openCount: cases.filter((c) => c.status !== "closed").length,
+  };
+}
+
 export async function addSession(caseId, { date, note, nextStep }) {
   if (!note || !note.trim()) throw new Error("ملاحظة الجلسة مطلوبة");
   return save("caseSessions", {

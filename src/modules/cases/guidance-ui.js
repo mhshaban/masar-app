@@ -1,8 +1,8 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import {
   CASE_CATEGORIES, listCases, getCase, createCase, updateCase, closeCase, reopenCase, removeCase,
-  listSessions, addSession, removeSession, listCandidates,
-} from "./guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
+  listSessions, addSession, removeSession, listCandidates, getCaseStats,
+} from "./guidance-service.js?v=2026-10-06-session-stats-1";
 import { getStudent } from "../students/students-service.js";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-10-01-avg-decimals-1";
 import { loadAcademicFlagsMap, studentQuickInfo, studentQuickCard } from "../shared/student-quick-info.js?v=2026-10-01-avg-decimals-1";
@@ -416,6 +416,7 @@ export async function mountCasesView(container, options = {}) {
       <div><h1>الجلسات والمقابلات الإرشادية</h1></div>
       <div class="forms-actions"><button class="btn btn-ghost" id="cases-export-excel-btn">تصدير Excel</button><button class="btn btn-ghost" id="cases-export-btn">تصدير Word</button></div>
     </div>
+    <div id="cases-stats" class="grid g3" style="margin-bottom:16px;"></div>
     <div id="cases-new-form" style="margin-bottom:16px;"></div>
     <div id="cases-table" style="margin-bottom:16px;"></div>
     <div id="cases-candidates"></div>
@@ -429,6 +430,11 @@ export async function mountCasesView(container, options = {}) {
   };
 
   showNewForm(prefillStudent, null);
+  const stats = await getCaseStats();
+  container.querySelector("#cases-stats").innerHTML = `
+    <div class="card stat"><div class="label">مجموع الجلسات والمقابلات</div><div class="value">${stats.sessionsCount}</div></div>
+    <div class="card stat"><div class="label">الحالات الإرشادية</div><div class="value">${stats.casesCount}</div></div>
+    <div class="card stat"><div class="label">الحالات المفتوحة</div><div class="value">${stats.openCount}</div></div>`;
   await renderCasesTable(container.querySelector("#cases-table"), openDetail);
   await renderCandidates(container.querySelector("#cases-candidates"), showNewForm);
 
