@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { COLLECTIONS } from "../src/core/config.js";
 import { clear, bulkPut } from "../src/services/cloud-runtime.js";
-import { listStaleOpenCases, listCasesForStudent } from "../src/modules/cases/guidance-service.js";
+import { listStaleOpenCases, listCasesForStudent, getCaseStats } from "../src/modules/cases/guidance-service.js";
 
 beforeEach(async () => {
   for (const name of COLLECTIONS) await clear(name);
@@ -65,4 +65,16 @@ test("listCasesForStudent returns only that student's cases (open and closed), n
   ]);
   const rows = await listCasesForStudent("s1");
   assert.deepEqual(rows.map((c) => c.id), ["c2", "c1"]);
+});
+
+test("getCaseStats totals sessions across all cases, skipping sessions of a deleted case", async () => {
+  await bulkPut("guidanceCases", [
+    { id: "c1", studentId: "s1", status: "open" },
+    { id: "c2", studentId: "s2", status: "closed" },
+  ]);
+  await bulkPut("caseSessions", [
+    { id: "a", caseId: "c1" }, { id: "b", caseId: "c1" }, { id: "c", caseId: "c2" },
+    { id: "orphan", caseId: "deleted-case" },
+  ]);
+  assert.deepEqual(await getCaseStats(), { sessionsCount: 3, casesCount: 2, openCount: 1 });
 });
