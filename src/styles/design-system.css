@@ -649,6 +649,8 @@
        لبقية بطاقات forms-print): لو تجاوزت المساحة المتبقية بأي طارئ، يفيض
        صفّان أو ثلاثة لصفحة تالية بدل دفع الجدول كاملًا لصفحة شبه فارغة. */
     .attendance-print .attendance-roster { break-inside: auto; }
+    /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
+    .forms-print .card.print-flow { break-inside: auto; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }

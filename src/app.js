@@ -16,7 +16,7 @@ const VIEW_LOADERS = {
   plan: async () => (await import("./modules/department-plan/department-plan-ui.js?v=2026-10-01-avg-decimals-1")).mountDepartmentPlanView,
   agenda: async () => (await import("./modules/agenda/agenda-ui.js?v=2026-10-01-avg-decimals-1")).mountAgendaView,
   students: async () => (await import("./modules/students/students-ui.js?v=2026-10-01-avg-decimals-1")).mountStudentsView,
-  locations: async () => (await import("./modules/schedule/section-locations-ui.js?v=2026-10-08-section-locations-1")).mountSectionLocationsView,
+  locations: async () => (await import("./modules/schedule/section-locations-ui.js?v=2026-10-08-locations-print-1")).mountSectionLocationsView,
   grades: async () => (await import("./modules/grades/grades-ui.js?v=2026-10-01-avg-decimals-1")).mountGradesView,
   cases: async () => (await import("./modules/cases/guidance-ui.js?v=2026-10-06-session-stats-1")).mountCasesView,
   support: async () => (await import("./modules/support/support-ui.js?v=2026-10-01-avg-decimals-1")).mountSupportView,
