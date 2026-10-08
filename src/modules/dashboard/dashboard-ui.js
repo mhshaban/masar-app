@@ -95,9 +95,17 @@ function printDailyReport(html) {
 
 // نُسخة "التذكيرات" كاملة (عرض + إضافة + تبديل/حذف) منقولة داخل الرئيسية —
 // لم تعد شاشة مستقلة، فالمستخدم ما يحتاج يتنقل لتبويب ثانٍ عشان تذكيراته.
+// يبقى قسم "كل التذكيرات" مفتوحًا بين إعادات الرسم (إضافة/تعديل/استرجاع).
+let allRemindersOpen = false;
+
 async function renderRemindersCard(root) {
   const allReminders = await listReminders();
   const reminders = allReminders.filter((r) => r.status !== "done" && (isDueToday(r) || isOverdue(r)));
+  // التذكيرات المنجزة والقادمة وبلا تاريخ لا تظهر بالقائمة الرئيسية — كانت
+  // تختفي بلا أي مكان لاسترجاعها، فتُعرض هنا بقسم مستقل قابل للفتح.
+  const shown = new Set(reminders.map((r) => r.id));
+  const upcoming = allReminders.filter((r) => r.status !== "done" && !shown.has(r.id));
+  const done = allReminders.filter((r) => r.status === "done").reverse();
 
   root.innerHTML = `
       <div class="card-head"><h2>تذكيرات اليوم والمتأخرة</h2><span class="pill pill-warning">${reminders.length}</span></div>
@@ -113,29 +121,28 @@ async function renderRemindersCard(root) {
       <button class="btn btn-primary" type="submit">إضافة</button>
     </form>
     <div id="dashboard-reminders-list"></div>
+    <details id="dashboard-reminders-all" style="margin-top:14px;"${allRemindersOpen ? " open" : ""}>
+      <summary style="cursor:pointer; font-weight:700;">كل التذكيرات — القادمة وبلا تاريخ (${upcoming.length}) · المنجزة (${done.length})</summary>
+      <div id="dashboard-reminders-all-list" style="margin-top:10px;"></div>
+    </details>
   `;
+  root.querySelector("#dashboard-reminders-all").addEventListener("toggle", (e) => { allRemindersOpen = e.target.open; });
 
   const inputStyle = "padding:7px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;";
   let editingId = null;
-  const drawList = () => {
-    const listRoot = root.querySelector("#dashboard-reminders-list");
-    if (!reminders.length) {
-      listRoot.innerHTML = '<p class="hint">لا توجد تذكيرات مستحقة اليوم أو متأخرة.</p>';
-      return;
-    }
-    listRoot.innerHTML = `<ul class="plain">${reminders.map((r) => {
-      const overdue = isOverdue(r);
-      const dueToday = isDueToday(r);
-      const badge = r.status === "done"
-        ? '<span class="pill pill-success">منجز</span>'
-        : overdue
-          ? '<span class="pill pill-critical">متأخر</span>'
-          : dueToday
-            ? '<span class="pill pill-warning">اليوم</span>'
-            : r.dueDate
-              ? `<span class="pill pill-neutral">${esc(r.dueDate)}</span>`
-              : '<span class="pill pill-neutral">بلا تاريخ</span>';
-      if (r.id === editingId) return `
+
+  const rowHtml = (r) => {
+    const isDone = r.status === "done";
+    const badge = isDone
+      ? '<span class="pill pill-success">منجز</span>'
+      : isOverdue(r)
+        ? '<span class="pill pill-critical">متأخر</span>'
+        : isDueToday(r)
+          ? '<span class="pill pill-warning">اليوم</span>'
+          : r.dueDate
+            ? `<span class="pill pill-neutral">${esc(r.dueDate)}</span>`
+            : '<span class="pill pill-neutral">بلا تاريخ</span>';
+    if (r.id === editingId) return `
         <li class="row-item" data-id="${esc(r.id)}">
           <form data-action="edit-form" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex:1;">
             <input name="title" required value="${esc(r.title)}" aria-label="عنوان التذكير" style="flex:2; min-width:180px; ${inputStyle}">
@@ -144,40 +151,51 @@ async function renderRemindersCard(root) {
             <button class="link-btn" type="button" data-action="edit-cancel">إلغاء</button>
           </form>
         </li>`;
-      return `
+    return `
         <li class="row-item" data-id="${esc(r.id)}">
-          <button class="box" data-action="toggle" aria-label="تبديل الحالة" style="width:20px;height:20px;border:1.5px solid var(--border);border-radius:6px;flex:0 0 auto;background:${r.status === "done" ? "var(--success)" : "transparent"};color:#fff;border-color:${r.status === "done" ? "var(--success)" : "var(--border)"};cursor:pointer;">${r.status === "done" ? "✓" : ""}</button>
+          <button class="box" data-action="toggle" aria-label="${isDone ? "استرجاع التذكير" : "تعليم كمنجز"}" style="width:20px;height:20px;border:1.5px solid var(--border);border-radius:6px;flex:0 0 auto;background:${isDone ? "var(--success)" : "transparent"};color:#fff;border-color:${isDone ? "var(--success)" : "var(--border)"};cursor:pointer;">${isDone ? "✓" : ""}</button>
           <div class="body">
-            <div class="title" style="${r.status === "done" ? "text-decoration:line-through;color:var(--ink-500);" : ""}">${esc(r.title)}</div>
+            <div class="title" style="${isDone ? "text-decoration:line-through;color:var(--ink-500);" : ""}">${esc(r.title)}</div>
           </div>
           ${badge}
-          <button class="link-btn" data-action="edit">تعديل</button>
+          ${isDone ? '<button class="link-btn" data-action="toggle">استرجاع</button>' : '<button class="link-btn" data-action="edit">تعديل</button>'}
           <button class="link-btn" data-action="delete" aria-label="حذف" style="color:var(--critical);">حذف</button>
         </li>`;
-    }).join("")}</ul>`;
+  };
+  const listHtml = (rows, emptyText) => rows.length ? `<ul class="plain">${rows.map(rowHtml).join("")}</ul>` : `<p class="hint">${emptyText}</p>`;
 
-    listRoot.querySelectorAll("[data-action='toggle']").forEach((btn) => {
+  const drawList = () => {
+    root.querySelector("#dashboard-reminders-list").innerHTML = listHtml(reminders, "لا توجد تذكيرات مستحقة اليوم أو متأخرة.");
+    root.querySelector("#dashboard-reminders-all-list").innerHTML = `
+      <div class="hint" style="font-weight:700; margin-bottom:4px;">القادمة وبلا تاريخ</div>
+      ${listHtml(upcoming, "لا توجد تذكيرات قادمة أو بلا تاريخ.")}
+      <div class="hint" style="font-weight:700; margin:12px 0 4px;">المنجزة</div>
+      ${listHtml(done, "لا توجد تذكيرات منجزة.")}`;
+
+    const find = (el) => allReminders.find((r) => r.id === el.closest("[data-id]").dataset.id);
+    root.querySelectorAll("[data-action='toggle']").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const id = btn.closest("[data-id]").dataset.id;
-        await toggleReminder(reminders.find((r) => r.id === id));
+        const reminder = find(btn);
+        await toggleReminder(reminder);
+        notify(reminder.status === "done" ? "تم استرجاع التذكير" : "تم تعليم التذكير كمنجز — تجده في «كل التذكيرات» لو احتجت استرجاعه");
         await renderRemindersCard(root);
       });
     });
-    listRoot.querySelectorAll("[data-action='edit']").forEach((btn) => {
+    root.querySelectorAll("[data-action='edit']").forEach((btn) => {
       btn.addEventListener("click", () => {
-        editingId = btn.closest("[data-id]").dataset.id;
+        editingId = find(btn).id;
         drawList();
-        listRoot.querySelector("[data-action='edit-form'] [name=title]")?.focus();
+        root.querySelector("[data-action='edit-form'] [name=title]")?.focus();
       });
     });
-    listRoot.querySelector("[data-action='edit-cancel']")?.addEventListener("click", () => {
+    root.querySelector("[data-action='edit-cancel']")?.addEventListener("click", () => {
       editingId = null;
       drawList();
     });
-    listRoot.querySelector("[data-action='edit-form']")?.addEventListener("submit", async (e) => {
+    root.querySelector("[data-action='edit-form']")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const form = e.target;
-      const reminder = reminders.find((r) => r.id === editingId);
+      const reminder = allReminders.find((r) => r.id === editingId);
       try {
         await updateReminder(reminder, { title: form.title.value, dueDate: form.dueDate.value });
         notify("تم حفظ تعديل التذكير");
@@ -186,10 +204,9 @@ async function renderRemindersCard(root) {
         notify(err.message);
       }
     });
-    listRoot.querySelectorAll("[data-action='delete']").forEach((btn) => {
+    root.querySelectorAll("[data-action='delete']").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const id = btn.closest("[data-id]").dataset.id;
-        await removeReminder(id);
+        await removeReminder(find(btn).id);
         await renderRemindersCard(root);
       });
     });
