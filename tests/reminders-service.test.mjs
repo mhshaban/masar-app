@@ -2,7 +2,7 @@ import './helpers/fake-cloud-backend.mjs';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { clear } from '../src/services/cloud-runtime.js';
-import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from '../src/modules/reminders/reminders-service.js';
+import { listReminders, addReminder, toggleReminder, updateReminder, removeReminder, isOverdue, isDueToday } from '../src/modules/reminders/reminders-service.js';
 
 function bahrainToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bahrain', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -68,4 +68,17 @@ test('isDueToday is true only for a reminder due exactly today and still open', 
   assert.equal(isDueToday({ dueDate: today, status: 'open' }), true);
   assert.equal(isDueToday({ dueDate: yesterday, status: 'open' }), false);
   assert.equal(isDueToday({ dueDate: today, status: 'done' }), false);
+});
+
+test('updateReminder changes title and due date, keeps status, and rejects an empty title', async () => {
+  const created = await addReminder({ title: 'قديم', dueDate: yesterday });
+  await updateReminder(created, { title: '  جديد  ', dueDate: tomorrow });
+  const [saved] = await listReminders();
+  assert.equal(saved.id, created.id);
+  assert.equal(saved.title, 'جديد');
+  assert.equal(saved.dueDate, tomorrow);
+  assert.equal(saved.status, 'open');
+  await updateReminder(saved, { title: 'بلا تاريخ', dueDate: '' });
+  assert.equal((await listReminders())[0].dueDate, null);
+  await assert.rejects(() => updateReminder(saved, { title: ' ', dueDate: today }), /عنوان التذكير/);
 });
