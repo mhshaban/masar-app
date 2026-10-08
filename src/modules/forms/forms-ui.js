@@ -496,8 +496,8 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
         <div class="tablewrap"><table>
           <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
           <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-          <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td>${students.length}</td><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td></tr>
-          <tr><th>المعلم المرافق الثاني</th><td colspan="3">${esc(teachers[1]) || "—"}</td></tr>
+          <tr><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td><th>المعلم المرافق الثاني</th><td>${esc(teachers[1]) || "—"}</td></tr>
+          <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
         </table></div>
       </div>
     </td></tr></thead>
