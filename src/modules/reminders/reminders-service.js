@@ -24,6 +24,11 @@ export async function toggleReminder(reminder) {
   return save("reminders", { ...reminder, status: reminder.status === "open" ? "done" : "open" });
 }
 
+export async function updateReminder(reminder, { title, dueDate }) {
+  if (!title || !title.trim()) throw new Error("عنوان التذكير مطلوب");
+  return save("reminders", { ...reminder, title: title.trim(), dueDate: dueDate || null });
+}
+
 export async function removeReminder(id) {
   return remove("reminders", id);
 }

@@ -1,6 +1,6 @@
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { listReminders, addReminder, toggleReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js";
+import { listReminders, addReminder, toggleReminder, updateReminder, removeReminder, isOverdue, isDueToday } from "../reminders/reminders-service.js?v=2026-10-08-reminder-edit-1";
 import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
@@ -115,6 +115,8 @@ async function renderRemindersCard(root) {
     <div id="dashboard-reminders-list"></div>
   `;
 
+  const inputStyle = "padding:7px 10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--surface); color:inherit;";
+  let editingId = null;
   const drawList = () => {
     const listRoot = root.querySelector("#dashboard-reminders-list");
     if (!reminders.length) {
@@ -133,6 +135,15 @@ async function renderRemindersCard(root) {
             : r.dueDate
               ? `<span class="pill pill-neutral">${esc(r.dueDate)}</span>`
               : '<span class="pill pill-neutral">بلا تاريخ</span>';
+      if (r.id === editingId) return `
+        <li class="row-item" data-id="${esc(r.id)}">
+          <form data-action="edit-form" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex:1;">
+            <input name="title" required value="${esc(r.title)}" aria-label="عنوان التذكير" style="flex:2; min-width:180px; ${inputStyle}">
+            <input name="dueDate" type="date" value="${esc(r.dueDate || "")}" aria-label="تاريخ الاستحقاق" style="${inputStyle}">
+            <button class="btn btn-primary" type="submit">حفظ</button>
+            <button class="link-btn" type="button" data-action="edit-cancel">إلغاء</button>
+          </form>
+        </li>`;
       return `
         <li class="row-item" data-id="${esc(r.id)}">
           <button class="box" data-action="toggle" aria-label="تبديل الحالة" style="width:20px;height:20px;border:1.5px solid var(--border);border-radius:6px;flex:0 0 auto;background:${r.status === "done" ? "var(--success)" : "transparent"};color:#fff;border-color:${r.status === "done" ? "var(--success)" : "var(--border)"};cursor:pointer;">${r.status === "done" ? "✓" : ""}</button>
@@ -140,6 +151,7 @@ async function renderRemindersCard(root) {
             <div class="title" style="${r.status === "done" ? "text-decoration:line-through;color:var(--ink-500);" : ""}">${esc(r.title)}</div>
           </div>
           ${badge}
+          <button class="link-btn" data-action="edit">تعديل</button>
           <button class="link-btn" data-action="delete" aria-label="حذف" style="color:var(--critical);">حذف</button>
         </li>`;
     }).join("")}</ul>`;
@@ -150,6 +162,29 @@ async function renderRemindersCard(root) {
         await toggleReminder(reminders.find((r) => r.id === id));
         await renderRemindersCard(root);
       });
+    });
+    listRoot.querySelectorAll("[data-action='edit']").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        editingId = btn.closest("[data-id]").dataset.id;
+        drawList();
+        listRoot.querySelector("[data-action='edit-form'] [name=title]")?.focus();
+      });
+    });
+    listRoot.querySelector("[data-action='edit-cancel']")?.addEventListener("click", () => {
+      editingId = null;
+      drawList();
+    });
+    listRoot.querySelector("[data-action='edit-form']")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const reminder = reminders.find((r) => r.id === editingId);
+      try {
+        await updateReminder(reminder, { title: form.title.value, dueDate: form.dueDate.value });
+        notify("تم حفظ تعديل التذكير");
+        await renderRemindersCard(root);
+      } catch (err) {
+        notify(err.message);
+      }
     });
     listRoot.querySelectorAll("[data-action='delete']").forEach((btn) => {
       btn.addEventListener("click", async () => {
