@@ -558,13 +558,18 @@ async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
             <td class="num">${esc(s.date) || "—"}</td>
             <td>${esc(s.location) || "—"}</td>
             <td class="num">${(s.students || []).length}</td>
-            <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(s.id)}" type="button">تعديل</button><button class="btn btn-ghost forms-danger" data-remove="${esc(s.id)}" type="button">حذف</button></div></td>
+            <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(s.id)}" type="button">تعديل</button><button class="btn btn-ghost" data-print="${esc(s.id)}" type="button">طباعة</button><button class="btn btn-ghost forms-danger" data-remove="${esc(s.id)}" type="button">حذف</button></div></td>
           </tr>
         `).join("")}</tbody>
       </table></div>` : `<div class="empty">${isCandidates ? "لا توجد كشوف مرشحين محفوظة بعد" : "لا توجد كشوف حضور محفوظة بعد"}</div>`}
   </div>`;
   root.querySelector("#attendance-new-btn").addEventListener("click", onNew);
   root.querySelectorAll("[data-edit]").forEach((btn) => btn.addEventListener("click", () => onEdit(btn.dataset.edit)));
+  root.querySelectorAll("[data-print]").forEach((btn) => btn.addEventListener("click", async () => {
+    const sheet = sheets.find((s) => s.id === btn.dataset.print);
+    const day = sheet.day || (sheet.date ? new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(new Date(sheet.date)) : "");
+    await printAttendanceSheetDirect({ ...sheet, day, teachers: sheet.teachers || [], students: sheet.students || [], kind });
+  }));
   root.querySelectorAll("[data-remove]").forEach((btn) => btn.addEventListener("click", async () => {
     if (!await confirmDialog(isCandidates ? "حذف كشف المرشحين هذا نهائيًا؟" : "حذف كشف الحضور هذا نهائيًا؟")) return;
     await removeAttendanceSheet(btn.dataset.remove);
