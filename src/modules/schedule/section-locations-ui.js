@@ -54,7 +54,7 @@ function locationsPrintMarkup(groups, state) {
     </td></tr></thead>
     <tbody><tr><td>
       ${groups.filter((g) => g.sections.length).map((g) => `
-        <div class="card print-flow"><h2>${esc(g.label)} (${g.sections.length})</h2>
+        <div class="card print-flow print-own-page"><h2>${esc(g.label)} (${g.sections.length})</h2>
           <div class="tablewrap"><table>
             <thead><tr><th>الشعبة</th><th>القاعة</th><th>المقرر</th><th>المعلم</th>${state.session ? "" : "<th>الفترة</th>"}</tr></thead>
             <tbody>${g.sections.map((s) => `<tr>

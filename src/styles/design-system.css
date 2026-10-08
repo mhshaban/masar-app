@@ -651,6 +651,8 @@
     .attendance-print .attendance-roster { break-inside: auto; }
     /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
     .forms-print .card.print-flow { break-inside: auto; }
+    /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
+    .forms-print .card.print-own-page + .card.print-own-page { break-before: page; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
