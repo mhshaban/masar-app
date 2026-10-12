@@ -227,7 +227,8 @@ test("buildAttendanceSheetReportHtml lists event info (including location and ti
   assert.match(html, /الخميس/);
   assert.match(html, /2026-09-17/);
   assert.match(html, /09:00 ص — 11:30 ص/);
-  assert.match(html, /محمد أحمد، سارة خالد/);
+  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>محمد أحمد<\/td>/);
+  assert.match(html, /<th>المعلم المرافق الثاني<\/th><td>سارة خالد<\/td>/);
   assert.match(html, />2</); // عدد الطلبة المشاركين
   assert.match(html, /طالب أول/);
   assert.match(html, /١تلم١/);
@@ -247,7 +248,7 @@ test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers, 
   const html = buildAttendanceSheetReportHtml({ title: "", day: "", date: "", teachers: ["", ""], students: [] }, "2026-09-17");
   assert.match(html, /كشف حضور فعالية/);
   assert.match(html, /لا يوجد طلبة مختارون/);
-  assert.match(html, /<th>المعلمون المرافقون<\/th><td colspan="3">—<\/td>/);
+  assert.match(html, /<th>المعلم المرافق<\/th><td colspan="3">—<\/td>/);
   assert.match(html, /<th>مكان الفعالية<\/th><td>—<\/td><th>الفترة<\/th><td>—<\/td>/);
 });
 
@@ -274,4 +275,16 @@ test('buildAttendanceSheetReportHtml with kind "candidates" falls back to a cand
   const html = buildAttendanceSheetReportHtml({ title: "", date: "", kind: "candidates", students: [] }, "2026-09-17");
   assert.match(html, /كشف طلاب مرشحين لفعالية/);
   assert.match(html, /لا يوجد طلبة مختارون/);
+});
+
+test("buildAttendanceSheetReportHtml lists each accompanying teacher with a phone, numbers extra teachers, and puts the student count after them", () => {
+  const html = buildAttendanceSheetReportHtml({
+    title: "ورشة", date: "2026-10-18",
+    teachers: ["محمد حسن شعبان", "", "حسن حبيب حسن"],
+    teacherPhones: ["33445566", "", ""],
+    students: [{ academicId: "1", name: "طالب" }],
+  }, "2026-10-12");
+  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>محمد حسن شعبان<\/td><th>رقم التواصل<\/th><td><span dir="ltr">33445566<\/span><\/td>/);
+  assert.match(html, /<th>المعلم المرافق الثاني<\/th><td>حسن حبيب حسن<\/td><th>رقم التواصل<\/th><td>—<\/td>/);
+  assert.ok(html.indexOf("المعلم المرافق الثاني") < html.indexOf("عدد الطلبة المشاركين"));
 });

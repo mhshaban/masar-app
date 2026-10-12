@@ -338,10 +338,31 @@ function formatTimeRange(startTime, endTime) {
   return start || end || "";
 }
 
+const TEACHER_ORDINALS = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+
+export function accompanyingTeacherLabel(index) {
+  return `المعلم المرافق ${TEACHER_ORDINALS[index] || index + 1}`;
+}
+
+// المعلمون المرافقون بكشف الحضور/المرشحين: الأسماء بـteachers والأرقام
+// بمصفوفة موازية teacherPhones (الكشوف المحفوظة قبل إضافة الأرقام لا تحملها،
+// فتُقرأ بلا رقم). الصفوف الفارغة تمامًا تُستبعد، والترقيم بعد الاستبعاد.
+export function accompanyingTeachers({ teachers = [], teacherPhones = [] } = {}) {
+  return teachers
+    .map((name, i) => ({ name: String(name || "").trim(), phone: String(teacherPhones[i] || "").trim() }))
+    .filter((t) => t.name || t.phone)
+    .map((t, i) => ({ ...t, label: accompanyingTeacherLabel(i) }));
+}
+
+export function accompanyingTeacherRowsHtml(data) {
+  const rows = accompanyingTeachers(data);
+  if (!rows.length) return '<tr><th>المعلم المرافق</th><td colspan="3">—</td></tr>';
+  return rows.map((t) => `<tr><th>${t.label}</th><td>${esc(t.name) || "—"}</td><th>رقم التواصل</th><td>${t.phone ? `<span dir="ltr">${esc(t.phone)}</span>` : "—"}</td></tr>`).join("");
+}
+
 export function buildAttendanceSheetReportHtml(data, exportedAt) {
-  const { title, location, day, date, startTime, endTime, teachers = [], students = [], kind } = data;
+  const { title, location, day, date, startTime, endTime, students = [], kind } = data;
   const isCandidates = kind === "candidates";
-  const teacherNames = teachers.filter((t) => String(t || "").trim());
   const timeRange = formatTimeRange(startTime, endTime);
   return `
     <h1>${esc(title || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية"))}</h1>
@@ -349,8 +370,8 @@ export function buildAttendanceSheetReportHtml(data, exportedAt) {
     <table>
       <tr><th>اليوم</th><td>${esc(day) || "—"}</td><th>التاريخ</th><td>${esc(date) || "—"}</td></tr>
       <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
+      ${accompanyingTeacherRowsHtml(data)}
       <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
-      <tr><th>المعلمون المرافقون</th><td colspan="3">${teacherNames.length ? teacherNames.map(esc).join("، ") : "—"}</td></tr>
     </table>
     <h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
     <table>

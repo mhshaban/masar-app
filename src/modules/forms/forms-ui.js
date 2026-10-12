@@ -10,7 +10,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml } from "../../services/report-builders.js?v=2026-10-01-avg-decimals-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeacherRowsHtml } from "../../services/report-builders.js?v=2026-10-12-teacher-phones-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -477,7 +477,7 @@ function attendanceTimeRange({ startTime, endTime }) {
 // وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
 // وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
 // واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
-function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, students, kind }) {
+function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, teacherPhones, students, kind }) {
   const isCandidates = kind === "candidates";
   const timeRange = attendanceTimeRange({ startTime, endTime });
   const rosterHead = isCandidates
@@ -496,7 +496,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
         <div class="tablewrap"><table>
           <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
           <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-          <tr><th>المعلم المرافق الأول</th><td>${esc(teachers[0]) || "—"}</td><th>المعلم المرافق الثاني</th><td>${esc(teachers[1]) || "—"}</td></tr>
+          ${accompanyingTeacherRowsHtml({ teachers, teacherPhones })}
           <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
         </table></div>
       </div>
@@ -567,8 +567,10 @@ async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
   root.querySelectorAll("[data-edit]").forEach((btn) => btn.addEventListener("click", () => onEdit(btn.dataset.edit)));
   root.querySelectorAll("[data-print]").forEach((btn) => btn.addEventListener("click", async () => {
     const sheet = sheets.find((s) => s.id === btn.dataset.print);
+    const directory = new Map((await listTeachers()).filter((t) => t.name && t.phone).map((t) => [t.name.trim(), String(t.phone).trim()]));
+    const teacherPhones = (sheet.teachers || []).map((name, i) => sheet.teacherPhones?.[i] || directory.get(String(name || "").trim()) || "");
     const day = sheet.day || (sheet.date ? new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(new Date(sheet.date)) : "");
-    await printAttendanceSheetDirect({ ...sheet, day, teachers: sheet.teachers || [], students: sheet.students || [], kind });
+    await printAttendanceSheetDirect({ ...sheet, day, teachers: sheet.teachers || [], teacherPhones, students: sheet.students || [], kind });
   }));
   root.querySelectorAll("[data-remove]").forEach((btn) => btn.addEventListener("click", async () => {
     if (!await confirmDialog(isCandidates ? "حذف كشف المرشحين هذا نهائيًا؟" : "حذف كشف الحضور هذا نهائيًا؟")) return;
@@ -584,6 +586,14 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   ]);
   if (sheetId && !existing) { notify(isCandidates ? "كشف المرشحين غير موجود" : "كشف الحضور غير موجود"); await onDone(); return; }
   const teacherNames = teachers.map((t) => t.name).filter(Boolean);
+  const directoryPhone = new Map(teachers.filter((t) => t.name && t.phone).map((t) => [t.name.trim(), String(t.phone).trim()]));
+  // صف لكل معلم مرافق (الاسم + الرقم). الكشوف القديمة بلا أرقام محفوظة تأخذ
+  // الرقم من بيانات المعلمين تلقائيًا؛ يبقى صفّان على الأقل كما كان سابقًا.
+  let teacherRows = (existing?.teachers || []).map((name, i) => ({
+    name: String(name || ""),
+    phone: String(existing?.teacherPhones?.[i] || directoryPhone.get(String(name || "").trim()) || ""),
+  }));
+  while (teacherRows.length < 2) teacherRows.push({ name: "", phone: "" });
 
   let mode = "section";
   let sectionRoster = [];
@@ -602,8 +612,11 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       ${field("التاريخ", "date", "date", true, existing?.date || today())}
       ${field("من الساعة", "startTime", "time", false, existing?.startTime || "")}
       ${field("إلى الساعة", "endTime", "time", false, existing?.endTime || "")}
-      <label class="forms-field"><span>المعلم المرافق الأول</span><input name="teacher1" list="attendance-teachers-list" autocomplete="off" value="${esc(existing?.teachers?.[0] || "")}"></label>
-      <label class="forms-field"><span>المعلم المرافق الثاني</span><input name="teacher2" list="attendance-teachers-list" autocomplete="off" value="${esc(existing?.teachers?.[1] || "")}"></label>
+      <div class="forms-field forms-wide">
+        <span>المعلمون المرافقون</span>
+        <div id="attendance-teachers"></div>
+        <div><button class="btn btn-ghost" type="button" id="attendance-add-teacher">+ إضافة معلم مرافق</button></div>
+      </div>
       <datalist id="attendance-teachers-list">${teacherNames.map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>
       <div class="forms-field forms-wide">
         <span>اختيار الطلبة</span>
@@ -623,6 +636,42 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   </div>`;
 
   root.querySelector("#attendance-back").addEventListener("click", onDone);
+
+  const teachersRoot = root.querySelector("#attendance-teachers");
+  const syncTeacherRows = () => {
+    teacherRows = [...teachersRoot.querySelectorAll("[data-teacher-row]")].map((row) => ({
+      name: row.querySelector("[data-role=name]").value.trim(),
+      phone: row.querySelector("[data-role=phone]").value.trim(),
+    }));
+  };
+  const renderTeacherRows = () => {
+    teachersRoot.innerHTML = teacherRows.map((t, i) => `
+      <div data-teacher-row style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+        <strong style="min-width:150px; color:var(--ink-700);">${esc(accompanyingTeacherLabel(i))}</strong>
+        <input data-role="name" list="attendance-teachers-list" autocomplete="off" placeholder="اسم المعلم" value="${esc(t.name)}" aria-label="${esc(accompanyingTeacherLabel(i))}" style="flex:2 1 200px;">
+        <input data-role="phone" type="tel" dir="ltr" placeholder="رقم التواصل" value="${esc(t.phone)}" aria-label="رقم تواصل ${esc(accompanyingTeacherLabel(i))}" style="flex:1 1 130px;">
+        ${i >= 2 ? '<button class="link-btn forms-danger" type="button" data-role="remove">حذف</button>' : ""}
+      </div>`).join("");
+    teachersRoot.querySelectorAll("[data-teacher-row]").forEach((row, i) => {
+      const nameInput = row.querySelector("[data-role=name]");
+      const phoneInput = row.querySelector("[data-role=phone]");
+      // رقم المعلم يُعبّأ من بيانات المعلمين عند اختيار اسمه، ما لم يكتب
+      // المستخدم رقمًا بنفسه (حينها لا يُستبدل).
+      phoneInput.addEventListener("input", () => { delete phoneInput.dataset.auto; });
+      nameInput.addEventListener("change", () => {
+        const phone = directoryPhone.get(nameInput.value.trim());
+        if (phone && (!phoneInput.value.trim() || phoneInput.dataset.auto)) { phoneInput.value = phone; phoneInput.dataset.auto = "1"; }
+      });
+      row.querySelector("[data-role=remove]")?.addEventListener("click", () => {
+        syncTeacherRows(); teacherRows.splice(i, 1); renderTeacherRows();
+      });
+    });
+  };
+  renderTeacherRows();
+  root.querySelector("#attendance-add-teacher").addEventListener("click", () => {
+    syncTeacherRows(); teacherRows.push({ name: "", phone: "" }); renderTeacherRows();
+    teachersRoot.querySelector("[data-teacher-row]:last-child [data-role=name]")?.focus();
+  });
 
   const pickerRoot = root.querySelector("#attendance-picker");
   const previewRoot = root.querySelector("#attendance-students-preview");
@@ -716,6 +765,8 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   });
 
   const buildData = () => {
+    syncTeacherRows();
+    const filledTeachers = teacherRows.filter((t) => t.name || t.phone);
     const values = Object.fromEntries(new FormData(root.querySelector("#attendance-form")).entries());
     const students = currentStudents();
     const day = values.date ? new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(new Date(values.date)) : "";
@@ -726,7 +777,8 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       day,
       startTime: values.startTime || "",
       endTime: values.endTime || "",
-      teachers: [values.teacher1 || "", values.teacher2 || ""],
+      teachers: filledTeachers.map((t) => t.name),
+      teacherPhones: filledTeachers.map((t) => t.phone),
       students,
       kind,
     };
