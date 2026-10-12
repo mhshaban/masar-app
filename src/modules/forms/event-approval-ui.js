@@ -85,7 +85,7 @@ export function eventApprovalMarkup(raw) {
         </table></div>
       </div>
       <div class="card"><h2>أهم الملاحظات</h2>${multi(d.notes)}</div>
-      <div class="print-approval form-workflow"><strong>اعتماد مدير(ة) المدرسة</strong><div class="workflow-signatures"><span>الاسم: ................................</span><span>التوقيع: ................................</span><span>ختم المدرسة:</span></div></div>
+      <div class="print-approval form-workflow"><strong>اعتماد مدير المدرسة</strong><div class="workflow-signatures"><span>الاسم: ................................</span><span>التوقيع: ................................</span><span>ختم المدرسة:</span></div></div>
     </td></tr></tbody>
   </table>`;
 }
