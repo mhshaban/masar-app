@@ -15,7 +15,7 @@ import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-pr
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
-import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-event-approval-3";
+import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-print-spacing-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
@@ -329,11 +329,11 @@ export function formDetailMarkup(item) {
   return `<button class="backlink" id="forms-back">رجوع لسجل الاستمارات</button><table class="forms-print" id="form-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
-      <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub${item.kind === "consent" ? " print-hide" : ""}">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
+      <div class="topbar"><div><h1>${esc(item.title)}</h1><div class="sub print-hide">تاريخ الطلب: ${esc(item.createdDate || "—")}</div></div>${statusPill(item.status)}</div>
       <div class="card"><h2>بيانات الطالب</h2>${studentCard(item.student, item.kind === "consent")}</div>
     </td></tr></thead>
     <tbody><tr><td>
-      <div class="card"><h2>بيانات الاستمارة</h2>${detailFields(item)}</div>
+      <div class="card"><h2>بيانات الاستمارة</h2>${item.kind === "consent" ? "" : `<div class="forms-detail-row print-only"><span>تاريخ الطلب</span><strong>${esc(item.createdDate || "—")}</strong></div>`}${detailFields(item)}</div>
       <div class="card${!item.feedback && !item.feedbackDate ? " print-hide-empty-feedback" : ""}"><h2>الإجراء والتغذية الراجعة</h2><div class="forms-print-feedback"><div class="forms-detail-row"><span>الحالة</span><strong>${esc(({ pending: "بانتظار الإجراء", in_progress: "قيد الإجراء", completed: "مكتملة", rejected: "مرفوضة" })[item.status] || "—")}</strong></div><div class="forms-detail-row"><span>تاريخ التغذية الراجعة</span><strong>${esc(item.feedbackDate || "—")}</strong></div><div class="forms-detail-row"><span>التغذية الراجعة / الإجراء المتخذ</span><strong>${esc(item.feedback || "—")}</strong></div></div><form id="feedback-form" class="forms-grid">
         <label class="forms-field"><span>حالة الطلب</span><select name="status"><option value="pending">بانتظار الإجراء</option><option value="in_progress">قيد الإجراء</option><option value="completed">مكتملة</option><option value="rejected">مرفوضة</option></select></label>
         ${field("تاريخ التغذية الراجعة", "feedbackDate", "date", false, item.feedbackDate || "")}${area("التغذية الراجعة / الإجراء المتخذ", "feedback", false, item.feedback || "")}
@@ -479,12 +479,14 @@ function attendanceTimeRange({ startTime, endTime }) {
 // وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
 // وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
 // واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
-// حتى ٤ مرافقين: صف لكل معلم؛ أكثر من ذلك: معلّمان بكل صف، حتى تبقى ترويسة
-// الكشف أقل من ربع الصفحة فيكرّرها المتصفح بكل صفحة.
-const MAX_SINGLE_TEACHER_ROWS = 4;
+// مرافقان: صف لكل معلم؛ أكثر من ذلك: معلّمان بكل صف، حتى تبقى ترويسة الكشف
+// أقل من ربع الصفحة فيكرّرها المتصفح بكل صفحة (٤ مرافقين بصف لكل معلم = ٢٧٥px
+// بتباعد الصفوف المريح، فوق الحد).
+const MAX_SINGLE_TEACHER_ROWS = 2;
 // فوق هذا العدد من الطلبة يُطبع الكشف بصفوف أكثف لعله يتسع بصفحة واحدة؛ لو
-// لم يتسع، تتكرر الترويسة بالصفحات التالية. القيم مقيسة بتصيير PDF فعلي.
-const DENSE_ROSTER_FROM = { attendance: 38, candidates: 38 };
+// لم يتسع، تتكرر الترويسة بالصفحات التالية. القيم مقيسة بتصيير PDF فعلي:
+// العادي يتسع لـ٣٦ طالبًا، والأكثف لـ٤٤ (بأطول ترويسة).
+const DENSE_ROSTER_FROM = { attendance: 36, candidates: 36 };
 
 function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, teacherPhones, students, kind }) {
   const isCandidates = kind === "candidates";
@@ -501,7 +503,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
   return `<table class="forms-print attendance-print${dense ? " attendance-dense" : ""}" id="attendance-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
-      <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
+      <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1></div></div>
       <div class="card event-info"><h2>بيانات الفعالية</h2>
         <div class="tablewrap"><table>
           <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
