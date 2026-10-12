@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
-  buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml,
+  buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherRowsHtml,
 } from "../src/services/report-builders.js";
 
 test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
@@ -287,4 +287,11 @@ test("buildAttendanceSheetReportHtml lists each accompanying teacher with a phon
   assert.match(html, /<th>المعلم المرافق الأول<\/th><td>محمد حسن شعبان<\/td><th>رقم التواصل<\/th><td><span dir="ltr">33445566<\/span><\/td>/);
   assert.match(html, /<th>المعلم المرافق الثاني<\/th><td>حسن حبيب حسن<\/td><th>رقم التواصل<\/th><td>—<\/td>/);
   assert.ok(html.indexOf("المعلم المرافق الثاني") < html.indexOf("عدد الطلبة المشاركين"));
+});
+
+test("accompanyingTeacherRowsHtml paired puts two teachers per row with name · phone, padding an odd last row", () => {
+  const html = accompanyingTeacherRowsHtml({ teachers: ["أ", "ب", "ج"], teacherPhones: ["111", "", "333"] }, { paired: true });
+  assert.equal((html.match(/<tr>/g) || []).length, 2);
+  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>أ · <span dir="ltr">111<\/span><\/td><th>المعلم المرافق الثاني<\/th><td>ب<\/td>/);
+  assert.match(html, /<th>المعلم المرافق الثالث<\/th><td>ج · <span dir="ltr">333<\/span><\/td><th><\/th><td><\/td>/);
 });
