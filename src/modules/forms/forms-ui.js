@@ -15,7 +15,7 @@ import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-la
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
-import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-event-approval-1";
+import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-event-approval-2";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
