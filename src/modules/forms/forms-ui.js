@@ -483,10 +483,10 @@ function attendanceTimeRange({ startTime, endTime }) {
 // أقل من ربع الصفحة فيكرّرها المتصفح بكل صفحة (٤ مرافقين بصف لكل معلم = ٢٧٥px
 // بتباعد الصفوف المريح، فوق الحد).
 const MAX_SINGLE_TEACHER_ROWS = 2;
-// فوق هذا العدد من الطلبة يُطبع الكشف بصفوف أكثف لعله يتسع بصفحة واحدة؛ لو
-// لم يتسع، تتكرر الترويسة بالصفحات التالية. القيم مقيسة بتصيير PDF فعلي:
-// العادي يتسع لـ٣٦ طالبًا، والأكثف لـ٤٤ (بأطول ترويسة).
-const DENSE_ROSTER_FROM = { attendance: 36, candidates: 36 };
+// قائمة الطلبة تُقسَّم بنفسها: ٣٥ طالبًا بحد أقصى في كل صفحة، كل جزء بطاقة
+// كاملة (عنوانها ورأس أعمدتها وإطارها المغلق) تبدأ صفحة جديدة، بنفس التباعد
+// المريح في كل الصفحات. ٣٥ أقل من السعة المقيسة (٣٦ بأطول ترويسة).
+const ROSTER_ROWS_PER_PAGE = 35;
 
 function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, teacherPhones, students, kind }) {
   const isCandidates = kind === "candidates";
@@ -494,13 +494,25 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
   const rosterHead = isCandidates
     ? "<th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>اسم الطالب</th><th>الشعبة</th><th>أرقام التواصل</th>"
     : "<th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th>";
-  const rosterRows = students.length
-    ? students.map((s, i) => isCandidates
-        ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
-        : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
-    : `<tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr>`;
-  const dense = students.length > DENSE_ROSTER_FROM[isCandidates ? "candidates" : "attendance"];
-  return `<table class="forms-print attendance-print${dense ? " attendance-dense" : ""}" id="attendance-printable">
+  const studentRow = (s, i) => isCandidates
+    ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
+    : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`;
+  const rosterTitle = isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين";
+  const chunks = [];
+  for (let start = 0; start < students.length; start += ROSTER_ROWS_PER_PAGE) chunks.push(start);
+  const rosterCards = chunks.length
+    ? chunks.map((start) => {
+        const part = students.slice(start, start + ROSTER_ROWS_PER_PAGE);
+        const range = chunks.length > 1 ? ` <span class="roster-range">(من ${start + 1} إلى ${start + part.length})</span>` : "";
+        return `<div class="card attendance-roster"><h2>${rosterTitle}${range}</h2>
+        <div class="tablewrap"><table>
+          <thead><tr>${rosterHead}</tr></thead>
+          <tbody>${part.map((s, i) => studentRow(s, start + i)).join("")}</tbody>
+        </table></div>
+      </div>`;
+      }).join("")
+    : `<div class="card attendance-roster"><h2>${rosterTitle}</h2><div class="tablewrap"><table><thead><tr>${rosterHead}</tr></thead><tbody><tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr></tbody></table></div></div>`;
+  return `<table class="forms-print attendance-print" id="attendance-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
       <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1></div></div>
@@ -514,12 +526,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
       </div>
     </td></tr></thead>
     <tbody><tr><td>
-      <div class="card attendance-roster"><h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
-        <div class="tablewrap"><table>
-          <thead><tr>${rosterHead}</tr></thead>
-          <tbody>${rosterRows}</tbody>
-        </table></div>
-      </div>
+      ${rosterCards}
     </td></tr></tbody>
   </table>`;
 }

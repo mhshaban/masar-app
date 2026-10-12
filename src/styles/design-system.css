@@ -680,16 +680,17 @@
     /* ===== كشوف الحضور والمرشحين =====
        نفس نِسب القالب العام بدرجة أكثف واحدة (لا قيم متفرقة لكل جزء): خلايا
        بيانات الفعالية وقائمة الطلبة بنفس الحشوة والخط، والمسافة بين البطاقات
-       ثابتة. فوق DENSE_ROSTER_FROM طالبًا تنتقل القائمة وحدها لدرجة أكثف.
+       ثابتة، وقائمة الطلبة ٣٥ طالبًا بحد أقصى في كل صفحة.
        القيم مقيسة بتصيير PDF فعلي (السعة وارتفاع الترويسة). */
     .attendance-print .card { margin: 0 0 2.5mm; }
     .attendance-print .card h2 { padding: .9mm var(--head-x); font-size: 10pt; }
     .attendance-print table { font-size: 8pt; line-height: 1.3; }
     .attendance-print th, .attendance-print td { padding: .9mm 2.4mm; }
-    /* بطاقة قائمة الطلبة تحديدًا لا تُمنع من الانقسام بين الصفحات (خلافًا
-       لبقية بطاقات forms-print): لو تجاوزت المساحة المتبقية بأي طارئ، يفيض
-       صفّان أو ثلاثة لصفحة تالية بدل دفع الجدول كاملًا لصفحة شبه فارغة. */
-    .attendance-print .attendance-roster { break-inside: auto; }
+    /* القائمة مقسَّمة مسبقًا (٣٥ طالبًا لكل بطاقة، forms-ui.js): كل بطاقة تبقى
+       كاملة بإطارها المغلق، وكل بطاقة بعد الأولى تبدأ صفحة جديدة. */
+    .attendance-print .attendance-roster { break-inside: avoid; }
+    .attendance-print .attendance-roster + .attendance-roster { break-before: page; }
+    .attendance-print .roster-range { color: var(--p-muted) !important; font-weight: 600; font-size: 9pt; }
     /* صفوف القائمة تُميَّز بالتظليل المتناوب وحده بلا أسطر فاصلة: سطر لكل صف
        يأكل ~١px × عدد الطلبة ويُسقط صفوفًا من سعة الصفحة الواحدة. */
     .attendance-print .attendance-roster td { border-bottom: 0 !important; }
@@ -699,9 +700,6 @@
     .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 2.5mm; font-size: 10pt; }
     .attendance-print .topbar { margin: 0 0 2.5mm; }
     .attendance-print .topbar h1 { font-size: 14pt; }
-    /* كشف طويل: القائمة وحدها بدرجة أكثف (نفس النسب، خط وحشوة أصغر قليلًا). */
-    .attendance-print.attendance-dense .attendance-roster table { font-size: 7.5pt; line-height: 1.25; }
-    .attendance-print.attendance-dense .attendance-roster th, .attendance-print.attendance-dense .attendance-roster td { padding: .6mm 2.4mm; }
     /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
     .forms-print .card.print-flow { break-inside: auto; }
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
