@@ -14,6 +14,8 @@ import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompan
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
+import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
+import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-event-approval-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
@@ -521,32 +523,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
 }
 
 async function printAttendanceSheetDirect(data) {
-  const popup = window.open("", "_blank");
-  if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
-  popup.document.body.textContent = "جارٍ تجهيز الكشف للطباعة…";
-  try {
-    popup.document.open();
-    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(data.title) || "كشف حضور فعالية"}</title></head><body><main id="attendance-root"></main></body></html>`);
-    popup.document.close();
-    popup.document.documentElement.dataset.theme = document.documentElement.dataset.theme || "light";
-    const root = popup.document.getElementById("attendance-root");
-    root.innerHTML = attendanceSheetMarkup(data);
-    const styles = [...document.querySelectorAll('link[rel="stylesheet"]')].map((source) => new Promise((resolve, reject) => {
-      const link = popup.document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = source.href;
-      link.onload = resolve;
-      link.onerror = () => reject(new Error("تعذّر تحميل تنسيق الطباعة؛ حاول مرة ثانية."));
-      popup.document.head.appendChild(link);
-    }));
-    for (const source of document.querySelectorAll("style")) popup.document.head.appendChild(source.cloneNode(true));
-    await Promise.all(styles);
-    if (popup.closed) return;
-    await Promise.all([400, 600, 700, 800].map((weight) => popup.document.fonts.load(`${weight} 12px "Cairo"`, "بيانات الطالب")));
-    await popup.document.fonts.ready;
-    if (popup.closed) return;
-    popup.requestAnimationFrame(() => { if (!popup.closed) { popup.focus(); popup.print(); } });
-  } catch (error) { if (!popup.closed) popup.close(); notify(error.message || "تعذّرت طباعة الكشف."); }
+  await printMarkupInPopup(data.title || (data.kind === "candidates" ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية"), attendanceSheetMarkup(data));
 }
 
 async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
@@ -852,7 +829,7 @@ export async function mountTeachersView(container) {
 
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وكشوف الفعاليات</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -866,7 +843,8 @@ export async function mountFormsView(container, options = {}) {
         await renderLog(content, openDetail, openEdit);
       }
       else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
-      else await renderAttendanceSheet(content, "candidates");
+      else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
+      else await renderEventApprovals(content);
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);
       content.innerHTML = `<div class="card"><div class="empty" role="alert">تعذر تحميل البيانات من الخادم. تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مجددًا.<br><button class="btn btn-primary" id="forms-retry" style="margin-top:12px;">إعادة المحاولة</button></div></div>`;

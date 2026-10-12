@@ -19,7 +19,8 @@ function currentActor() {
 
 function validate(data) {
   if (!String(data.title || "").trim()) throw new Error("اكتب عنوان الفعالية أولًا");
-  if (!data.students?.length) throw new Error("اختر الطلبة المشاركين أولًا");
+  // استمارة اعتماد الفعالية (kind = "approval") تُحفظ بنفس الجدول بلا قائمة طلبة.
+  if (data.kind !== "approval" && !data.students?.length) throw new Error("اختر الطلبة المشاركين أولًا");
 }
 
 export async function listAttendanceSheets() {
