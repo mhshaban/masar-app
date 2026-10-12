@@ -354,9 +354,18 @@ export function accompanyingTeachers({ teachers = [], teacherPhones = [] } = {})
     .map((t, i) => ({ ...t, label: accompanyingTeacherLabel(i) }));
 }
 
-export function accompanyingTeacherRowsHtml(data) {
+// paired: معلّمان بكل صف (الاسم · الرقم بخلية واحدة) — للطباعة المباشرة عند
+// كثرة المرافقين، كي تبقى ترويسة الكشف قصيرة بما يكفي ليكرّرها المتصفح بكل
+// صفحة (Chromium لا يكرّر رأس جدول يتجاوز ربع ارتفاع الصفحة تقريبًا).
+export function accompanyingTeacherRowsHtml(data, { paired = false } = {}) {
   const rows = accompanyingTeachers(data);
   if (!rows.length) return '<tr><th>المعلم المرافق</th><td colspan="3">—</td></tr>';
+  if (paired) {
+    const cell = (t) => `<th>${t.label}</th><td>${esc(t.name) || "—"}${t.phone ? ` · <span dir="ltr">${esc(t.phone)}</span>` : ""}</td>`;
+    const out = [];
+    for (let i = 0; i < rows.length; i += 2) out.push(`<tr>${cell(rows[i])}${rows[i + 1] ? cell(rows[i + 1]) : "<th></th><td></td>"}</tr>`);
+    return out.join("");
+  }
   return rows.map((t) => `<tr><th>${t.label}</th><td>${esc(t.name) || "—"}</td><th>رقم التواصل</th><td>${t.phone ? `<span dir="ltr">${esc(t.phone)}</span>` : "—"}</td></tr>`).join("");
 }
 

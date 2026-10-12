@@ -10,7 +10,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeacherRowsHtml } from "../../services/report-builders.js?v=2026-10-12-teacher-phones-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeacherRowsHtml, accompanyingTeachers } from "../../services/report-builders.js?v=2026-10-12-attendance-fit-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -477,6 +477,13 @@ function attendanceTimeRange({ startTime, endTime }) {
 // وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
 // وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
 // واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
+// حتى ٤ مرافقين: صف لكل معلم؛ أكثر من ذلك: معلّمان بكل صف، حتى تبقى ترويسة
+// الكشف أقل من ربع الصفحة فيكرّرها المتصفح بكل صفحة.
+const MAX_SINGLE_TEACHER_ROWS = 4;
+// فوق هذا العدد من الطلبة يُطبع الكشف بصفوف أكثف لعله يتسع بصفحة واحدة؛ لو
+// لم يتسع، تتكرر الترويسة بالصفحات التالية. القيم مقيسة بتصيير PDF فعلي.
+const DENSE_ROSTER_FROM = { attendance: 38, candidates: 38 };
+
 function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, teacherPhones, students, kind }) {
   const isCandidates = kind === "candidates";
   const timeRange = attendanceTimeRange({ startTime, endTime });
@@ -488,15 +495,16 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
         ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
         : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`).join("")
     : `<tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr>`;
-  return `<table class="forms-print attendance-print" id="attendance-printable">
+  const dense = students.length > DENSE_ROSTER_FROM[isCandidates ? "candidates" : "attendance"];
+  return `<table class="forms-print attendance-print${dense ? " attendance-dense" : ""}" id="attendance-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
       <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1><div class="sub">${esc(day) || "—"} ${date ? `— ${esc(date)}` : ""}</div></div></div>
-      <div class="card"><h2>بيانات الفعالية</h2>
+      <div class="card event-info"><h2>بيانات الفعالية</h2>
         <div class="tablewrap"><table>
           <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
           <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-          ${accompanyingTeacherRowsHtml({ teachers, teacherPhones })}
+          ${accompanyingTeacherRowsHtml({ teachers, teacherPhones }, { paired: accompanyingTeachers({ teachers, teacherPhones }).length > MAX_SINGLE_TEACHER_ROWS })}
           <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
         </table></div>
       </div>

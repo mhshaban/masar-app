@@ -649,6 +649,19 @@
        لبقية بطاقات forms-print): لو تجاوزت المساحة المتبقية بأي طارئ، يفيض
        صفّان أو ثلاثة لصفحة تالية بدل دفع الجدول كاملًا لصفحة شبه فارغة. */
     .attendance-print .attendance-roster { break-inside: auto; }
+    /* ترويسة الكشف (القسم + العنوان + بيانات الفعالية) يجب أن تبقى أقل من ربع
+       ارتفاع الصفحة: Chromium لا يكرّر رأس جدول أطول من ذلك بالصفحات التالية
+       (مؤكَّد بالقياس: ٢ مرافقَين = ٢٦٥px تتكرر، ٤ = ٣٠٥px لا تتكرر). */
+    .attendance-print > thead > tr > td { padding-top: 4mm !important; }
+    .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 1.5mm; font-size: 10pt; }
+    .attendance-print .topbar { margin: 0 0 1.5mm; }
+    .attendance-print .topbar h1 { font-size: 14pt; }
+    .attendance-print .card.event-info { padding: 1.8mm 3mm; margin: 0 0 2mm; }
+    .attendance-print .card.event-info h2 { font-size: 10pt; margin: 0 0 .8mm; }
+    .attendance-print .card.event-info th, .attendance-print .card.event-info td { padding: .45mm 1.6mm; }
+    /* كشف طويل: صفوف أكثف لعل القائمة كلها تتسع بصفحة واحدة. */
+    .attendance-print.attendance-dense .attendance-roster table { font-size: 7pt; line-height: 1.05; }
+    .attendance-print.attendance-dense .attendance-roster th, .attendance-print.attendance-dense .attendance-roster td { padding: .3mm 1.4mm; }
     /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
     .forms-print .card.print-flow { break-inside: auto; }
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
