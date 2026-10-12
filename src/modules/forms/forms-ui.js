@@ -10,7 +10,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeacherRowsHtml, accompanyingTeachers } from "../../services/report-builders.js?v=2026-10-12-attendance-fit-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeachers, accompanyingTeachersTableHtml } from "../../services/report-builders.js?v=2026-10-12-teachers-card-1";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -475,18 +475,18 @@ function attendanceTimeRange({ startTime, endTime }) {
   return start || end || "";
 }
 
-// بطاقة بيانات الفعالية بجدول مضغوط (زوجان لكل صف) بدل صف كامل لكل حقل —
-// وclass إضافي "attendance-print" (راجع design-system.css) يُحكم به تباعد
-// وحجم خط جدول الطلبة تحديدًا، ليتسع كشف حضور فعالية بـ٣٠ طالبًا بصفحة A4
-// واحدة عند الطباعة (تأكَّد بالقياس الفعلي، لا تخمينًا — راجع اختبار الطباعة).
-// مرافقان: صف لكل معلم؛ أكثر من ذلك: معلّمان بكل صف، حتى تبقى ترويسة الكشف
-// أقل من ربع الصفحة فيكرّرها المتصفح بكل صفحة (٤ مرافقين بصف لكل معلم = ٢٧٥px
-// بتباعد الصفوف المريح، فوق الحد).
-const MAX_SINGLE_TEACHER_ROWS = 2;
-// قائمة الطلبة تُقسَّم بنفسها: ٣٥ طالبًا بحد أقصى في كل صفحة، كل جزء بطاقة
-// كاملة (عنوانها ورأس أعمدتها وإطارها المغلق) تبدأ صفحة جديدة، بنفس التباعد
-// المريح في كل الصفحات. ٣٥ أقل من السعة المقيسة (٣٦ بأطول ترويسة).
+// كشف الحضور/المرشحين للطباعة: صفحة مستقلة لكل ٣٥ طالبًا بحد أقصى، كل صفحة
+// جدول forms-print كامل (ترويسة: القسم + العنوان + بيانات الفعالية + المعلمون
+// المرافقون، ثم بطاقة جزء القائمة بإطارها المغلق). فصل الصفحات بين عناصر
+// عليا مستقلة (attendance-page) مضمون بكل المتصفحات، خلافًا لفاصل صفحة داخل
+// خلية جدول واحدة (تجاهله Chrome فعليًا عند المستخدم).
+// ٣٥ طالبًا بحد أقصى في الصفحة؛ كل صف معلمين إضافي فوق صفّين بالترويسة
+// يُنقص صفّي طلبة (مقيس: حتى ٤ مرافقين ٣٥، ٦ = ٣٤، ٨ = ٣٢، ١٠ = ٣١ يتسعون).
 const ROSTER_ROWS_PER_PAGE = 35;
+function rosterRowsPerPage(teacherCount) {
+  const teacherRows = teacherCount > 1 ? Math.ceil(teacherCount / 2) : teacherCount;
+  return ROSTER_ROWS_PER_PAGE - 2 * Math.max(0, teacherRows - 2);
+}
 
 function attendanceSheetMarkup({ title, location, day, date, startTime, endTime, teachers, teacherPhones, students, kind }) {
   const isCandidates = kind === "candidates";
@@ -498,37 +498,39 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
     ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
     : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`;
   const rosterTitle = isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين";
-  const chunks = [];
-  for (let start = 0; start < students.length; start += ROSTER_ROWS_PER_PAGE) chunks.push(start);
-  const rosterCards = chunks.length
-    ? chunks.map((start) => {
-        const part = students.slice(start, start + ROSTER_ROWS_PER_PAGE);
-        const range = chunks.length > 1 ? ` <span class="roster-range">(من ${start + 1} إلى ${start + part.length})</span>` : "";
-        return `<div class="card attendance-roster"><h2>${rosterTitle}${range}</h2>
-        <div class="tablewrap"><table>
-          <thead><tr>${rosterHead}</tr></thead>
-          <tbody>${part.map((s, i) => studentRow(s, start + i)).join("")}</tbody>
-        </table></div>
-      </div>`;
-      }).join("")
-    : `<div class="card attendance-roster"><h2>${rosterTitle}</h2><div class="tablewrap"><table><thead><tr>${rosterHead}</tr></thead><tbody><tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr></tbody></table></div></div>`;
-  return `<table class="forms-print attendance-print" id="attendance-printable">
-    <thead><tr><td>
+  const teachersTable = accompanyingTeachersTableHtml({ teachers, teacherPhones });
+  const header = `
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
       <div class="topbar"><div><h1>${esc(title) || (isCandidates ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية")}</h1></div></div>
       <div class="card event-info"><h2>بيانات الفعالية</h2>
         <div class="tablewrap"><table>
           <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>اليوم</th><td>${esc(day) || "—"}</td></tr>
           <tr><th>التاريخ</th><td>${esc(date) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-          ${accompanyingTeacherRowsHtml({ teachers, teacherPhones }, { paired: accompanyingTeachers({ teachers, teacherPhones }).length > MAX_SINGLE_TEACHER_ROWS })}
           <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
         </table></div>
       </div>
+      ${teachersTable ? `<div class="card teachers-info"><h2>المعلمون المرافقون</h2><div class="tablewrap">${teachersTable}</div></div>` : ""}`;
+  const perPage = rosterRowsPerPage(accompanyingTeachers({ teachers, teacherPhones }).length);
+  const starts = [];
+  for (let start = 0; start < students.length; start += perPage) starts.push(start);
+  if (!starts.length) starts.push(0);
+  return starts.map((start, pageIndex) => {
+    const part = students.slice(start, start + perPage);
+    const range = starts.length > 1 ? ` <span class="roster-range">(من ${start + 1} إلى ${start + part.length})</span>` : "";
+    const rows = part.length ? part.map((s, i) => studentRow(s, start + i)).join("") : `<tr><td colspan="${isCandidates ? 6 : 5}">لا يوجد طلبة مختارون</td></tr>`;
+    return `<div class="attendance-page"><table class="forms-print attendance-print"${pageIndex ? "" : ' id="attendance-printable"'}>
+    <thead><tr><td>${header}
     </td></tr></thead>
     <tbody><tr><td>
-      ${rosterCards}
+      <div class="card attendance-roster"><h2>${rosterTitle}${range}</h2>
+        <div class="tablewrap"><table>
+          <thead><tr>${rosterHead}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>
     </td></tr></tbody>
-  </table>`;
+  </table></div>`;
+  }).join("");
 }
 
 async function printAttendanceSheetDirect(data) {

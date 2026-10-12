@@ -686,10 +686,15 @@
     .attendance-print .card h2 { padding: .9mm var(--head-x); font-size: 10pt; }
     .attendance-print table { font-size: 8pt; line-height: 1.3; }
     .attendance-print th, .attendance-print td { padding: .9mm 2.4mm; }
-    /* القائمة مقسَّمة مسبقًا (٣٥ طالبًا لكل بطاقة، forms-ui.js): كل بطاقة تبقى
-       كاملة بإطارها المغلق، وكل بطاقة بعد الأولى تبدأ صفحة جديدة. */
+    /* كل ٣٥ طالبًا صفحة مستقلة (forms-ui.js): كل صفحة جدول forms-print كامل
+       داخل .attendance-page، والفاصل بين هذه العناصر العليا مضمون بكل
+       المتصفحات. تلغى هنا وضعية absolute العامة (لصفحة واحدة) كي تتتابع. */
+    .forms-print.attendance-print { position: static !important; inset: auto !important; }
+    .attendance-page + .attendance-page { break-before: page; }
     .attendance-print .attendance-roster { break-inside: avoid; }
-    .attendance-print .attendance-roster + .attendance-roster { break-before: page; }
+    /* المعلمون المرافقون معلّمان بكل صف: فاصل رأسي بين الزوجين. */
+    .attendance-print .teachers-table td:nth-child(3) { border-right: .25mm solid var(--p-line); }
+    .attendance-print .teachers-table th:nth-child(3) { border-right: .25mm solid rgba(255, 255, 255, .35); }
     .attendance-print .roster-range { color: var(--p-muted) !important; font-weight: 600; font-size: 9pt; }
     /* صفوف القائمة تُميَّز بالتظليل المتناوب وحده بلا أسطر فاصلة: سطر لكل صف
        يأكل ~١px × عدد الطلبة ويُسقط صفوفًا من سعة الصفحة الواحدة. */
