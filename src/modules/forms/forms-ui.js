@@ -825,9 +825,26 @@ async function renderAttendanceSheet(root, kind = "attendance") {
 // options.formId يفتح استمارة محدَّدة مباشرة من سجل الاستمارات (قادم من
 // رابط "فتح ملف الطالب" المعاكس بملف الطالب) بدل هبوط المرشد على تبويب
 // "استمارة جديدة" ليتنقل بنفسه لسجل الاستمارات ويبحث عن نفس الاستمارة.
+// بيانات المعلمين شاشة مستقلة بالقائمة الجانبية ("المعلمين") بدل تبويب داخل
+// الاستمارات والسجلات.
+export async function mountTeachersView(container) {
+  container.innerHTML = `<div class="topbar"><div><h1>المعلمين</h1><div class="sub">بيانات المعلمين وصورهم وأرقام تواصلهم — تُستخدم أيضًا لتعبئة المعلمين المرافقين بكشوف الفعاليات</div></div></div><div id="teachers-content"><div class="empty" role="status">جارٍ تحميل البيانات…</div></div>`;
+  const content = container.querySelector("#teachers-content");
+  const load = async () => {
+    try {
+      await renderTeachers(content);
+    } catch (error) {
+      console.error("تعذر تحميل بيانات المعلمين", error);
+      content.innerHTML = '<div class="card"><div class="empty" role="alert">تعذر تحميل البيانات من الخادم.<br><button class="btn btn-primary" id="teachers-retry" style="margin-top:12px;">إعادة المحاولة</button></div></div>';
+      content.querySelector("#teachers-retry")?.addEventListener("click", load);
+    }
+  };
+  await load();
+}
+
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وسجل المعلمين</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="teachers">بيانات المعلمين</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، وكشوف الفعاليات</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -841,8 +858,7 @@ export async function mountFormsView(container, options = {}) {
         await renderLog(content, openDetail, openEdit);
       }
       else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
-      else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
-      else await renderTeachers(content);
+      else await renderAttendanceSheet(content, "candidates");
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);
       content.innerHTML = `<div class="card"><div class="empty" role="alert">تعذر تحميل البيانات من الخادم. تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مجددًا.<br><button class="btn btn-primary" id="forms-retry" style="margin-top:12px;">إعادة المحاولة</button></div></div>`;
