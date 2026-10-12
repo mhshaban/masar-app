@@ -246,7 +246,7 @@ function planDetailPrintMarkup(plan, actions) {
   return `<table class="forms-print" id="plan-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
-      <div class="topbar"><div><h1>${esc(plan.domain) || "خطة دعم فردية"}</h1><div class="sub">${esc(plan.studentName) || esc(plan.studentId)}</div></div></div>
+      <div class="topbar"><div><h1>${esc(plan.domain) || "خطة دعم فردية"}</h1></div></div>
       <div class="card"><h2>بيانات الخطة</h2>
         <div class="tablewrap"><table>
           <tr><th>الطالب</th><td>${esc(plan.studentName) || esc(plan.studentId)}</td><th>المجال</th><td>${esc(plan.domain) || "—"}</td></tr>

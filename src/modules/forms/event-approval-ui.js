@@ -41,13 +41,13 @@ export function eventApprovalMarkup(raw) {
   return `<table class="forms-print event-approval-print">
     <thead><tr><td>
       <div class="print-dept-line">${esc(DEPARTMENT_NAME)}</div>
-      <div class="topbar"><div><h1>${FORM_TITLE}</h1><div class="sub">تاريخ الطلب: ${v(d.requestDate)}</div></div></div>
+      <div class="topbar"><div><h1>${FORM_TITLE}</h1></div></div>
     </td></tr></thead>
     <tbody><tr><td>
       <div class="card"><h2>بيانات الفعالية</h2>
         <div class="tablewrap"><table class="ea-pairs">
           <tr><th>اسم الفعالية</th><td colspan="3"><strong>${v(d.title)}</strong></td></tr>
-          <tr><th>اسم المدرسة</th><td colspan="3">${v(d.schoolName)}</td></tr>
+          <tr><th>اسم المدرسة</th><td>${v(d.schoolName)}</td><th>تاريخ الطلب</th><td>${v(d.requestDate)}</td></tr>
           <tr><th>نوع الفعالية / النشاط المطلوب</th><td>${v(d.eventType)}</td><th>الجهة المعنية</th><td>${v(d.concernedParty)}</td></tr>
           <tr><th>وصف الفعالية / النشاط</th><td colspan="3">${multi(d.description)}</td></tr>
           <tr><th>مبررات تنفيذ الفعالية / أهداف الفعالية</th><td colspan="3">${multi(d.objectives)}</td></tr>

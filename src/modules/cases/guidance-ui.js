@@ -261,7 +261,7 @@ function caseDetailPrintMarkup(item, sessions) {
   return `<table class="forms-print" id="case-printable">
     <thead><tr><td>
       <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
-      <div class="topbar"><div><h1>${esc(item.title) || esc(item.category) || "حالة إرشادية"}</h1><div class="sub">${esc(item.studentName) || esc(item.studentId)}${item.category ? ` — ${esc(item.category)}` : ""}</div></div></div>
+      <div class="topbar"><div><h1>${esc(item.title) || esc(item.category) || "حالة إرشادية"}</h1></div></div>
       <div class="card"><h2>بيانات الحالة</h2>
         <div class="tablewrap"><table>
           <tr><th>الطالب</th><td>${esc(item.studentName) || esc(item.studentId)}</td><th>الفئة</th><td>${esc(item.category) || "—"}</td></tr>

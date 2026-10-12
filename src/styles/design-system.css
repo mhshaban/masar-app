@@ -544,6 +544,7 @@
   .forms-print > thead > tr, .forms-print > tbody > tr { display: block; }
   .forms-print > thead > tr > td, .forms-print > tbody > tr > td { display: block; padding: 0; border: 0; }
   .print-dept-line { display: none; }
+  .print-only { display: none; }
   .forms-print-feedback { display: none; }
   .print-approval { display: none; }
   .forms-empty-print { display: none; }
@@ -632,7 +633,7 @@
     .forms-print .print-hide-empty-feedback { display: none !important; }
     .forms-print .forms-empty-screen { display: none !important; }
     .forms-print .forms-empty-print { display: inline !important; visibility: visible !important; color: #777 !important; font-style: normal; font-weight: 400; letter-spacing: .2mm; }
-    .forms-print .topbar { display: flex; align-items: flex-end; justify-content: space-between; margin: 0 0 3.5mm; gap: 3mm; }
+    .forms-print .topbar { display: flex; align-items: flex-end; justify-content: space-between; margin: 0 0 3mm; gap: 3mm; }
     .forms-print .topbar h1 { margin: 0; padding-right: 2.6mm; border-right: 1.3mm solid var(--p-gold); font-size: 15pt; font-weight: 800; line-height: 1.25; color: var(--p-ink) !important; }
     .forms-print .topbar .sub { margin-top: .8mm; padding-right: 3.9mm; font-size: 8.5pt; color: var(--p-muted) !important; }
     .forms-print .card { --pad-y: 2.6mm; --pad-x: 3.6mm; --head-x: 3.6mm; box-shadow: none; border: .25mm solid var(--p-line); border-radius: 1.8mm; padding: var(--pad-y) var(--pad-x); margin: 0 0 3mm; overflow: hidden; break-inside: avoid-page; background: #fff !important; color: #000 !important; }
@@ -650,11 +651,14 @@
     .forms-print .forms-student span { color: #222 !important; }
     .forms-print .forms-detail-row { grid-template-columns: 32% 1fr; gap: 0; min-height: 0; padding: 0; border-bottom: .2mm solid var(--p-hair); font-size: 8.7pt; break-inside: avoid; }
     .forms-print .forms-detail-row:last-child { border-bottom: 0; }
-    .forms-print .forms-detail-row span { padding: 1.5mm 2.5mm; background: var(--p-tint) !important; color: var(--p-ink-2) !important; font-weight: 700; }
-    .forms-print .forms-detail-row strong { padding: 1.5mm 2.5mm; font-weight: 600; }
+    .forms-print .forms-detail-row span { padding: 1.2mm 2.4mm; background: var(--p-tint) !important; color: var(--p-ink-2) !important; font-weight: 700; }
+    .forms-print .forms-detail-row strong { padding: 1.2mm 2.4mm; font-weight: 600; }
+    .forms-print .forms-detail-row.print-only { display: grid !important; }
+    .forms-print .topbar .sub.print-hide { display: none !important; }
     .forms-print .pill { border: .3mm solid var(--p-gold); border-radius: 10mm; background: #fdf6ea !important; color: var(--p-ink) !important; font-size: 8pt; font-weight: 700; padding: .6mm 2.6mm; white-space: nowrap; }
     .forms-print table { font-size: 8.5pt; }
-    .forms-print th, .forms-print td { padding: 1.5mm 2mm; break-inside: avoid; }
+    .forms-print table { line-height: 1.35; }
+    .forms-print th, .forms-print td { padding: 1.2mm 2.4mm; break-inside: avoid; }
     /* الجداول الداخلية فقط (لا جدول الصفحة الخارجي): رأس أعمدة كحلي، عناوين
        صفوف بخلفية فاتحة، أسطر فاصلة دقيقة وتظليل خفيف للصفوف الزوجية. */
     .forms-print td table > thead > tr > th { background: var(--p-ink) !important; color: #fff !important; font-weight: 700; border: 0; }
@@ -664,7 +668,7 @@
     .forms-print td table:has(> thead) > tbody > tr:nth-child(even) > td { background: var(--p-zebra) !important; }
     .forms-print td table > tbody > tr:last-child > td { border-bottom: 0; }
     .forms-print img { max-width: 100%; }
-    .forms-print .print-approval { display: block !important; visibility: visible !important; min-height: 0; margin-top: 3mm; padding: 0 3.6mm 3mm; border: .25mm solid var(--p-line); border-radius: 1.8mm; overflow: hidden; break-inside: avoid-page; color: #000 !important; }
+    .forms-print .print-approval { display: block !important; visibility: visible !important; min-height: 0; margin-top: 0; padding: 0 3.6mm 3mm; border: .25mm solid var(--p-line); border-radius: 1.8mm; overflow: hidden; break-inside: avoid-page; color: #000 !important; }
     .forms-print .print-approval strong { display: flex; align-items: center; gap: 1.8mm; margin: 0 -3.6mm 2.5mm; padding: 1.2mm 3.6mm; background: var(--p-tint) !important; border-bottom: .25mm solid var(--p-line); color: var(--p-ink) !important; font-size: 10.5pt; font-weight: 800; }
     .forms-print .print-approval strong::before { content: ""; flex: none; width: 1.6mm; height: 1.6mm; border-radius: .4mm; background: var(--p-gold); }
     .forms-print .workflow-options { margin-bottom: 3.5mm; font-size: 9pt; color: var(--p-ink-2); }
@@ -673,15 +677,15 @@
     .forms-print .forms-entry-footer { display: flex; justify-content: space-between; gap: 2mm 6mm; margin-top: 2.5mm; padding-top: 1.5mm; border-top: .2mm solid var(--p-hair); color: var(--p-muted) !important; font-size: 7.2pt; line-height: 1.35; break-inside: avoid-page; }
     .forms-print .forms-entry-footer span { color: var(--p-muted) !important; }
     .forms-print .print-hide { display: none !important; }
-    /* كشف حضور فعالية: قد يصل لـ٣٠-٤٠ طالبًا بصف واحد لكل طالب — أضيق من
-       بقية استمارات forms-print (سطر واحد أو سطرين لكل استمارة) فيحتاج
-       تباعدًا أدق كي يبقى بصفحة A4 واحدة. قيست القيم فعليًا لا تخمينًا،
-       مع هامش أمان إضافي لاختلاف هوامش الطباعة الفعلية بين المتصفحات
-       ومحرّكات "طباعة كـPDF" (لا تلتزم كلّها بـ@page{margin:0} بدقة). */
-    .attendance-print .card { --pad-y: 2mm; --pad-x: 3mm; --head-x: 3mm; margin: 0 0 2.5mm; }
+    /* ===== كشوف الحضور والمرشحين =====
+       نفس نِسب القالب العام بدرجة أكثف واحدة (لا قيم متفرقة لكل جزء): خلايا
+       بيانات الفعالية وقائمة الطلبة بنفس الحشوة والخط، والمسافة بين البطاقات
+       ثابتة. فوق DENSE_ROSTER_FROM طالبًا تنتقل القائمة وحدها لدرجة أكثف.
+       القيم مقيسة بتصيير PDF فعلي (السعة وارتفاع الترويسة). */
+    .attendance-print .card { margin: 0 0 2.5mm; }
     .attendance-print .card h2 { padding: .9mm var(--head-x); font-size: 10pt; }
-    .attendance-print table { font-size: 7.5pt; line-height: 1.15; }
-    .attendance-print th, .attendance-print td { padding: .8mm 1.6mm; }
+    .attendance-print table { font-size: 8pt; line-height: 1.3; }
+    .attendance-print th, .attendance-print td { padding: .9mm 2.4mm; }
     /* بطاقة قائمة الطلبة تحديدًا لا تُمنع من الانقسام بين الصفحات (خلافًا
        لبقية بطاقات forms-print): لو تجاوزت المساحة المتبقية بأي طارئ، يفيض
        صفّان أو ثلاثة لصفحة تالية بدل دفع الجدول كاملًا لصفحة شبه فارغة. */
@@ -690,27 +694,18 @@
        يأكل ~١px × عدد الطلبة ويُسقط صفوفًا من سعة الصفحة الواحدة. */
     .attendance-print .attendance-roster td { border-bottom: 0 !important; }
     /* ترويسة الكشف (القسم + العنوان + بيانات الفعالية) يجب أن تبقى أقل من ربع
-       ارتفاع الصفحة: Chromium لا يكرّر رأس جدول أطول من ذلك بالصفحات التالية
-       (مؤكَّد بالقياس: ٢ مرافقَين = ٢٦٥px تتكرر، ٤ = ٣٠٥px لا تتكرر). */
+       ارتفاع الصفحة (~٢٧٣px): Chromium لا يكرّر رأس جدول أطول من ذلك. */
     .attendance-print > thead > tr > td { padding-top: 4mm !important; }
-    .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 2.2mm; font-size: 10pt; }
-    .attendance-print .topbar { margin: 0 0 2mm; }
+    .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 2.5mm; font-size: 10pt; }
+    .attendance-print .topbar { margin: 0 0 2.5mm; }
     .attendance-print .topbar h1 { font-size: 14pt; }
-    .attendance-print .card.event-info { --head-x: 2.6mm; margin: 0 0 2mm; }
-    .attendance-print .card.event-info h2 { font-size: 9.5pt; padding: .6mm var(--head-x); }
-    .attendance-print .card.event-info th, .attendance-print .card.event-info td { padding: .45mm 1.6mm; }
-    /* كشف طويل: صفوف أكثف لعل القائمة كلها تتسع بصفحة واحدة. */
-    .attendance-print.attendance-dense .attendance-roster table { font-size: 7pt; line-height: 1.05; }
-    .attendance-print.attendance-dense .attendance-roster th, .attendance-print.attendance-dense .attendance-roster td { padding: .3mm 1.4mm; }
+    /* كشف طويل: القائمة وحدها بدرجة أكثف (نفس النسب، خط وحشوة أصغر قليلًا). */
+    .attendance-print.attendance-dense .attendance-roster table { font-size: 7.5pt; line-height: 1.25; }
+    .attendance-print.attendance-dense .attendance-roster th, .attendance-print.attendance-dense .attendance-roster td { padding: .6mm 2.4mm; }
     /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
     .forms-print .card.print-flow { break-inside: auto; }
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
     .forms-print .card.print-own-page + .card.print-own-page { break-before: page; }
-    /* استمارة اعتماد فعالية: نفس قالب الاستمارات بتباعد أدق لتبقى بصفحة واحدة. */
-    .event-approval-print .card { --pad-y: 2mm; --pad-x: 3.2mm; --head-x: 3.2mm; margin: 0 0 2.2mm; }
-    .event-approval-print .card h2 { padding: .9mm var(--head-x); margin-bottom: 1.4mm; font-size: 10pt; }
-    .event-approval-print th, .event-approval-print td { padding: 1mm 2mm; }
-    .event-approval-print .print-approval { margin-top: 2mm; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }
