@@ -11,7 +11,7 @@ import {
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
 import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeacherRowsHtml, accompanyingTeachers } from "../../services/report-builders.js?v=2026-10-12-attendance-fit-1";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";

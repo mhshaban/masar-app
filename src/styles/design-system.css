@@ -635,11 +635,17 @@
     .forms-print .topbar { display: flex; align-items: flex-end; justify-content: space-between; margin: 0 0 3.5mm; gap: 3mm; }
     .forms-print .topbar h1 { margin: 0; padding-right: 2.6mm; border-right: 1.3mm solid var(--p-gold); font-size: 15pt; font-weight: 800; line-height: 1.25; color: var(--p-ink) !important; }
     .forms-print .topbar .sub { margin-top: .8mm; padding-right: 3.9mm; font-size: 8.5pt; color: var(--p-muted) !important; }
-    .forms-print .card { --pad-y: 2.6mm; --pad-x: 3.6mm; box-shadow: none; border: .25mm solid var(--p-line); border-radius: 1.8mm; padding: var(--pad-y) var(--pad-x); margin: 0 0 3mm; overflow: hidden; break-inside: avoid-page; background: #fff !important; color: #000 !important; }
-    .forms-print .card h2 { display: flex; align-items: center; gap: 1.8mm; margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) 2mm; padding: 1.2mm var(--pad-x); background: var(--p-tint) !important; border-bottom: .25mm solid var(--p-line); font-size: 10.5pt; font-weight: 800; color: var(--p-ink) !important; }
+    .forms-print .card { --pad-y: 2.6mm; --pad-x: 3.6mm; --head-x: 3.6mm; box-shadow: none; border: .25mm solid var(--p-line); border-radius: 1.8mm; padding: var(--pad-y) var(--pad-x); margin: 0 0 3mm; overflow: hidden; break-inside: avoid-page; background: #fff !important; color: #000 !important; }
+    .forms-print .card h2 { display: flex; align-items: center; gap: 1.8mm; margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) 2mm; padding: 1.2mm var(--head-x); background: var(--p-tint) !important; border-bottom: .25mm solid var(--p-line); font-size: 10.5pt; font-weight: 800; color: var(--p-ink) !important; }
     .forms-print .card h2::before { content: ""; flex: none; width: 1.6mm; height: 1.6mm; border-radius: .4mm; background: var(--p-gold); }
     .forms-print .card > p { margin: 0; white-space: pre-wrap; }
-    .forms-print .forms-student { gap: 1mm 5mm; padding: 2mm 3mm; margin: 0; border: .2mm solid var(--p-line); border-right: 1.1mm solid var(--p-gold); border-radius: 1.2mm; background: var(--p-zebra) !important; font-size: 8.5pt; }
+    /* بطاقة محتواها جدول أو صفوف بيانات: المحتوى يملأ البطاقة لحوافها (بلا
+       حشوة) فتبدو البطاقة والجدول قطعة واحدة، لا جدولًا داخل إطار آخر. */
+    .forms-print .card:has(> .tablewrap), .forms-print .card:has(> .forms-detail-row), .forms-print .card:has(> .forms-print-feedback), .forms-print .card:has(> .forms-student) { --pad-y: 0mm; --pad-x: 0mm; }
+    .forms-print .card:has(> .tablewrap) > h2, .forms-print .card:has(> .forms-detail-row) > h2, .forms-print .card:has(> .forms-print-feedback) > h2, .forms-print .card:has(> .forms-student) > h2 { margin-bottom: 0; }
+    .forms-print .card > .tablewrap tr > :first-child, .forms-print .card > .forms-detail-row > span, .forms-print .card > .forms-print-feedback .forms-detail-row > span { padding-right: var(--head-x); }
+    .forms-print .card > .tablewrap tr > :last-child, .forms-print .card > .forms-detail-row > strong, .forms-print .card > .forms-print-feedback .forms-detail-row > strong { padding-left: var(--head-x); }
+    .forms-print .forms-student { gap: 1mm 5mm; padding: 2mm var(--head-x); margin: 0; border: 0; border-radius: 0; background: #fff !important; font-size: 8.5pt; }
     .forms-print .forms-student strong { flex-basis: 100%; font-size: 10.5pt; color: var(--p-ink) !important; }
     .forms-print .forms-student span { color: #222 !important; }
     .forms-print .forms-detail-row { grid-template-columns: 32% 1fr; gap: 0; min-height: 0; padding: 0; border-bottom: .2mm solid var(--p-hair); font-size: 8.7pt; break-inside: avoid; }
@@ -652,8 +658,6 @@
     /* الجداول الداخلية فقط (لا جدول الصفحة الخارجي): رأس أعمدة كحلي، عناوين
        صفوف بخلفية فاتحة، أسطر فاصلة دقيقة وتظليل خفيف للصفوف الزوجية. */
     .forms-print td table > thead > tr > th { background: var(--p-ink) !important; color: #fff !important; font-weight: 700; border: 0; }
-    .forms-print td table > thead > tr > th:first-child { border-top-right-radius: 1mm; }
-    .forms-print td table > thead > tr > th:last-child { border-top-left-radius: 1mm; }
     .forms-print td table > tbody > tr > td { border-bottom: .2mm solid var(--p-hair); color: #111; }
     .forms-print td table > tbody > tr > th { background: var(--p-tint) !important; color: var(--p-ink-2) !important; font-weight: 700; border-bottom: .2mm solid #fff; }
     .forms-print td table > tbody > tr > td + th { border-right: .2mm solid var(--p-hair); }
@@ -674,8 +678,8 @@
        تباعدًا أدق كي يبقى بصفحة A4 واحدة. قيست القيم فعليًا لا تخمينًا،
        مع هامش أمان إضافي لاختلاف هوامش الطباعة الفعلية بين المتصفحات
        ومحرّكات "طباعة كـPDF" (لا تلتزم كلّها بـ@page{margin:0} بدقة). */
-    .attendance-print .card { --pad-y: 2mm; --pad-x: 3mm; margin: 0 0 2.5mm; }
-    .attendance-print .card h2 { padding: .9mm var(--pad-x); margin-bottom: 1.5mm; font-size: 10pt; }
+    .attendance-print .card { --pad-y: 2mm; --pad-x: 3mm; --head-x: 3mm; margin: 0 0 2.5mm; }
+    .attendance-print .card h2 { padding: .9mm var(--head-x); font-size: 10pt; }
     .attendance-print table { font-size: 7.5pt; line-height: 1.15; }
     .attendance-print th, .attendance-print td { padding: .8mm 1.6mm; }
     /* بطاقة قائمة الطلبة تحديدًا لا تُمنع من الانقسام بين الصفحات (خلافًا
@@ -692,8 +696,8 @@
     .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 2.2mm; font-size: 10pt; }
     .attendance-print .topbar { margin: 0 0 2mm; }
     .attendance-print .topbar h1 { font-size: 14pt; }
-    .attendance-print .card.event-info { --pad-y: 1.4mm; --pad-x: 2.6mm; margin: 0 0 2mm; }
-    .attendance-print .card.event-info h2 { font-size: 9.5pt; padding: .6mm var(--pad-x); margin-bottom: 1mm; }
+    .attendance-print .card.event-info { --head-x: 2.6mm; margin: 0 0 2mm; }
+    .attendance-print .card.event-info h2 { font-size: 9.5pt; padding: .6mm var(--head-x); }
     .attendance-print .card.event-info th, .attendance-print .card.event-info td { padding: .45mm 1.6mm; }
     /* كشف طويل: صفوف أكثف لعل القائمة كلها تتسع بصفحة واحدة. */
     .attendance-print.attendance-dense .attendance-roster table { font-size: 7pt; line-height: 1.05; }
@@ -703,8 +707,8 @@
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
     .forms-print .card.print-own-page + .card.print-own-page { break-before: page; }
     /* استمارة اعتماد فعالية: نفس قالب الاستمارات بتباعد أدق لتبقى بصفحة واحدة. */
-    .event-approval-print .card { --pad-y: 2mm; --pad-x: 3.2mm; margin: 0 0 2.2mm; }
-    .event-approval-print .card h2 { padding: .9mm var(--pad-x); margin-bottom: 1.4mm; font-size: 10pt; }
+    .event-approval-print .card { --pad-y: 2mm; --pad-x: 3.2mm; --head-x: 3.2mm; margin: 0 0 2.2mm; }
+    .event-approval-print .card h2 { padding: .9mm var(--head-x); margin-bottom: 1.4mm; font-size: 10pt; }
     .event-approval-print th, .event-approval-print td { padding: 1mm 2mm; }
     .event-approval-print .print-approval { margin-top: 2mm; }
   }
