@@ -354,19 +354,18 @@ export function accompanyingTeachers({ teachers = [], teacherPhones = [] } = {})
     .map((t, i) => ({ ...t, label: accompanyingTeacherLabel(i) }));
 }
 
-// paired: معلّمان بكل صف (الاسم · الرقم بخلية واحدة) — للطباعة المباشرة عند
-// كثرة المرافقين، كي تبقى ترويسة الكشف قصيرة بما يكفي ليكرّرها المتصفح بكل
-// صفحة (Chromium لا يكرّر رأس جدول يتجاوز ربع ارتفاع الصفحة تقريبًا).
-export function accompanyingTeacherRowsHtml(data, { paired = false } = {}) {
+// المعلمون المرافقون جدولًا مستقلًا: الاسم ورقم التواصل فقط (بلا "الأول/
+// الثاني")، ومعلّمان بكل صف عند تعددهم كي يبقى الجدول قصيرًا. "" لو لا مرافقين.
+export function accompanyingTeachersTableHtml(data) {
   const rows = accompanyingTeachers(data);
-  if (!rows.length) return '<tr><th>المعلم المرافق</th><td colspan="3">—</td></tr>';
-  if (paired) {
-    const cell = (t) => `<th>${t.label}</th><td>${esc(t.name) || "—"}${t.phone ? ` · <span dir="ltr">${esc(t.phone)}</span>` : ""}</td>`;
-    const out = [];
-    for (let i = 0; i < rows.length; i += 2) out.push(`<tr>${cell(rows[i])}${rows[i + 1] ? cell(rows[i + 1]) : "<th></th><td></td>"}</tr>`);
-    return out.join("");
-  }
-  return rows.map((t) => `<tr><th>${t.label}</th><td>${esc(t.name) || "—"}</td><th>رقم التواصل</th><td>${t.phone ? `<span dir="ltr">${esc(t.phone)}</span>` : "—"}</td></tr>`).join("");
+  if (!rows.length) return "";
+  const perRow = rows.length > 1 ? 2 : 1;
+  const cells = (t) => (t
+    ? `<td>${esc(t.name) || "—"}</td><td>${t.phone ? `<span dir="ltr">${esc(t.phone)}</span>` : "—"}</td>`
+    : "<td></td><td></td>");
+  const body = [];
+  for (let i = 0; i < rows.length; i += perRow) body.push(`<tr>${cells(rows[i])}${perRow === 2 ? cells(rows[i + 1]) : ""}</tr>`);
+  return `<table class="teachers-table"><thead><tr>${"<th>اسم المعلم</th><th>رقم التواصل</th>".repeat(perRow)}</tr></thead><tbody>${body.join("")}</tbody></table>`;
 }
 
 export function buildAttendanceSheetReportHtml(data, exportedAt) {
@@ -379,9 +378,9 @@ export function buildAttendanceSheetReportHtml(data, exportedAt) {
     <table>
       <tr><th>اليوم</th><td>${esc(day) || "—"}</td><th>التاريخ</th><td>${esc(date) || "—"}</td></tr>
       <tr><th>مكان الفعالية</th><td>${esc(location) || "—"}</td><th>الفترة</th><td>${esc(timeRange) || "—"}</td></tr>
-      ${accompanyingTeacherRowsHtml(data)}
       <tr><th>${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}</th><td colspan="3">${students.length}</td></tr>
     </table>
+    ${accompanyingTeachersTableHtml(data) ? `<h2>المعلمون المرافقون</h2>${accompanyingTeachersTableHtml(data)}` : ""}
     <h2>${isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين"}</h2>
     <table>
       ${isCandidates

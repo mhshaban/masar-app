@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
-  buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherRowsHtml,
+  buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml, accompanyingTeachersTableHtml,
 } from "../src/services/report-builders.js";
 
 test("buildDepartmentFormReportHtml exports student data, form content, and feedback", () => {
@@ -227,8 +227,7 @@ test("buildAttendanceSheetReportHtml lists event info (including location and ti
   assert.match(html, /الخميس/);
   assert.match(html, /2026-09-17/);
   assert.match(html, /09:00 ص — 11:30 ص/);
-  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>محمد أحمد<\/td>/);
-  assert.match(html, /<th>المعلم المرافق الثاني<\/th><td>سارة خالد<\/td>/);
+  assert.match(html, /<td>محمد أحمد<\/td><td>—<\/td><td>سارة خالد<\/td><td>—<\/td>/);
   assert.match(html, />2</); // عدد الطلبة المشاركين
   assert.match(html, /طالب أول/);
   assert.match(html, /١تلم١/);
@@ -248,7 +247,7 @@ test("buildAttendanceSheetReportHtml shows clear placeholders with no teachers, 
   const html = buildAttendanceSheetReportHtml({ title: "", day: "", date: "", teachers: ["", ""], students: [] }, "2026-09-17");
   assert.match(html, /كشف حضور فعالية/);
   assert.match(html, /لا يوجد طلبة مختارون/);
-  assert.match(html, /<th>المعلم المرافق<\/th><td colspan="3">—<\/td>/);
+  assert.doesNotMatch(html, /المعلمون المرافقون/);
   assert.match(html, /<th>مكان الفعالية<\/th><td>—<\/td><th>الفترة<\/th><td>—<\/td>/);
 });
 
@@ -277,21 +276,24 @@ test('buildAttendanceSheetReportHtml with kind "candidates" falls back to a cand
   assert.match(html, /لا يوجد طلبة مختارون/);
 });
 
-test("buildAttendanceSheetReportHtml lists each accompanying teacher with a phone, numbers extra teachers, and puts the student count after them", () => {
+test("buildAttendanceSheetReportHtml lists the accompanying teachers in their own table (name and phone, no ordinals) after the event data", () => {
   const html = buildAttendanceSheetReportHtml({
     title: "ورشة", date: "2026-10-18",
     teachers: ["محمد حسن شعبان", "", "حسن حبيب حسن"],
     teacherPhones: ["33445566", "", ""],
     students: [{ academicId: "1", name: "طالب" }],
   }, "2026-10-12");
-  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>محمد حسن شعبان<\/td><th>رقم التواصل<\/th><td><span dir="ltr">33445566<\/span><\/td>/);
-  assert.match(html, /<th>المعلم المرافق الثاني<\/th><td>حسن حبيب حسن<\/td><th>رقم التواصل<\/th><td>—<\/td>/);
-  assert.ok(html.indexOf("المعلم المرافق الثاني") < html.indexOf("عدد الطلبة المشاركين"));
+  assert.match(html, /<h2>المعلمون المرافقون<\/h2><table class="teachers-table">/);
+  assert.match(html, /<td>محمد حسن شعبان<\/td><td><span dir="ltr">33445566<\/span><\/td><td>حسن حبيب حسن<\/td><td>—<\/td>/);
+  assert.doesNotMatch(html, /المعلم المرافق الأول/);
+  assert.ok(html.indexOf("عدد الطلبة المشاركين") < html.indexOf("المعلمون المرافقون"));
 });
 
-test("accompanyingTeacherRowsHtml paired puts two teachers per row with name · phone, padding an odd last row", () => {
-  const html = accompanyingTeacherRowsHtml({ teachers: ["أ", "ب", "ج"], teacherPhones: ["111", "", "333"] }, { paired: true });
-  assert.equal((html.match(/<tr>/g) || []).length, 2);
-  assert.match(html, /<th>المعلم المرافق الأول<\/th><td>أ · <span dir="ltr">111<\/span><\/td><th>المعلم المرافق الثاني<\/th><td>ب<\/td>/);
-  assert.match(html, /<th>المعلم المرافق الثالث<\/th><td>ج · <span dir="ltr">333<\/span><\/td><th><\/th><td><\/td>/);
+test("accompanyingTeachersTableHtml shows two teachers per row (padding an odd last row), one column pair for a single teacher, nothing for none", () => {
+  const three = accompanyingTeachersTableHtml({ teachers: ["أ", "ب", "ج"], teacherPhones: ["111", "", "333"] });
+  assert.match(three, /<thead><tr><th>اسم المعلم<\/th><th>رقم التواصل<\/th><th>اسم المعلم<\/th><th>رقم التواصل<\/th><\/tr><\/thead>/);
+  assert.match(three, /<tr><td>أ<\/td><td><span dir="ltr">111<\/span><\/td><td>ب<\/td><td>—<\/td><\/tr><tr><td>ج<\/td><td><span dir="ltr">333<\/span><\/td><td><\/td><td><\/td><\/tr>/);
+  const one = accompanyingTeachersTableHtml({ teachers: ["أ"], teacherPhones: ["111"] });
+  assert.match(one, /<thead><tr><th>اسم المعلم<\/th><th>رقم التواصل<\/th><\/tr><\/thead><tbody><tr><td>أ<\/td><td><span dir="ltr">111<\/span><\/td><\/tr><\/tbody>/);
+  assert.equal(accompanyingTeachersTableHtml({ teachers: ["", " "], teacherPhones: [] }), "");
 });
