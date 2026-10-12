@@ -692,6 +692,10 @@
     .forms-print.attendance-print { position: static !important; inset: auto !important; }
     .attendance-page + .attendance-page { break-before: page; }
     .attendance-print .attendance-roster { break-inside: avoid; }
+    /* كل طالب سطر واحد دائمًا (لا التفاف للأرقام أو الأسماء): عدد الطلبة في
+       الصفحة محسوب على صفوف بسطر واحد، وصف بسطرين (٤ أرقام تواصل أو اسم طويل)
+       كان يدفع الكشف لصفحات إضافية. ٤ أرقام + اسم بـ٤٠ حرفًا تتسع بعرض A4. */
+    .attendance-print .attendance-roster th, .attendance-print .attendance-roster td { white-space: nowrap; }
     /* المعلمون المرافقون معلّمان بكل صف: فاصل رأسي بين الزوجين. */
     .attendance-print .teachers-table td:nth-child(3) { border-right: .25mm solid var(--p-line); }
     .attendance-print .teachers-table th:nth-child(3) { border-right: .25mm solid rgba(255, 255, 255, .35); }
