@@ -5,7 +5,7 @@ import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-14-cumulative
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-09-13-landscape-export-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
@@ -79,14 +79,14 @@ function printDailyReport(html) {
     table.report-page>tbody>tr>td{display:block;padding:1mm 9mm 0}
     .dept-line{position:relative;display:block;padding-bottom:1.6mm;margin-bottom:3mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:800}
     .dept-line::after{content:"";position:absolute;right:0;bottom:-.75mm;width:32mm;height:1.15mm;background:#1a2744;border-radius:.3mm}
-    .report-page td table{width:100%;border-collapse:collapse;margin:0 0 4mm;page-break-inside:auto;font-size:8.7pt}
-    .report-page td th,.report-page td td{padding:1.4mm 2mm;text-align:right}
+    .report-page td table{width:100%;border-collapse:collapse;margin:0 0 4mm;page-break-inside:auto;font-size:8.7pt;border:.25mm solid #d5dbe6;border-top:0}
+    .report-page td th,.report-page td td{padding:1.4mm 3mm;text-align:right}
     .report-page td th{background:#1a2744;color:#fff;font-weight:700}
     .report-page td td{border-bottom:.2mm solid #e4e8ef}
     .report-page td tbody tr:nth-child(even) td{background:#f8f9fc}
     tr,h1,h2{page-break-inside:avoid;page-break-after:auto}
     h1{font-size:15pt;font-weight:800;color:#1a2744;margin:0;padding-right:2.6mm;border-right:1.3mm solid #c8923a;line-height:1.25}
-    h2{display:flex;align-items:center;gap:1.8mm;font-size:10.5pt;font-weight:800;margin:0 0 1.5mm;padding:1.2mm 2.5mm;background:#f1f4f9;border:.25mm solid #d5dbe6;border-radius:1.5mm;color:#1a2744;page-break-after:avoid}
+    h2{display:flex;align-items:center;gap:1.8mm;font-size:10.5pt;font-weight:800;margin:0;padding:1.2mm 3mm;background:#f1f4f9;border:.25mm solid #d5dbe6;border-bottom:0;border-radius:1.5mm 1.5mm 0 0;color:#1a2744;page-break-after:avoid}
     h2::before{content:"";width:1.6mm;height:1.6mm;border-radius:.4mm;background:#c8923a}
     .meta{color:#5b6680;font-size:8pt;margin:.8mm 0 3.5mm;padding-right:3.9mm}
     .document-approval{margin-top:5mm;padding:0 3.6mm 3mm;border:.25mm solid #d5dbe6;border-radius:1.8mm;page-break-inside:avoid}
