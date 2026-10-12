@@ -297,3 +297,12 @@ test("accompanyingTeachersTableHtml shows two teachers per row (padding an odd l
   assert.match(one, /<thead><tr><th>اسم المعلم<\/th><th>رقم التواصل<\/th><\/tr><\/thead><tbody><tr><td>أ<\/td><td><span dir="ltr">111<\/span><\/td><\/tr><\/tbody>/);
   assert.equal(accompanyingTeachersTableHtml({ teachers: ["", " "], teacherPhones: [] }), "");
 });
+
+test("buildAttendanceSheetReportHtml shows at most 3 distinct contact numbers per candidate", () => {
+  const html = buildAttendanceSheetReportHtml({
+    title: "ورشة", kind: "candidates",
+    students: [{ academicId: "1", name: "طالب", phones: ["111", "111", "222", "333", "444"] }],
+  }, "2026-10-12");
+  assert.match(html, /<td>111 · 222 · 333<\/td>/);
+  assert.doesNotMatch(html, /444/);
+});

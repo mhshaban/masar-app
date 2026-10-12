@@ -10,7 +10,7 @@ import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
   updateDepartmentForm, removeDepartmentForm, addFinalCumulativeAverages, listTeachers, listTeachersDirectory, getTeacherPhoto, saveTeacher, removeTeacher,
 } from "./forms-service.js?v=2026-09-08-form-fields-1";
-import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeachers, accompanyingTeachersTableHtml } from "../../services/report-builders.js?v=2026-10-12-teachers-card-1";
+import { buildDepartmentFormReportHtml, buildAttendanceSheetReportHtml, accompanyingTeacherLabel, accompanyingTeachers, accompanyingTeachersTableHtml } from "../../services/report-builders.js?v=2026-10-12-phones-3";
 import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -483,6 +483,7 @@ function attendanceTimeRange({ startTime, endTime }) {
 // ٣٥ طالبًا بحد أقصى في الصفحة؛ كل صف معلمين إضافي فوق صفّين بالترويسة
 // يُنقص صفّي طلبة (مقيس: حتى ٤ مرافقين ٣٥، ٦ = ٣٤، ٨ = ٣٢، ١٠ = ٣١ يتسعون).
 const ROSTER_ROWS_PER_PAGE = 35;
+// أرقام تواصل الطالب بالكشوف: بلا تكرار، و٣ بالكثير (تكفي، وتبقي الصف بسطر واحد).
 function rosterRowsPerPage(teacherCount) {
   const teacherRows = teacherCount > 1 ? Math.ceil(teacherCount / 2) : teacherCount;
   return ROSTER_ROWS_PER_PAGE - 2 * Math.max(0, teacherRows - 2);
@@ -495,7 +496,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
     ? "<th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>اسم الطالب</th><th>الشعبة</th><th>أرقام التواصل</th>"
     : "<th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th>";
   const studentRow = (s, i) => isCandidates
-    ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
+    ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${[...new Set(s.phones || [])].slice(0, 3).map(esc).join(" · ") || "—"}</td></tr>`
     : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td></td></tr>`;
   const rosterTitle = isCandidates ? "قائمة الطلبة المرشحين" : "قائمة الطلبة المشاركين";
   const teachersTable = accompanyingTeachersTableHtml({ teachers, teacherPhones });
@@ -680,7 +681,7 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       ? "<th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>الاسم</th><th>الشعبة</th><th>أرقام التواصل</th>"
       : "<th>م</th><th>الرقم الأكاديمي</th><th>الاسم</th><th>الشعبة</th>";
     const previewRows = list.map((s, i) => isCandidates
-      ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`
+      ? `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${[...new Set(s.phones || [])].slice(0, 3).map(esc).join(" · ") || "—"}</td></tr>`
       : `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td></tr>`).join("");
     previewRoot.innerHTML = list.length
       ? `<p class="hint">${isCandidates ? "عدد الطلبة المرشحين" : "عدد الطلبة المشاركين"}: ${list.length}</p><div class="tablewrap"><table><thead><tr>${previewHead}</tr></thead><tbody>${previewRows}</tbody></table></div>`

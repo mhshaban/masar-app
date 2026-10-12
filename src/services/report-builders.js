@@ -386,7 +386,7 @@ export function buildAttendanceSheetReportHtml(data, exportedAt) {
       ${isCandidates
         ? `<tr><th>م</th><th>الرقم الأكاديمي</th><th>الرقم الشخصي</th><th>اسم الطالب</th><th>الشعبة</th><th>أرقام التواصل</th></tr>
       ${students.length
-        ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${(s.phones || []).map(esc).join(" · ") || "—"}</td></tr>`).join("")
+        ? students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.academicId || s.id)}</td><td>${esc(s.civilId) || "—"}</td><td>${esc(s.name)}</td><td>${esc(s.section) || "—"}</td><td>${[...new Set(s.phones || [])].slice(0, 3).map(esc).join(" · ") || "—"}</td></tr>`).join("")
         : '<tr><td colspan="6">لا يوجد طلبة مختارون</td></tr>'}`
         : `<tr><th>م</th><th>الرقم الأكاديمي</th><th>اسم الطالب</th><th>الشعبة</th><th>التوقيع</th></tr>
       ${students.length
