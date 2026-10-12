@@ -72,20 +72,27 @@ function printDailyReport(html) {
     @page{size:A4 portrait;margin:0 0 8mm}
     @page{@bottom-center{content:"صفحة " counter(page,arabic-indic) " من " counter(pages,arabic-indic);font-family:Cairo,Arial,sans-serif;font-size:8.5pt;color:#666}}
     html,body{margin:0;padding:0}
-    body{font-family:Cairo,Arial,sans-serif;direction:rtl;font-size:9pt;line-height:1.3}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:Cairo,Arial,sans-serif;direction:rtl;font-size:9pt;line-height:1.35;color:#111}
     table.report-page{width:100%;border-collapse:collapse}
-    table.report-page>thead>tr>td,table.report-page>tbody>tr>td{display:block;padding:8mm 9mm 0}
-    .dept-line{display:block;padding-bottom:2.5mm;margin-bottom:4mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:700}
-    table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}
-    th,td{border:1px solid #999;padding:3px 5px;text-align:right}
-    th{background:#1a2744;color:#fff}
+    table.report-page>thead>tr>td{display:block;padding:8mm 9mm 0}
+    table.report-page>tbody>tr>td{display:block;padding:1mm 9mm 0}
+    .dept-line{position:relative;display:block;padding-bottom:1.6mm;margin-bottom:3mm;border-bottom:.35mm solid #c8923a;color:#1a2744;font-size:11pt;font-weight:800}
+    .dept-line::after{content:"";position:absolute;right:0;bottom:-.75mm;width:32mm;height:1.15mm;background:#1a2744;border-radius:.3mm}
+    .report-page td table{width:100%;border-collapse:collapse;margin:0 0 4mm;page-break-inside:auto;font-size:8.7pt}
+    .report-page td th,.report-page td td{padding:1.4mm 2mm;text-align:right}
+    .report-page td th{background:#1a2744;color:#fff;font-weight:700}
+    .report-page td td{border-bottom:.2mm solid #e4e8ef}
+    .report-page td tbody tr:nth-child(even) td{background:#f8f9fc}
     tr,h1,h2{page-break-inside:avoid;page-break-after:auto}
-    h1{font-size:16pt;margin:0 0 6px}
-    h2{font-size:11pt;margin:9px 0 4px;color:#1a2744;page-break-after:avoid}
-    .meta{color:#666;font-size:8pt}
-    .document-approval{margin-top:7mm;padding-top:3mm;border-top:.25mm solid #999;page-break-inside:avoid}
-    .document-approval strong{display:block;margin-bottom:3mm;color:#1a2744}
-    .document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+    h1{font-size:15pt;font-weight:800;color:#1a2744;margin:0;padding-right:2.6mm;border-right:1.3mm solid #c8923a;line-height:1.25}
+    h2{display:flex;align-items:center;gap:1.8mm;font-size:10.5pt;font-weight:800;margin:0 0 1.5mm;padding:1.2mm 2.5mm;background:#f1f4f9;border:.25mm solid #d5dbe6;border-radius:1.5mm;color:#1a2744;page-break-after:avoid}
+    h2::before{content:"";width:1.6mm;height:1.6mm;border-radius:.4mm;background:#c8923a}
+    .meta{color:#5b6680;font-size:8pt;margin:.8mm 0 3.5mm;padding-right:3.9mm}
+    .document-approval{margin-top:5mm;padding:0 3.6mm 3mm;border:.25mm solid #d5dbe6;border-radius:1.8mm;page-break-inside:avoid}
+    .document-approval strong{display:flex;align-items:center;gap:1.8mm;margin:0 -3.6mm 2.5mm;padding:1.2mm 3.6mm;background:#f1f4f9;border-bottom:.25mm solid #d5dbe6;color:#1a2744;font-size:10.5pt}
+    .document-approval strong::before{content:"";width:1.6mm;height:1.6mm;border-radius:.4mm;background:#c8923a}
+    .document-approval div{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm;font-size:8.7pt}
   </style></head><body><table class="report-page">
     <thead><tr><td><div class="dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>${head}</td></tr></thead>
     <tbody><tr><td>${body}<div class="document-approval"><strong>الاعتماد</strong><div><span>يعتمد من: ................................</span><span>التاريخ: ........ / ........ / ................</span><span>التوقيع: ................................</span></div></div></td></tr></tbody>
