@@ -552,24 +552,10 @@
   .event-approval-section { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-700); }
   .event-approval-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   .event-approval-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-  .event-approval-print .ea-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 4mm; padding-bottom: 1.5mm; border-bottom: .35mm solid #c8923a; color: #1a2744; font-weight: 700; line-height: 1.35; }
-  .event-approval-print .ea-title { margin: 3mm 0 3mm; text-align: center; font-size: 15pt; color: #1a2744; }
-  .event-approval-print .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 2mm; }
-  .event-approval-print .ea-grid th, .event-approval-print .ea-grid td { border: .3mm solid #444; padding: 1.4mm 2mm; text-align: right; vertical-align: middle; overflow-wrap: anywhere; }
-  .event-approval-print .ea-grid th { background: #e4e4e4; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .event-approval-print .ea-centered th, .event-approval-print .ea-centered td { text-align: center; }
-  .event-approval-print .ea-label { width: 24%; }
-  .event-approval-print .ea-label-sm { width: 14%; }
-  .event-approval-print .ea-value-sm { width: 20%; }
-  .event-approval-print .ea-label-xs { width: 10%; }
-  .event-approval-print .ea-date { width: 19%; }
-  .event-approval-print .ea-duration { width: 12%; }
-  .event-approval-print .ea-stamp { width: 22%; }
-  .event-approval-print .ea-tall td { height: 22mm; vertical-align: top; }
-  .event-approval-print .ea-sign td, .event-approval-print .ea-sign th { height: 24mm; }
+  .event-approval-print .ea-pairs th { width: 22%; }
+  .event-approval-print .ea-counts th, .event-approval-print .ea-counts td { text-align: center; }
+  .event-approval-print .ea-counts tbody th { text-align: right; width: 22%; }
   .event-approval-print .ea-multiline { white-space: pre-wrap; }
-  .event-approval-print .ea-grid .ea-time th, .event-approval-print .ea-grid .ea-time td { padding-inline: 1mm; white-space: nowrap; font-size: 8.5pt; }
-  .event-approval-print .ea-blank { background: #fff; }
   .forms-entry-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--ink-500); font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 10.5px; }
   .forms-entry-footer strong { color: inherit; font-weight: 700; }
   .teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
@@ -688,10 +674,11 @@
     .forms-print .card.print-flow { break-inside: auto; }
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */
     .forms-print .card.print-own-page + .card.print-own-page { break-before: page; }
-    .event-approval-print .ea-grid { font-size: 9pt; line-height: 1.35; break-inside: avoid; }
-    .event-approval-print .ea-grid th, .event-approval-print .ea-grid td { padding: 1.4mm 2mm; border: .3mm solid #444 !important; }
-    .event-approval-print .ea-grid th { background: #e4e4e4 !important; }
-    .event-approval-print .ea-grid .ea-time th, .event-approval-print .ea-grid .ea-time td { padding-inline: 1mm; }
+    /* استمارة اعتماد فعالية: نفس قالب الاستمارات بتباعد أدق لتبقى بصفحة واحدة. */
+    .event-approval-print .card { padding: 2.2mm 3.5mm; margin: 0 0 2.2mm; }
+    .event-approval-print .card h2 { margin: 0 0 1mm; font-size: 10.5pt; }
+    .event-approval-print th, .event-approval-print td { padding: 1mm 2mm; }
+    .event-approval-print .print-approval { min-height: 0; margin-top: 2mm; padding-top: 2mm; }
   }
 
   .backlink { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-500); background: none; border: none; cursor: pointer; font-family: inherit; margin-bottom: 12px; padding: 0; }

@@ -31,59 +31,61 @@ function formatDate(date) {
   return `${esc(day)} <span dir="ltr">${esc(date)}</span>`;
 }
 
-// نسخة طباعة مطابقة لترتيب النموذج الرسمي (خلايا عناوين رمادية وجداول
-// متتالية)، مقصورة على بنود المدرسة والقسم.
+// نفس قالب طباعة استمارات مسار (سطر القسم + العنوان + بطاقات)، ببنود
+// المدرسة والقسم فقط من النموذج الرسمي.
 export function eventApprovalMarkup(raw) {
   const d = normalizeEventApproval(raw);
-  const v = (value) => (value ? esc(value) : "&nbsp;");
-  const multi = (value) => (value ? `<div class="ea-multiline">${esc(value)}</div>` : "&nbsp;");
+  const v = (value) => (value ? esc(value) : "—");
+  const multi = (value) => (value ? `<div class="ea-multiline">${esc(value)}</div>` : "—");
+  const time = (t) => v(formatTime(t));
   return `<table class="forms-print event-approval-print">
     <thead><tr><td>
-      <div class="ea-header"><div>مملكة البحرين<br>وزارة التربية والتعليم</div><div>${esc(DEPARTMENT_NAME)}</div></div>
-      <h1 class="ea-title">${FORM_TITLE}</h1>
+      <div class="print-dept-line">${esc(DEPARTMENT_NAME)}</div>
+      <div class="topbar"><div><h1>${FORM_TITLE}</h1><div class="sub">تاريخ الطلب: ${v(d.requestDate)}</div></div></div>
     </td></tr></thead>
     <tbody><tr><td>
-      <table class="ea-grid">
-        <colgroup><col class="ea-label"><col><col class="ea-label-sm"><col class="ea-value-sm"></colgroup>
-        <tr><th>اسم الفعالية</th><td colspan="3"><strong>${v(d.title)}</strong></td></tr>
-        <tr><th>اسم المدرسة</th><td>${v(d.schoolName)}</td><th>تاريخ الطلب</th><td>${v(d.requestDate)}</td></tr>
-        <tr><th>نوع الفعالية / النشاط المطلوب</th><td>${v(d.eventType)}</td><th>الجهة المعنية</th><td>${v(d.concernedParty)}</td></tr>
-        <tr class="ea-tall"><th>وصف الفعالية / النشاط</th><td colspan="3">${multi(d.description)}</td></tr>
-        <tr class="ea-tall"><th>مبررات تنفيذ الفعالية / أهداف الفعالية</th><td colspan="3">${multi(d.objectives)}</td></tr>
-      </table>
-      <table class="ea-grid">
-        <colgroup><col class="ea-label"><col class="ea-date"><col class="ea-label-xs"><col><col class="ea-label-xs"><col><col class="ea-label-xs"><col class="ea-duration"></colgroup>
-        <tr class="ea-time"><th>تاريخ التنفيذ</th><td>${formatDate(d.date) || "&nbsp;"}</td><th>من الساعة</th><td>${v(formatTime(d.startTime))}</td><th>إلى الساعة</th><td>${v(formatTime(d.endTime))}</td><th>المدة الزمنية</th><td>${v(d.duration)}</td></tr>
-      </table>
-      <table class="ea-grid">
-        <colgroup><col class="ea-label"><col></colgroup>
-        <tr><th>اسم الراعي</th><td>${v(d.sponsor)}</td></tr>
-        <tr><th>الميزانية المخصصة</th><td>${v(d.budget)}</td></tr>
-      </table>
-      <table class="ea-grid ea-centered">
-        <tr><th colspan="3">الجهة المنظمة</th><th colspan="2">المشرف على التنظيم</th></tr>
-        <tr><th>الاسم</th><th>المسمى الوظيفي</th><th>جهة العمل</th><th>الاسم</th><th>المسمى الوظيفي</th></tr>
-        <tr><td>${v(d.organizerName)}</td><td>${v(d.organizerTitle)}</td><td>${v(d.organizerWorkplace)}</td><td>${v(d.supervisorName)}</td><td>${v(d.supervisorTitle)}</td></tr>
-      </table>
-      <table class="ea-grid ea-centered">
-        <tr><th>اسم المحاضر / منفذ الورشة أو الندوة</th><th>جهة العمل</th><th>الجهات الأخرى المتعاونة</th></tr>
-        <tr><td>${v(d.presenterName)}</td><td>${v(d.presenterWorkplace)}</td><td>${v(d.partners)}</td></tr>
-      </table>
-      <table class="ea-grid ea-centered">
-        <colgroup><col class="ea-label"><col><col><col><col><col></colgroup>
-        <tr><th rowspan="2">عدد المنتفعين</th>${BENEFICIARY_GROUPS.map((g) => `<th>${g.label}</th>`).join("")}</tr>
-        <tr>${BENEFICIARY_GROUPS.map((g) => `<td>${v(d.beneficiaries[g.key])}</td>`).join("")}</tr>
-        <tr><th rowspan="2">عدد المنتفعين من مدارس أخرى</th>${OTHER_SCHOOL_GROUPS.map((g) => `<th>${g.label}</th>`).join("")}<td rowspan="2" class="ea-blank"></td></tr>
-        <tr>${OTHER_SCHOOL_GROUPS.map((g) => `<td>${v(d.otherSchoolBeneficiaries[g.key])}</td>`).join("")}</tr>
-      </table>
-      <table class="ea-grid">
-        <colgroup><col class="ea-label"><col></colgroup>
-        <tr class="ea-tall"><th>أهم الملاحظات</th><td>${multi(d.notes)}</td></tr>
-      </table>
-      <table class="ea-grid">
-        <colgroup><col class="ea-label"><col><col class="ea-label-xs"><col class="ea-stamp"></colgroup>
-        <tr class="ea-sign"><th>يعتمد من مدير(ة) المدرسة</th><td></td><th>ختم المدرسة</th><td></td></tr>
-      </table>
+      <div class="card"><h2>بيانات الفعالية</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>اسم الفعالية</th><td colspan="3"><strong>${v(d.title)}</strong></td></tr>
+          <tr><th>اسم المدرسة</th><td colspan="3">${v(d.schoolName)}</td></tr>
+          <tr><th>نوع الفعالية / النشاط المطلوب</th><td>${v(d.eventType)}</td><th>الجهة المعنية</th><td>${v(d.concernedParty)}</td></tr>
+          <tr><th>وصف الفعالية / النشاط</th><td colspan="3">${multi(d.description)}</td></tr>
+          <tr><th>مبررات تنفيذ الفعالية / أهداف الفعالية</th><td colspan="3">${multi(d.objectives)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>موعد التنفيذ والتمويل</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>تاريخ التنفيذ</th><td>${formatDate(d.date) || "—"}</td><th>المدة الزمنية</th><td>${v(d.duration)}</td></tr>
+          <tr><th>من الساعة</th><td>${time(d.startTime)}</td><th>إلى الساعة</th><td>${time(d.endTime)}</td></tr>
+          <tr><th>اسم الراعي</th><td>${v(d.sponsor)}</td><th>الميزانية المخصصة</th><td>${v(d.budget)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>الجهة المنظمة والمشرف على التنظيم</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th></th><th>الاسم</th><th>المسمى الوظيفي</th><th>جهة العمل</th></tr></thead>
+          <tbody>
+            <tr><th>الجهة المنظمة</th><td>${v(d.organizerName)}</td><td>${v(d.organizerTitle)}</td><td>${v(d.organizerWorkplace)}</td></tr>
+            <tr><th>المشرف على التنظيم</th><td>${v(d.supervisorName)}</td><td>${v(d.supervisorTitle)}</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>المحاضر والجهات المتعاونة</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>اسم المحاضر / منفذ الورشة أو الندوة</th><td>${v(d.presenterName)}</td><th>جهة العمل</th><td>${v(d.presenterWorkplace)}</td></tr>
+          <tr><th>الجهات الأخرى المتعاونة</th><td colspan="3">${v(d.partners)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>عدد المنتفعين</h2>
+        <div class="tablewrap"><table class="ea-counts">
+          <thead><tr><th></th>${BENEFICIARY_GROUPS.map((g) => `<th>${g.label}</th>`).join("")}</tr></thead>
+          <tbody>
+            <tr><th>من المدرسة</th>${BENEFICIARY_GROUPS.map((g) => `<td>${v(d.beneficiaries[g.key])}</td>`).join("")}</tr>
+            <tr><th>من مدارس أخرى</th>${BENEFICIARY_GROUPS.map((g) => `<td>${g.key in d.otherSchoolBeneficiaries ? v(d.otherSchoolBeneficiaries[g.key]) : "—"}</td>`).join("")}</tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>أهم الملاحظات</h2>${multi(d.notes)}</div>
+      <div class="print-approval form-workflow"><strong>اعتماد مدير(ة) المدرسة</strong><div class="workflow-signatures"><span>الاسم: ................................</span><span>التوقيع: ................................</span><span>ختم المدرسة:</span></div></div>
     </td></tr></tbody>
   </table>`;
 }
