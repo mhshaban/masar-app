@@ -19,8 +19,10 @@ function currentActor() {
 
 function validate(data) {
   if (!String(data.title || "").trim()) throw new Error("اكتب عنوان الفعالية أولًا");
-  // استمارة اعتماد الفعالية (kind = "approval") تُحفظ بنفس الجدول بلا قائمة طلبة.
-  if (data.kind !== "approval" && !data.students?.length) throw new Error("اختر الطلبة المشاركين أولًا");
+  // كشوف الحضور/المرشحين وملف الفعالية فقط تتطلب طلبة؛ بقية السجلات بنفس الجدول (استمارة
+  // اعتماد الفعالية "approval"، حملات زيارة الشعب "visits") بلا قائمة طلبة.
+  const needsStudents = !data.kind || data.kind === "attendance" || data.kind === "candidates" || data.kind === "event";
+  if (needsStudents && !data.students?.length) throw new Error("اختر الطلبة المشاركين أولًا");
 }
 
 export async function listAttendanceSheets() {
@@ -47,7 +49,8 @@ export async function createAttendanceSheet(data) {
 export async function updateAttendanceSheet(id, data) {
   const current = await getAttendanceSheet(id);
   if (!current) throw new Error("كشف الحضور غير موجود");
-  validate(data);
+  // التحقق على السجل بعد الدمج: تحديث جزئي (مثل شطب زيارة شعبة) لا يحمل العنوان.
+  validate({ ...current, ...data });
   const actor = currentActor();
   return save("attendanceSheets", {
     ...current,

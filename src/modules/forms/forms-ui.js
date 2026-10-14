@@ -5,6 +5,7 @@ import { getFilterOptions, listStudentsForSection } from "../students/students-s
 import {
   createAttendanceSheet, updateAttendanceSheet, listAttendanceSheets, getAttendanceSheet, removeAttendanceSheet,
 } from "./attendance-service.js";
+import { levelOfSection } from "../schedule/section-locations-service.js?v=2026-10-08-section-locations-1";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
@@ -15,6 +16,7 @@ import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-pr
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
+import { renderEventFiles } from "./event-file-ui.js?v=2026-10-14-event-file-1";
 import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-print-spacing-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -534,7 +536,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
   }).join("");
 }
 
-async function printAttendanceSheetDirect(data) {
+export async function printAttendanceSheetDirect(data) {
   await printMarkupInPopup(data.title || (data.kind === "candidates" ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية"), attendanceSheetMarkup(data));
 }
 
@@ -576,8 +578,12 @@ async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
   }));
 }
 
-async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance") {
-  const isCandidates = kind === "candidates";
+// kind = "event": ملف الفعالية الموحّد (event-file-ui.js) يستخدم نفس المحرر
+// لبيانات الفعالية واختيار المرشحين (بأعمدة كشف المرشحين)، ثم يفتح ملفها بعد
+// الحفظ: onDone(id) يستقبل معرّف السجل المحفوظ.
+export async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance") {
+  const isEvent = kind === "event";
+  const isCandidates = kind === "candidates" || isEvent;
   const [schoolOptions, teachers, existing] = await Promise.all([
     getFilterOptions(), listTeachers(), sheetId ? getAttendanceSheet(sheetId) : Promise.resolve(null),
   ]);
@@ -593,16 +599,20 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   while (teacherRows.length < 2) teacherRows.push({ name: "", phone: "" });
 
   let mode = "section";
-  let sectionRoster = [];
+  // شعبة كاملة أو أكثر: كل شعبة مختارة تُحمَّل طلبتها مرة واحدة، والقائمة
+  // بترتيب اختيار الشعب.
+  let selectedSections = [];
+  const rosterBySection = new Map();
   let sectionSelectedIds = new Set();
+  const sectionRoster = () => selectedSections.flatMap((section) => rosterBySection.get(section) || []);
   let customStudents = existing?.students ? [...existing.students] : [];
 
   root.innerHTML = `<div class="card forms-card">
     <div class="card-head">
-      <h2>${sheetId ? (isCandidates ? "تعديل كشف المرشحين" : "تعديل كشف الحضور") : (isCandidates ? "كشف طلاب مرشحين لفعالية جديد" : "كشف حضور فعالية جديد")}</h2>
-      <button class="btn btn-ghost" type="button" id="attendance-back">رجوع للسجل</button>
+      <h2>${isEvent ? (sheetId ? "تعديل بيانات الفعالية والمرشحين" : "ملف فعالية جديد") : sheetId ? (isCandidates ? "تعديل كشف المرشحين" : "تعديل كشف الحضور") : (isCandidates ? "كشف طلاب مرشحين لفعالية جديد" : "كشف حضور فعالية جديد")}</h2>
+      <button class="btn btn-ghost" type="button" id="attendance-back">${isEvent && sheetId ? "رجوع لملف الفعالية" : "رجوع للسجل"}</button>
     </div>
-    <p class="hint">${isCandidates ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ الكشف أو اطبعه أو صدّره Word." : "عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word."}</p>
+    <p class="hint">${isEvent ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ لمتابعة موافقات أولياء الأمور وكشف الحضور من ملف الفعالية." : isCandidates ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ الكشف أو اطبعه أو صدّره Word." : "عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word."}</p>
     <form id="attendance-form" class="forms-grid">
       ${field("عنوان الفعالية", "title", "text", true, existing?.title || "", true)}
       ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
@@ -618,21 +628,21 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       <div class="forms-field forms-wide">
         <span>اختيار الطلبة</span>
         <div class="chip-row" id="attendance-mode-chips">
-          <div class="chip${mode === "section" ? " on" : ""}" data-mode="section">شعبة كاملة</div>
+          <div class="chip${mode === "section" ? " on" : ""}" data-mode="section">شعبة كاملة أو أكثر</div>
           <div class="chip${mode === "custom" ? " on" : ""}" data-mode="custom">طلاب من شعب مختلفة</div>
         </div>
       </div>
       <div id="attendance-picker" class="forms-wide"></div>
       <div id="attendance-students-preview" class="forms-wide"></div>
       <div class="forms-actions forms-wide">
-        <button class="btn btn-primary" type="button" id="attendance-save">حفظ الكشف</button>
-        <button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
-        <button class="btn btn-ghost" type="button" id="attendance-word">تصدير Word</button>
+        <button class="btn btn-primary" type="button" id="attendance-save">${isEvent ? "حفظ ومتابعة" : "حفظ الكشف"}</button>
+        ${isEvent ? "" : `<button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
+        <button class="btn btn-ghost" type="button" id="attendance-word">تصدير Word</button>`}
       </div>
     </form>
   </div>`;
 
-  root.querySelector("#attendance-back").addEventListener("click", onDone);
+  root.querySelector("#attendance-back").addEventListener("click", () => onDone());
 
   const teachersRoot = root.querySelector("#attendance-teachers");
   const syncTeacherRows = () => {
@@ -644,7 +654,7 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   const renderTeacherRows = () => {
     teachersRoot.innerHTML = teacherRows.map((t, i) => `
       <div data-teacher-row style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
-        <strong style="min-width:150px; color:var(--ink-700);">${esc(accompanyingTeacherLabel(i))}</strong>
+        <strong style="min-width:150px; color:var(--ink-800);">${esc(accompanyingTeacherLabel(i))}</strong>
         <input data-role="name" list="attendance-teachers-list" autocomplete="off" placeholder="اسم المعلم" value="${esc(t.name)}" aria-label="${esc(accompanyingTeacherLabel(i))}" style="flex:2 1 200px;">
         <input data-role="phone" type="tel" dir="ltr" placeholder="رقم التواصل" value="${esc(t.phone)}" aria-label="رقم تواصل ${esc(accompanyingTeacherLabel(i))}" style="flex:1 1 130px;">
         ${i >= 2 ? '<button class="link-btn forms-danger" type="button" data-role="remove">حذف</button>' : ""}
@@ -673,7 +683,7 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   const pickerRoot = root.querySelector("#attendance-picker");
   const previewRoot = root.querySelector("#attendance-students-preview");
 
-  const currentStudents = () => (mode === "section" ? sectionRoster.filter((s) => sectionSelectedIds.has(s.id)) : customStudents);
+  const currentStudents = () => (mode === "section" ? sectionRoster().filter((s) => sectionSelectedIds.has(s.id)) : customStudents);
 
   const renderPreview = () => {
     const list = currentStudents();
@@ -688,53 +698,80 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       : '<div class="empty">لم يتم اختيار طلبة بعد</div>';
   };
 
-  // بطاقات checkbox لكل طالب بالشعبة — كلهم محدَّدون افتراضيًا (كل الشعبة)،
-  // ويقدر المرشد يلغي تحديد من يبي استبعادهم بدل اضطراره لأخذ الشعبة كاملة.
+  // طلبة كل شعبة مختارة بمجموعة مستقلة، كلهم محدَّدون افتراضيًا (الشعبة كاملة)،
+  // ويقدر المرشد يلغي تحديد من يبي استبعادهم، أو يحدد/يلغي شعبة كاملة.
   const renderSectionRoster = () => {
     const rosterRoot = pickerRoot.querySelector("#attendance-section-roster");
     if (!rosterRoot) return;
-    rosterRoot.innerHTML = sectionRoster.length ? `
+    const roster = sectionRoster();
+    rosterRoot.innerHTML = roster.length ? `
       <div class="forms-actions" style="margin:8px 0;">
         <button type="button" class="btn btn-ghost" id="attendance-select-all">تحديد الكل</button>
         <button type="button" class="btn btn-ghost" id="attendance-select-none">إلغاء تحديد الكل</button>
       </div>
-      <ul class="plain">
-        ${sectionRoster.map((s) => `
-          <li class="row-item">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
-              <input type="checkbox" class="attendance-roster-checkbox" data-id="${esc(s.id)}" ${sectionSelectedIds.has(s.id) ? "checked" : ""}>
-              <span>${esc(s.name)} <span class="hint">(${esc(s.academicId || s.id)})</span></span>
-            </label>
-          </li>
-        `).join("")}
-      </ul>
+      ${selectedSections.map((section) => {
+        const list = rosterBySection.get(section) || [];
+        const picked = list.filter((s) => sectionSelectedIds.has(s.id)).length;
+        return `<div class="roster-section">
+          <div class="roster-section-head"><strong>${esc(section)}</strong> <span class="hint">(${picked} من ${list.length})</span>
+            <button type="button" class="link-btn" data-section-all="${esc(section)}">تحديد الشعبة</button>
+            <button type="button" class="link-btn" data-section-none="${esc(section)}">إلغاء الشعبة</button>
+          </div>
+          ${list.length ? `<ul class="plain">${list.map((s) => `
+            <li class="row-item">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
+                <input type="checkbox" class="attendance-roster-checkbox" data-id="${esc(s.id)}" ${sectionSelectedIds.has(s.id) ? "checked" : ""}>
+                <span>${esc(s.name)} <span class="hint">(${esc(s.academicId || s.id)})</span></span>
+              </label>
+            </li>`).join("")}</ul>` : '<p class="hint">لا يوجد طلبة بهذه الشعبة.</p>'}
+        </div>`;
+      }).join("")}
     ` : "";
     rosterRoot.querySelectorAll(".attendance-roster-checkbox").forEach((checkbox) => {
       checkbox.addEventListener("change", () => {
         if (checkbox.checked) sectionSelectedIds.add(checkbox.dataset.id); else sectionSelectedIds.delete(checkbox.dataset.id);
+        renderSectionRoster();
         renderPreview();
       });
     });
-    rosterRoot.querySelector("#attendance-select-all")?.addEventListener("click", () => {
-      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
-      renderSectionRoster();
-      renderPreview();
-    });
-    rosterRoot.querySelector("#attendance-select-none")?.addEventListener("click", () => {
-      sectionSelectedIds = new Set();
-      renderSectionRoster();
-      renderPreview();
-    });
+    const setMany = (list, on) => { for (const s of list) { if (on) sectionSelectedIds.add(s.id); else sectionSelectedIds.delete(s.id); } renderSectionRoster(); renderPreview(); };
+    rosterRoot.querySelector("#attendance-select-all")?.addEventListener("click", () => setMany(sectionRoster(), true));
+    rosterRoot.querySelector("#attendance-select-none")?.addEventListener("click", () => setMany(sectionRoster(), false));
+    rosterRoot.querySelectorAll("[data-section-all]").forEach((btn) => btn.addEventListener("click", () => setMany(rosterBySection.get(btn.dataset.sectionAll) || [], true)));
+    rosterRoot.querySelectorAll("[data-section-none]").forEach((btn) => btn.addEventListener("click", () => setMany(rosterBySection.get(btn.dataset.sectionNone) || [], false)));
   };
 
+  // اختيار شعبة أو أكثر من شارات الشعب (مجمّعة حسب المستوى).
   const mountSectionPicker = () => {
-    pickerRoot.innerHTML = `<label class="forms-field forms-wide"><span>الشعبة</span><select id="attendance-section-select"><option value="">اختر الشعبة</option>${schoolOptions.sections.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label><div id="attendance-section-roster" class="forms-wide"></div>`;
-    pickerRoot.querySelector("#attendance-section-select").addEventListener("change", async (event) => {
-      sectionRoster = event.target.value ? await listStudentsForSection(event.target.value) : [];
-      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
+    const byLevel = new Map();
+    for (const section of schoolOptions.sections) {
+      const level = levelOfSection(section) || "غير محدد";
+      if (!byLevel.has(level)) byLevel.set(level, []);
+      byLevel.get(level).push(section);
+    }
+    pickerRoot.innerHTML = `<div class="forms-field forms-wide"><span>الشعب — اختر شعبة أو أكثر <span class="hint" id="attendance-sections-count">${selectedSections.length ? `(${selectedSections.length} مختارة)` : ""}</span></span>
+      ${[...byLevel.entries()].map(([level, list]) => `<div class="visits-level"><div class="visits-level-head">المستوى ${esc(level)}</div>
+        <div class="visits-grid">${list.map((section) => `<label class="visits-chip"><input type="checkbox" data-pick-section="${esc(section)}" ${selectedSections.includes(section) ? "checked" : ""}> ${esc(section)}</label>`).join("")}</div></div>`).join("")}
+    </div><div id="attendance-section-roster" class="forms-wide"></div>`;
+    pickerRoot.querySelectorAll("[data-pick-section]").forEach((box) => box.addEventListener("change", async () => {
+      const section = box.dataset.pickSection;
+      if (box.checked) {
+        box.disabled = true;
+        try {
+          if (!rosterBySection.has(section)) rosterBySection.set(section, await listStudentsForSection(section));
+          if (!selectedSections.includes(section)) selectedSections.push(section);
+          for (const s of rosterBySection.get(section)) sectionSelectedIds.add(s.id);
+        } catch (error) { box.checked = false; notify(error.message || "تعذر تحميل طلبة الشعبة"); }
+        box.disabled = false;
+      } else {
+        selectedSections = selectedSections.filter((x) => x !== section);
+        for (const s of rosterBySection.get(section) || []) sectionSelectedIds.delete(s.id);
+      }
+      pickerRoot.querySelector("#attendance-sections-count").textContent = selectedSections.length ? `(${selectedSections.length} مختارة)` : "";
       renderSectionRoster();
       renderPreview();
-    });
+    }));
+    renderSectionRoster();
   };
   const mountCustomPicker = () => {
     pickerRoot.innerHTML = `<div id="attendance-custom-picker"></div>`;
@@ -792,21 +829,22 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
     if (!validate(data)) return;
     const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ الحفظ…";
     try {
-      if (sheetId) { await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
-      else { await createAttendanceSheet(data); notify(isCandidates ? "تم حفظ كشف المرشحين" : "تم حفظ كشف الحضور"); }
-      await onDone();
+      let saved;
+      if (sheetId) { saved = await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
+      else { saved = await createAttendanceSheet(data); notify(isEvent ? "تم إنشاء ملف الفعالية" : isCandidates ? "تم حفظ كشف المرشحين" : "تم حفظ كشف الحضور"); }
+      await onDone(saved?.id);
     } catch (error) { notify(error.message || "تعذر حفظ الكشف"); }
     finally { button.disabled = false; button.textContent = original; }
   });
 
-  root.querySelector("#attendance-word").addEventListener("click", () => {
+  root.querySelector("#attendance-word")?.addEventListener("click", () => {
     const data = buildData();
     if (!validate(data)) return;
     const html = buildAttendanceSheetReportHtml(data, new Date().toLocaleString("ar-BH"));
     downloadAsWordDoc(data.title, html, `${isCandidates ? "كشف-مرشحين" : "كشف-حضور"}-${data.title}-${data.date || today()}`.replace(/[\\/:*?"<>|]/g, "-"));
   });
 
-  root.querySelector("#attendance-print").addEventListener("click", async () => {
+  root.querySelector("#attendance-print")?.addEventListener("click", async () => {
     const data = buildData();
     if (!validate(data)) return;
     await printAttendanceSheetDirect(data);
@@ -841,7 +879,7 @@ export async function mountTeachersView(container) {
 
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="events">ملفات الفعاليات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -854,6 +892,7 @@ export async function mountFormsView(container, options = {}) {
         const openEdit = (id) => renderEdit(content, id, back, openDetail);
         await renderLog(content, openDetail, openEdit);
       }
+      else if (tab === "events") await renderEventFiles(content, { renderEditor: renderAttendanceEditor, printSheet: printAttendanceSheetDirect });
       else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
       else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
       else await renderEventApprovals(content);
