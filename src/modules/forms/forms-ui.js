@@ -15,6 +15,7 @@ import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-pr
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
+import { renderEventFiles } from "./event-file-ui.js?v=2026-10-14-event-file-1";
 import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-print-spacing-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -534,7 +535,7 @@ function attendanceSheetMarkup({ title, location, day, date, startTime, endTime,
   }).join("");
 }
 
-async function printAttendanceSheetDirect(data) {
+export async function printAttendanceSheetDirect(data) {
   await printMarkupInPopup(data.title || (data.kind === "candidates" ? "كشف طلاب مرشحين لفعالية" : "كشف حضور فعالية"), attendanceSheetMarkup(data));
 }
 
@@ -576,8 +577,12 @@ async function renderAttendanceLog(root, onNew, onEdit, kind = "attendance") {
   }));
 }
 
-async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance") {
-  const isCandidates = kind === "candidates";
+// kind = "event": ملف الفعالية الموحّد (event-file-ui.js) يستخدم نفس المحرر
+// لبيانات الفعالية واختيار المرشحين (بأعمدة كشف المرشحين)، ثم يفتح ملفها بعد
+// الحفظ: onDone(id) يستقبل معرّف السجل المحفوظ.
+export async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance") {
+  const isEvent = kind === "event";
+  const isCandidates = kind === "candidates" || isEvent;
   const [schoolOptions, teachers, existing] = await Promise.all([
     getFilterOptions(), listTeachers(), sheetId ? getAttendanceSheet(sheetId) : Promise.resolve(null),
   ]);
@@ -599,10 +604,10 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
 
   root.innerHTML = `<div class="card forms-card">
     <div class="card-head">
-      <h2>${sheetId ? (isCandidates ? "تعديل كشف المرشحين" : "تعديل كشف الحضور") : (isCandidates ? "كشف طلاب مرشحين لفعالية جديد" : "كشف حضور فعالية جديد")}</h2>
-      <button class="btn btn-ghost" type="button" id="attendance-back">رجوع للسجل</button>
+      <h2>${isEvent ? (sheetId ? "تعديل بيانات الفعالية والمرشحين" : "ملف فعالية جديد") : sheetId ? (isCandidates ? "تعديل كشف المرشحين" : "تعديل كشف الحضور") : (isCandidates ? "كشف طلاب مرشحين لفعالية جديد" : "كشف حضور فعالية جديد")}</h2>
+      <button class="btn btn-ghost" type="button" id="attendance-back">${isEvent && sheetId ? "رجوع لملف الفعالية" : "رجوع للسجل"}</button>
     </div>
-    <p class="hint">${isCandidates ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ الكشف أو اطبعه أو صدّره Word." : "عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word."}</p>
+    <p class="hint">${isEvent ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ لمتابعة موافقات أولياء الأمور وكشف الحضور من ملف الفعالية." : isCandidates ? "عبّئ بيانات الفعالية واختر الطلبة المرشحين، ثم احفظ الكشف أو اطبعه أو صدّره Word." : "عبّئ بيانات الفعالية واختر الطلبة المشاركين، ثم احفظ الكشف أو اطبعه أو صدّره Word."}</p>
     <form id="attendance-form" class="forms-grid">
       ${field("عنوان الفعالية", "title", "text", true, existing?.title || "", true)}
       ${field("مكان الفعالية", "location", "text", false, existing?.location || "")}
@@ -625,14 +630,14 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
       <div id="attendance-picker" class="forms-wide"></div>
       <div id="attendance-students-preview" class="forms-wide"></div>
       <div class="forms-actions forms-wide">
-        <button class="btn btn-primary" type="button" id="attendance-save">حفظ الكشف</button>
-        <button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
-        <button class="btn btn-ghost" type="button" id="attendance-word">تصدير Word</button>
+        <button class="btn btn-primary" type="button" id="attendance-save">${isEvent ? "حفظ ومتابعة" : "حفظ الكشف"}</button>
+        ${isEvent ? "" : `<button class="btn btn-ghost" type="button" id="attendance-print">طباعة</button>
+        <button class="btn btn-ghost" type="button" id="attendance-word">تصدير Word</button>`}
       </div>
     </form>
   </div>`;
 
-  root.querySelector("#attendance-back").addEventListener("click", onDone);
+  root.querySelector("#attendance-back").addEventListener("click", () => onDone());
 
   const teachersRoot = root.querySelector("#attendance-teachers");
   const syncTeacherRows = () => {
@@ -644,7 +649,7 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
   const renderTeacherRows = () => {
     teachersRoot.innerHTML = teacherRows.map((t, i) => `
       <div data-teacher-row style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
-        <strong style="min-width:150px; color:var(--ink-700);">${esc(accompanyingTeacherLabel(i))}</strong>
+        <strong style="min-width:150px; color:var(--ink-800);">${esc(accompanyingTeacherLabel(i))}</strong>
         <input data-role="name" list="attendance-teachers-list" autocomplete="off" placeholder="اسم المعلم" value="${esc(t.name)}" aria-label="${esc(accompanyingTeacherLabel(i))}" style="flex:2 1 200px;">
         <input data-role="phone" type="tel" dir="ltr" placeholder="رقم التواصل" value="${esc(t.phone)}" aria-label="رقم تواصل ${esc(accompanyingTeacherLabel(i))}" style="flex:1 1 130px;">
         ${i >= 2 ? '<button class="link-btn forms-danger" type="button" data-role="remove">حذف</button>' : ""}
@@ -792,21 +797,22 @@ async function renderAttendanceEditor(root, sheetId, onDone, kind = "attendance"
     if (!validate(data)) return;
     const button = event.currentTarget; const original = button.textContent; button.disabled = true; button.textContent = "جارٍ الحفظ…";
     try {
-      if (sheetId) { await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
-      else { await createAttendanceSheet(data); notify(isCandidates ? "تم حفظ كشف المرشحين" : "تم حفظ كشف الحضور"); }
-      await onDone();
+      let saved;
+      if (sheetId) { saved = await updateAttendanceSheet(sheetId, data); notify("تم حفظ التعديلات"); }
+      else { saved = await createAttendanceSheet(data); notify(isEvent ? "تم إنشاء ملف الفعالية" : isCandidates ? "تم حفظ كشف المرشحين" : "تم حفظ كشف الحضور"); }
+      await onDone(saved?.id);
     } catch (error) { notify(error.message || "تعذر حفظ الكشف"); }
     finally { button.disabled = false; button.textContent = original; }
   });
 
-  root.querySelector("#attendance-word").addEventListener("click", () => {
+  root.querySelector("#attendance-word")?.addEventListener("click", () => {
     const data = buildData();
     if (!validate(data)) return;
     const html = buildAttendanceSheetReportHtml(data, new Date().toLocaleString("ar-BH"));
     downloadAsWordDoc(data.title, html, `${isCandidates ? "كشف-مرشحين" : "كشف-حضور"}-${data.title}-${data.date || today()}`.replace(/[\\/:*?"<>|]/g, "-"));
   });
 
-  root.querySelector("#attendance-print").addEventListener("click", async () => {
+  root.querySelector("#attendance-print")?.addEventListener("click", async () => {
     const data = buildData();
     if (!validate(data)) return;
     await printAttendanceSheetDirect(data);
@@ -841,7 +847,7 @@ export async function mountTeachersView(container) {
 
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="events">ملفات الفعاليات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -854,6 +860,7 @@ export async function mountFormsView(container, options = {}) {
         const openEdit = (id) => renderEdit(content, id, back, openDetail);
         await renderLog(content, openDetail, openEdit);
       }
+      else if (tab === "events") await renderEventFiles(content, { renderEditor: renderAttendanceEditor, printSheet: printAttendanceSheetDirect });
       else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
       else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
       else await renderEventApprovals(content);

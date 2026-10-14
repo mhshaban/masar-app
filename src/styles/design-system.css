@@ -550,9 +550,18 @@
   .forms-empty-print { display: none; }
   .forms-empty-screen { color: var(--ink-500); font-size: 12px; font-style: normal; font-weight: 400; }
   /* استمارة اعتماد فعالية: عناوين أقسام المحرر، وشبكة الطباعة بنمط النموذج الرسمي. */
+  /* ملف الفعالية: مراحل مرقّمة وأزرار رد ولي الأمر. */
+  .event-step .step-no { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-inline-end: 6px; border-radius: 50%; background: var(--teal-600); color: #fff; font-size: 13px; }
+  .consent-toggle { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .consent-btn { padding: 5px 11px; border-radius: 100px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-600); font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .consent-btn.approve.on { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+  .consent-btn.decline.on { background: var(--critical-bg); border-color: var(--critical); color: var(--critical); }
+  .consent-btn:disabled { opacity: .6; cursor: wait; }
+  .consent-text-box { margin-bottom: 12px; }
+  .consent-text-box summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-800); }
   /* زيارات الشعب: قائمة الشطب ومحرر الشعب المستهدفة. */
   .visits-level { margin-bottom: 10px; }
-  .visits-level-head { font-weight: 700; font-size: 12.5px; color: var(--ink-700); margin-bottom: 6px; }
+  .visits-level-head { font-weight: 700; font-size: 12.5px; color: var(--ink-800); margin-bottom: 6px; }
   .visits-grid { display: flex; flex-wrap: wrap; gap: 6px; }
   .visits-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; }
   .visits-chip.done { background: var(--success-bg); border-color: var(--success); color: var(--success); }
@@ -560,7 +569,7 @@
   .visits-only { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding-bottom: 9px; cursor: pointer; }
   .visits-only[hidden] { display: none; }
   .visits-row-done td { background: var(--success-bg); }
-  .event-approval-section { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-700); }
+  .event-approval-section { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-800); }
   .event-approval-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   .event-approval-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
   .event-approval-print .ea-pairs th { width: 22%; }
@@ -699,7 +708,7 @@
     /* كل ٣٥ طالبًا صفحة مستقلة (forms-ui.js): كل صفحة جدول forms-print كامل
        داخل .attendance-page، والفاصل بين هذه العناصر العليا مضمون بكل
        المتصفحات. تلغى هنا وضعية absolute العامة (لصفحة واحدة) كي تتتابع. */
-    .forms-print.attendance-print { position: static !important; inset: auto !important; }
+    .attendance-page > .forms-print { position: static !important; inset: auto !important; }
     .attendance-page + .attendance-page { break-before: page; }
     .attendance-print .attendance-roster { break-inside: avoid; }
     /* كل طالب سطر واحد دائمًا (لا التفاف للأرقام أو الأسماء): عدد الطلبة في

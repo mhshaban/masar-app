@@ -19,9 +19,9 @@ function currentActor() {
 
 function validate(data) {
   if (!String(data.title || "").trim()) throw new Error("اكتب عنوان الفعالية أولًا");
-  // كشوف الحضور/المرشحين فقط تتطلب طلبة؛ بقية السجلات بنفس الجدول (استمارة
+  // كشوف الحضور/المرشحين وملف الفعالية فقط تتطلب طلبة؛ بقية السجلات بنفس الجدول (استمارة
   // اعتماد الفعالية "approval"، حملات زيارة الشعب "visits") بلا قائمة طلبة.
-  const needsStudents = !data.kind || data.kind === "attendance" || data.kind === "candidates";
+  const needsStudents = !data.kind || data.kind === "attendance" || data.kind === "candidates" || data.kind === "event";
   if (needsStudents && !data.students?.length) throw new Error("اختر الطلبة المشاركين أولًا");
 }
 

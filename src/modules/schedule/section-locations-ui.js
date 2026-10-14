@@ -262,7 +262,7 @@ export async function mountSectionLocationsView(container) {
     input.disabled = true;
     try {
       replaceCampaign(await setSectionVisited(campaign.id, input.dataset.visit, input.checked));
-      notify(input.checked ? `تم تسجيل زيارة ${input.dataset.visit}` : `أُلغي تسجيل زيارة ${input.dataset.visit}`);
+      notify(input.checked ? `تم تسجيل زيارة ${input.dataset.visit}` : `تم إلغاء تسجيل زيارة ${input.dataset.visit}`);
     } catch (error) {
       input.checked = !input.checked;
       notify(error.message || "تعذر حفظ الزيارة");
