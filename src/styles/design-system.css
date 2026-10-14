@@ -550,6 +550,16 @@
   .forms-empty-print { display: none; }
   .forms-empty-screen { color: var(--ink-500); font-size: 12px; font-style: normal; font-weight: 400; }
   /* استمارة اعتماد فعالية: عناوين أقسام المحرر، وشبكة الطباعة بنمط النموذج الرسمي. */
+  /* زيارات الشعب: قائمة الشطب ومحرر الشعب المستهدفة. */
+  .visits-level { margin-bottom: 10px; }
+  .visits-level-head { font-weight: 700; font-size: 12.5px; color: var(--ink-700); margin-bottom: 6px; }
+  .visits-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .visits-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .visits-chip.done { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+  .visits-date { font-size: 10.5px; font-weight: 500; color: var(--ink-500); }
+  .visits-only { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding-bottom: 9px; cursor: pointer; }
+  .visits-only[hidden] { display: none; }
+  .visits-row-done td { background: var(--success-bg); }
   .event-approval-section { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-700); }
   .event-approval-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   .event-approval-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
