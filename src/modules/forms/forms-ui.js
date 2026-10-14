@@ -5,6 +5,7 @@ import { getFilterOptions, listStudentsForSection } from "../students/students-s
 import {
   createAttendanceSheet, updateAttendanceSheet, listAttendanceSheets, getAttendanceSheet, removeAttendanceSheet,
 } from "./attendance-service.js";
+import { levelOfSection } from "../schedule/section-locations-service.js?v=2026-10-08-section-locations-1";
 import { findTeacherPhotos } from "./teacher-photo-local.js?v=2026-09-06-polish-1";
 import {
   FORM_TYPES, createDepartmentForm, listDepartmentForms, getDepartmentForm,
@@ -598,8 +599,12 @@ export async function renderAttendanceEditor(root, sheetId, onDone, kind = "atte
   while (teacherRows.length < 2) teacherRows.push({ name: "", phone: "" });
 
   let mode = "section";
-  let sectionRoster = [];
+  // شعبة كاملة أو أكثر: كل شعبة مختارة تُحمَّل طلبتها مرة واحدة، والقائمة
+  // بترتيب اختيار الشعب.
+  let selectedSections = [];
+  const rosterBySection = new Map();
   let sectionSelectedIds = new Set();
+  const sectionRoster = () => selectedSections.flatMap((section) => rosterBySection.get(section) || []);
   let customStudents = existing?.students ? [...existing.students] : [];
 
   root.innerHTML = `<div class="card forms-card">
@@ -623,7 +628,7 @@ export async function renderAttendanceEditor(root, sheetId, onDone, kind = "atte
       <div class="forms-field forms-wide">
         <span>اختيار الطلبة</span>
         <div class="chip-row" id="attendance-mode-chips">
-          <div class="chip${mode === "section" ? " on" : ""}" data-mode="section">شعبة كاملة</div>
+          <div class="chip${mode === "section" ? " on" : ""}" data-mode="section">شعبة كاملة أو أكثر</div>
           <div class="chip${mode === "custom" ? " on" : ""}" data-mode="custom">طلاب من شعب مختلفة</div>
         </div>
       </div>
@@ -678,7 +683,7 @@ export async function renderAttendanceEditor(root, sheetId, onDone, kind = "atte
   const pickerRoot = root.querySelector("#attendance-picker");
   const previewRoot = root.querySelector("#attendance-students-preview");
 
-  const currentStudents = () => (mode === "section" ? sectionRoster.filter((s) => sectionSelectedIds.has(s.id)) : customStudents);
+  const currentStudents = () => (mode === "section" ? sectionRoster().filter((s) => sectionSelectedIds.has(s.id)) : customStudents);
 
   const renderPreview = () => {
     const list = currentStudents();
@@ -693,53 +698,80 @@ export async function renderAttendanceEditor(root, sheetId, onDone, kind = "atte
       : '<div class="empty">لم يتم اختيار طلبة بعد</div>';
   };
 
-  // بطاقات checkbox لكل طالب بالشعبة — كلهم محدَّدون افتراضيًا (كل الشعبة)،
-  // ويقدر المرشد يلغي تحديد من يبي استبعادهم بدل اضطراره لأخذ الشعبة كاملة.
+  // طلبة كل شعبة مختارة بمجموعة مستقلة، كلهم محدَّدون افتراضيًا (الشعبة كاملة)،
+  // ويقدر المرشد يلغي تحديد من يبي استبعادهم، أو يحدد/يلغي شعبة كاملة.
   const renderSectionRoster = () => {
     const rosterRoot = pickerRoot.querySelector("#attendance-section-roster");
     if (!rosterRoot) return;
-    rosterRoot.innerHTML = sectionRoster.length ? `
+    const roster = sectionRoster();
+    rosterRoot.innerHTML = roster.length ? `
       <div class="forms-actions" style="margin:8px 0;">
         <button type="button" class="btn btn-ghost" id="attendance-select-all">تحديد الكل</button>
         <button type="button" class="btn btn-ghost" id="attendance-select-none">إلغاء تحديد الكل</button>
       </div>
-      <ul class="plain">
-        ${sectionRoster.map((s) => `
-          <li class="row-item">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
-              <input type="checkbox" class="attendance-roster-checkbox" data-id="${esc(s.id)}" ${sectionSelectedIds.has(s.id) ? "checked" : ""}>
-              <span>${esc(s.name)} <span class="hint">(${esc(s.academicId || s.id)})</span></span>
-            </label>
-          </li>
-        `).join("")}
-      </ul>
+      ${selectedSections.map((section) => {
+        const list = rosterBySection.get(section) || [];
+        const picked = list.filter((s) => sectionSelectedIds.has(s.id)).length;
+        return `<div class="roster-section">
+          <div class="roster-section-head"><strong>${esc(section)}</strong> <span class="hint">(${picked} من ${list.length})</span>
+            <button type="button" class="link-btn" data-section-all="${esc(section)}">تحديد الشعبة</button>
+            <button type="button" class="link-btn" data-section-none="${esc(section)}">إلغاء الشعبة</button>
+          </div>
+          ${list.length ? `<ul class="plain">${list.map((s) => `
+            <li class="row-item">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
+                <input type="checkbox" class="attendance-roster-checkbox" data-id="${esc(s.id)}" ${sectionSelectedIds.has(s.id) ? "checked" : ""}>
+                <span>${esc(s.name)} <span class="hint">(${esc(s.academicId || s.id)})</span></span>
+              </label>
+            </li>`).join("")}</ul>` : '<p class="hint">لا يوجد طلبة بهذه الشعبة.</p>'}
+        </div>`;
+      }).join("")}
     ` : "";
     rosterRoot.querySelectorAll(".attendance-roster-checkbox").forEach((checkbox) => {
       checkbox.addEventListener("change", () => {
         if (checkbox.checked) sectionSelectedIds.add(checkbox.dataset.id); else sectionSelectedIds.delete(checkbox.dataset.id);
+        renderSectionRoster();
         renderPreview();
       });
     });
-    rosterRoot.querySelector("#attendance-select-all")?.addEventListener("click", () => {
-      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
-      renderSectionRoster();
-      renderPreview();
-    });
-    rosterRoot.querySelector("#attendance-select-none")?.addEventListener("click", () => {
-      sectionSelectedIds = new Set();
-      renderSectionRoster();
-      renderPreview();
-    });
+    const setMany = (list, on) => { for (const s of list) { if (on) sectionSelectedIds.add(s.id); else sectionSelectedIds.delete(s.id); } renderSectionRoster(); renderPreview(); };
+    rosterRoot.querySelector("#attendance-select-all")?.addEventListener("click", () => setMany(sectionRoster(), true));
+    rosterRoot.querySelector("#attendance-select-none")?.addEventListener("click", () => setMany(sectionRoster(), false));
+    rosterRoot.querySelectorAll("[data-section-all]").forEach((btn) => btn.addEventListener("click", () => setMany(rosterBySection.get(btn.dataset.sectionAll) || [], true)));
+    rosterRoot.querySelectorAll("[data-section-none]").forEach((btn) => btn.addEventListener("click", () => setMany(rosterBySection.get(btn.dataset.sectionNone) || [], false)));
   };
 
+  // اختيار شعبة أو أكثر من شارات الشعب (مجمّعة حسب المستوى).
   const mountSectionPicker = () => {
-    pickerRoot.innerHTML = `<label class="forms-field forms-wide"><span>الشعبة</span><select id="attendance-section-select"><option value="">اختر الشعبة</option>${schoolOptions.sections.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label><div id="attendance-section-roster" class="forms-wide"></div>`;
-    pickerRoot.querySelector("#attendance-section-select").addEventListener("change", async (event) => {
-      sectionRoster = event.target.value ? await listStudentsForSection(event.target.value) : [];
-      sectionSelectedIds = new Set(sectionRoster.map((s) => s.id));
+    const byLevel = new Map();
+    for (const section of schoolOptions.sections) {
+      const level = levelOfSection(section) || "غير محدد";
+      if (!byLevel.has(level)) byLevel.set(level, []);
+      byLevel.get(level).push(section);
+    }
+    pickerRoot.innerHTML = `<div class="forms-field forms-wide"><span>الشعب — اختر شعبة أو أكثر <span class="hint" id="attendance-sections-count">${selectedSections.length ? `(${selectedSections.length} مختارة)` : ""}</span></span>
+      ${[...byLevel.entries()].map(([level, list]) => `<div class="visits-level"><div class="visits-level-head">المستوى ${esc(level)}</div>
+        <div class="visits-grid">${list.map((section) => `<label class="visits-chip"><input type="checkbox" data-pick-section="${esc(section)}" ${selectedSections.includes(section) ? "checked" : ""}> ${esc(section)}</label>`).join("")}</div></div>`).join("")}
+    </div><div id="attendance-section-roster" class="forms-wide"></div>`;
+    pickerRoot.querySelectorAll("[data-pick-section]").forEach((box) => box.addEventListener("change", async () => {
+      const section = box.dataset.pickSection;
+      if (box.checked) {
+        box.disabled = true;
+        try {
+          if (!rosterBySection.has(section)) rosterBySection.set(section, await listStudentsForSection(section));
+          if (!selectedSections.includes(section)) selectedSections.push(section);
+          for (const s of rosterBySection.get(section)) sectionSelectedIds.add(s.id);
+        } catch (error) { box.checked = false; notify(error.message || "تعذر تحميل طلبة الشعبة"); }
+        box.disabled = false;
+      } else {
+        selectedSections = selectedSections.filter((x) => x !== section);
+        for (const s of rosterBySection.get(section) || []) sectionSelectedIds.delete(s.id);
+      }
+      pickerRoot.querySelector("#attendance-sections-count").textContent = selectedSections.length ? `(${selectedSections.length} مختارة)` : "";
       renderSectionRoster();
       renderPreview();
-    });
+    }));
+    renderSectionRoster();
   };
   const mountCustomPicker = () => {
     pickerRoot.innerHTML = `<div id="attendance-custom-picker"></div>`;

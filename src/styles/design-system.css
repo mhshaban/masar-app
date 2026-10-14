@@ -559,6 +559,9 @@
   .consent-btn:disabled { opacity: .6; cursor: wait; }
   .consent-text-box { margin-bottom: 12px; }
   .consent-text-box summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--ink-800); }
+  /* محرر الكشوف: طلبة كل شعبة مختارة بمجموعة مستقلة. */
+  .roster-section { margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; }
+  .roster-section-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
   /* زيارات الشعب: قائمة الشطب ومحرر الشعب المستهدفة. */
   .visits-level { margin-bottom: 10px; }
   .visits-level-head { font-weight: 700; font-size: 12.5px; color: var(--ink-800); margin-bottom: 6px; }
