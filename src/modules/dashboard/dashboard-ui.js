@@ -5,7 +5,7 @@ import { NEED_LABELS } from "./followup-needs-service.js?v=2026-09-14-cumulative
 import { loadDashboardSnapshot } from "./dashboard-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { priorityScore, priorityLevel } from "./dashboard-local-folder.js?v=2026-09-10-live-analytics-1";
 import { markPriorityReviewed, snoozePriority, priorityDecisionState, clearPriorityDecision } from "./dashboard-priority-state.js?v=2026-08-31-priorities-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-16-followup-points-1";
 
 const NEED_TARGET_VIEW = { case: "cases", support: "support", career: "career", promoted: "promoted" };
 
