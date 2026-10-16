@@ -731,6 +731,13 @@
     .attendance-print .print-dept-line { padding-bottom: 1mm; margin-bottom: 2.5mm; font-size: 10pt; }
     .attendance-print .topbar { margin: 0 0 2.5mm; }
     .attendance-print .topbar h1 { font-size: 14pt; }
+    /* تقرير المتابعة: ملخص كل بند نقاطًا، وأعمدة بعرض ثابت للملخص. */
+    .followup-print .followup-points { margin: 0; padding-inline-start: 4mm; }
+    .followup-print .followup-points li { margin: 0 0 .8mm; }
+    .followup-print .followup-items th:nth-child(1) { width: 5%; }
+    .followup-print .followup-items th:nth-child(2) { width: 27%; }
+    .followup-print .followup-items th:nth-child(3), .followup-print .followup-items th:nth-child(4) { width: 10%; }
+    .followup-print .followup-items td { vertical-align: top; }
     /* بطاقة قائمة طويلة (مثل شعب مبنى كامل) تنقسم بين الصفحات بدل دفعها كاملة لصفحة جديدة. */
     .forms-print .card.print-flow { break-inside: auto; }
     /* بطاقة "print-own-page" تبدأ صفحة جديدة دائمًا ما عدا الأولى (مكان واحد بكل صفحة). */

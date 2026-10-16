@@ -28,7 +28,7 @@ const A4_LANDSCAPE_PT = "841.9pt 595.3pt";
 // أعمدة (th فقط) كحلي، عنوان صف بجانب قيمة (th بجانب td) فاتح، وصفوف بيانات
 // جداول الأعمدة تتناوب تظليلًا.
 const MARK = '<span style="color:#C8923A;font-size:8pt">&#9632;</span>&nbsp;';
-const CELL = "border:none;border-bottom:.5pt solid #E4E8EF;padding:3.5pt 7pt;text-align:right;font-size:9pt";
+const CELL = "border:none;border-bottom:.5pt solid #E4E8EF;padding:3.5pt 7pt;text-align:right;vertical-align:top;font-size:9pt";
 const HEAD_CELL = "background:#1A2744;color:#FFFFFF;font-weight:bold;border:none;padding:3.5pt 7pt;text-align:right;font-size:9pt";
 const LABEL_CELL = "background:#F1F4F9;color:#2C3E6B;font-weight:bold;border:none;border-bottom:.5pt solid #FFFFFF;padding:3.5pt 7pt;text-align:right;font-size:9pt";
 const ZEBRA = "background:#F8F9FC;";
@@ -77,6 +77,8 @@ export function buildWordDocumentHtml(title, bodyHtml, { orientation = "portrait
   h1 { font-size: 16pt; color: #1A2744; margin: 0 0 3pt; padding-right: 6pt; border-right: 4.5pt solid #C8923A; }
   h2 { font-size: 11pt; color: #1A2744; margin: 12pt 0 0; padding: 3pt 7pt; background: #F1F4F9; border: .75pt solid #D5DBE6; border-bottom: none; page-break-after: avoid; }
   h3 { font-size: 10pt; color: #1A2744; page-break-after: avoid; }
+  ul.followup-points { margin: 0; padding-right: 14pt; }
+  ul.followup-points li { margin: 0 0 3pt; }
   .meta { color: #5B6680; font-size: 8.5pt; margin: 0 0 8pt; padding-right: 10pt; }
   p, tr, .card { page-break-inside: avoid; }
   .document-header { padding-bottom: 5pt; margin-bottom: 12pt; border-bottom: 2.25pt solid #C8923A; color: #1A2744; font-size: 12pt; font-weight: bold; }

@@ -1,7 +1,7 @@
 import { listAgendaEntries, groupByPeriod, groupByMonth, listFollowUpItemOptions } from "./agenda-service.js?v=2026-09-13-period-order-fix-1";
 import { mountActionEditor } from "../shared/action-editor.js";
-import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-10-12-phones-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
+import { buildAgendaReportHtml } from "../../services/report-builders.js?v=2026-10-16-followup-points-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-16-followup-points-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

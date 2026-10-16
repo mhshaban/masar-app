@@ -15,8 +15,9 @@ import { listAgendaEntries, getAgendaProgressSummary, listFollowUpItemOptions } 
 import { getFollowUpReport, getStatsSummary, listUnlinkedActions } from "../followup/followup-service.js?v=2026-09-13-period-order-fix-1";
 import { saveProgress } from "../execution/execution-service.js";
 import { mountActionEditor } from "../shared/action-editor.js";
-import { buildFollowUpReportHtml } from "../../services/report-builders.js?v=2026-10-12-phones-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
+import { buildFollowUpReportHtml, buildFollowUpPrintHtml } from "../../services/report-builders.js?v=2026-10-16-followup-points-1";
+import { printMarkupInPopup } from "../forms/print-popup.js?v=2026-10-12-event-approval-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-16-followup-points-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -449,6 +450,7 @@ export async function mountDepartmentPlanView(container) {
       <div><h1>خطة القسم — الإرشاد الأكاديمي والتوجيه المهني</h1><div class="sub">العام الدراسي 2026/2027</div></div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost" id="plan-export-followup-btn">تصدير تقرير المتابعة (Word)</button>
+        <button class="btn btn-ghost" id="plan-print-followup-btn">طباعة / PDF</button>
         <button class="btn btn-primary" id="plan-new-project-btn">+ مشروع جديد</button>
       </div>
     </div>
@@ -562,6 +564,19 @@ export async function mountDepartmentPlanView(container) {
     } finally {
       btn.disabled = false;
       btn.textContent = original;
+    }
+  });
+
+  container.querySelector("#plan-print-followup-btn").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const [bySection, stats] = await Promise.all([getFollowUpReport(), getStatsSummary()]);
+      await printMarkupInPopup("تقرير المتابعة والإحصائيات", buildFollowUpPrintHtml(bySection, stats, new Date().toLocaleString("ar-BH")));
+    } catch (err) {
+      notify(err.message);
+    } finally {
+      btn.disabled = false;
     }
   });
 

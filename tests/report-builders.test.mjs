@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildFollowUpReportHtml, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
+  buildFollowUpReportHtml, buildFollowUpPrintHtml, followUpSummaryPoints, buildAgendaReportHtml, buildGuidanceCasesReportHtml, buildSupportPlansReportHtml,
   buildDepartmentFormReportHtml, buildStudentProfileReportHtml, buildAttendanceSheetReportHtml, accompanyingTeachersTableHtml,
 } from "../src/services/report-builders.js";
 
@@ -305,4 +305,25 @@ test("buildAttendanceSheetReportHtml shows at most 3 distinct contact numbers pe
   }, "2026-10-12");
   assert.match(html, /<td>111 · 222 · 333<\/td>/);
   assert.doesNotMatch(html, /444/);
+});
+
+test("followUpSummaryPoints lists one point per proof/action, splitting ' · ' joined files and dropping repeats", () => {
+  const item = { linkedActions: [
+    { action: "إجراء أ", progress: { proofNote: "ملف «تصنيف الطلاب» · ملف «نتائج الطلبة»" } },
+    { action: "إجراء ب", progress: { proofNote: "ملف «تصنيف الطلاب»" } },
+    { action: "إجراء ج", progress: {} },
+  ] };
+  assert.deepEqual(followUpSummaryPoints(item), ["ملف «تصنيف الطلاب»", "ملف «نتائج الطلبة»", "إجراء ج"]);
+  assert.deepEqual(followUpSummaryPoints({ summary: "أ · ب" }), ["أ", "ب"]);
+  assert.deepEqual(followUpSummaryPoints({}), []);
+});
+
+test("follow-up Word and print reports render each summary point as its own list item", () => {
+  const bySection = new Map([["التحصيل", [{ no: 1, title: "بند", status: "ongoing", totalParticipants: 5, linkedActions: [
+    { action: "أ", progress: { proofNote: "ملف 1 · ملف 2" } },
+  ] }]]]);
+  const stats = { completionPct: 50, doneItems: 1, totalItems: 2, actionsExecuted: 3, totalParticipants: 5, sections: [] };
+  for (const html of [buildFollowUpReportHtml(bySection, stats, "x"), buildFollowUpPrintHtml(bySection, stats, "x")]) {
+    assert.match(html, /<ul class="followup-points"><li>ملف 1<\/li><li>ملف 2<\/li><\/ul>/);
+  }
 });

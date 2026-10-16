@@ -14,8 +14,8 @@ import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
 import { listFormsForStudent } from "../forms/forms-service.js?v=2026-09-08-form-fields-1";
-import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-10-12-phones-3";
-import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-12-print-theme-2";
+import { buildStudentProfileReportHtml } from "../../services/report-builders.js?v=2026-10-16-followup-points-1";
+import { downloadAsWordDoc } from "../../services/word-export.js?v=2026-10-16-followup-points-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

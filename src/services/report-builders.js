@@ -103,6 +103,21 @@ export function buildDepartmentFormReportHtml(item, exportedAt) {
     ${departmentFormEntryFooter(item)}`;
 }
 
+// ملخص بند تقرير المتابعة نقاطًا: سطر لكل ثبوتية/إجراء مرتبط بدل نص واحد
+// متصل. الثبوتية الواحدة قد تحمل عدة ملفات مفصولة بـ" · " فتُفصل هي أيضًا،
+// والمكرر (نفس الملف مرفقًا بأكثر من إجراء) يظهر مرة واحدة.
+export function followUpSummaryPoints(item) {
+  const raw = (item.linkedActions || []).length
+    ? item.linkedActions.map((e) => e.progress?.proofNote || e.action || "")
+    : [item.summary || ""];
+  return [...new Set(raw.flatMap((text) => String(text).split(/\s+·\s+/)).map((p) => p.trim()).filter(Boolean))];
+}
+
+const summaryPointsHtml = (item) => {
+  const points = followUpSummaryPoints(item);
+  return points.length ? `<ul class="followup-points">${points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : "—";
+};
+
 export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
   const sections = [...bySection.entries()];
   return `
@@ -110,10 +125,8 @@ export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
     <p class="meta">تاريخ التصدير: ${esc(exportedAt)}</p>
     <h2>الإحصائيات العامة</h2>
     <table>
-      <tr><th>نسبة الإنجاز الكلية</th><td>${stats.completionPct}٪</td></tr>
-      <tr><th>بنود منجزة</th><td>${stats.doneItems} من ${stats.totalItems}</td></tr>
-      <tr><th>إجراءات مُنفَّذة</th><td>${stats.actionsExecuted}</td></tr>
-      <tr><th>إجمالي المستفيدين</th><td>${stats.totalParticipants}</td></tr>
+      <tr><th>نسبة الإنجاز الكلية</th><td>${stats.completionPct}٪</td><th>بنود منجزة</th><td>${stats.doneItems} من ${stats.totalItems}</td></tr>
+      <tr><th>إجراءات مُنفَّذة</th><td>${stats.actionsExecuted}</td><th>إجمالي المستفيدين</th><td>${stats.totalParticipants}</td></tr>
     </table>
     <h2>الإنجاز حسب القسم</h2>
     <table>
@@ -122,23 +135,60 @@ export function buildFollowUpReportHtml(bySection, stats, exportedAt) {
         <tr><td>${esc(s.section)}</td><td>${s.done} / ${s.total}</td><td>${s.completionPct}٪</td><td>${s.participants}</td></tr>
       `).join("")}
     </table>
-    <h2>بنود تقرير المتابعة</h2>
     ${sections.map(([section, items]) => `
-      <h3>${esc(section)}</h3>
+      <h2>${esc(section)}</h2>
       <table>
-        <tr><th>#</th><th>البند</th><th>الحالة</th><th>المستفيدون</th><th>الملخص</th></tr>
+        <tr><th width="4%">#</th><th width="26%">البند</th><th width="11%">الحالة</th><th width="11%">المستفيدون</th><th width="48%">الملخص</th></tr>
         ${items.map((item) => `
           <tr>
             <td>${esc(item.no)}</td>
             <td>${esc(item.title)}</td>
             <td>${esc(FOLLOWUP_STATUS_LABELS[item.status] || item.status)}</td>
             <td>${item.totalParticipants || 0}</td>
-            <td>${esc(item.summary || "")}</td>
+            <td>${summaryPointsHtml(item)}</td>
           </tr>
         `).join("")}
       </table>
     `).join("")}
   `;
+}
+
+// نفس التقرير للطباعة المباشرة / حفظ PDF بقالب مسار الموحّد.
+export function buildFollowUpPrintHtml(bySection, stats, exportedAt) {
+  const sections = [...bySection.entries()];
+  return `<table class="forms-print followup-print">
+    <thead><tr><td>
+      <div class="print-dept-line">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div class="topbar"><div><h1>تقرير المتابعة والإحصائيات</h1><div class="sub">تاريخ الإعداد: ${esc(exportedAt)}</div></div></div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      <div class="card"><h2>الإحصائيات العامة</h2>
+        <div class="tablewrap"><table>
+          <tr><th>نسبة الإنجاز الكلية</th><td><strong>${stats.completionPct}٪</strong></td><th>بنود منجزة</th><td>${stats.doneItems} من ${stats.totalItems}</td></tr>
+          <tr><th>إجراءات مُنفَّذة</th><td>${stats.actionsExecuted}</td><th>إجمالي المستفيدين</th><td>${stats.totalParticipants}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>الإنجاز حسب القسم</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>القسم</th><th>بنود منجزة</th><th>نسبة الإنجاز</th><th>عدد المستفيدين</th></tr></thead>
+          <tbody>${stats.sections.map((s) => `<tr><td>${esc(s.section)}</td><td>${s.done} / ${s.total}</td><td>${s.completionPct}٪</td><td>${s.participants}</td></tr>`).join("")}</tbody>
+        </table></div>
+      </div>
+      ${sections.map(([section, items]) => `
+      <div class="card print-flow"><h2>${esc(section)}</h2>
+        <div class="tablewrap"><table class="followup-items">
+          <thead><tr><th>#</th><th>البند</th><th>الحالة</th><th>المستفيدون</th><th>الملخص</th></tr></thead>
+          <tbody>${items.map((item) => `<tr>
+            <td>${esc(item.no)}</td>
+            <td><strong>${esc(item.title)}</strong></td>
+            <td>${esc(FOLLOWUP_STATUS_LABELS[item.status] || item.status)}</td>
+            <td>${item.totalParticipants || 0}</td>
+            <td>${summaryPointsHtml(item)}</td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+      </div>`).join("")}
+    </td></tr></tbody>
+  </table>`;
 }
 
 const AGENDA_PILLAR_ORDER = ["الانجاز الاكاديمي", "التطور الشخصي", "القيادة"];
