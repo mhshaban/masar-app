@@ -244,7 +244,9 @@ function prepRatingBadge(student) {
 // loadedStudents: كل ما جُلب من الخادم حتى الآن (يحكم زر "تحميل المزيد").
 // displayStudents: الجزء المعروض فعليًا بالجدول بعد تصفية التقدير الاختيارية
 // (تصفية من جانب المتصفح فقط، على المحمَّل حاليًا — لا استعلام خادم جديد).
-function renderTable(root, loadedStudents, displayStudents, total, onOpen, onLoadMore) {
+// selection (عند اختيار شعبة فقط): عمود اختيار لكل طالب + "تحديد الكل" لاختيار
+// من يُطبعون بكشف الشعبة (كل الشعبة افتراضيًا، أو بعض طلابها).
+function renderTable(root, loadedStudents, displayStudents, total, onOpen, onLoadMore, selection = null) {
   if (!loadedStudents.length) {
     root.innerHTML = '<div class="card"><div class="empty">لا يوجد طلاب مطابقون لهذا البحث</div></div>';
     return;
@@ -257,10 +259,11 @@ function renderTable(root, loadedStudents, displayStudents, total, onOpen, onLoa
   root.innerHTML = `
     <div class="card">
       <div class="tablewrap"><table>
-        <thead><tr><th>الطالب</th><th>المستوى</th><th>الشعبة</th><th>القسم</th><th>المسار</th><th>المرشد</th><th>تقدير الإعدادية</th></tr></thead>
+        <thead><tr>${selection ? `<th style="width:36px;"><input type="checkbox" id="students-select-all" aria-label="تحديد كل طلاب الشعبة" ${displayStudents.every((s) => selection.isSelected(s.id)) ? "checked" : ""}></th>` : ""}<th>الطالب</th><th>المستوى</th><th>الشعبة</th><th>القسم</th><th>المسار</th><th>المرشد</th><th>تقدير الإعدادية</th></tr></thead>
         <tbody>
           ${displayStudents.map((s) => `
             <tr data-id="${esc(s.id)}">
+              ${selection ? `<td class="student-select-cell"><input type="checkbox" class="student-select" data-select-id="${esc(s.id)}" aria-label="تحديد ${esc(s.name)} لكشف الشعبة" ${selection.isSelected(s.id) ? "checked" : ""}></td>` : ""}
               <td>
                 <div style="display:flex; align-items:center; gap:10px;">
                   <div class="row-item" style="padding:0; border:none;"><div class="avatar" data-student-avatar="${esc(s.id)}">${esc(initials(s.name))}</div></div>
@@ -288,8 +291,15 @@ function renderTable(root, loadedStudents, displayStudents, total, onOpen, onLoa
     </div>
   `;
   root.querySelectorAll("tbody tr").forEach((tr) => {
-    tr.addEventListener("click", () => onOpen(tr.dataset.id));
+    tr.addEventListener("click", (event) => {
+      if (event.target.closest(".student-select-cell")) return;
+      onOpen(tr.dataset.id);
+    });
   });
+  if (selection) {
+    root.querySelectorAll(".student-select").forEach((box) => box.addEventListener("change", () => selection.toggle(box.dataset.selectId, box.checked)));
+    root.querySelector("#students-select-all")?.addEventListener("change", (event) => selection.toggleAll(displayStudents.map((s) => s.id), event.target.checked));
+  }
   const loadMoreBtn = root.querySelector("#students-load-more");
   if (loadMoreBtn) loadMoreBtn.addEventListener("click", onLoadMore);
 }
@@ -577,6 +587,36 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
   let requestVersion = 0;
   let searchTimer = null;
   let ratingFilter = "";
+  // طلاب الشعبة المختارة المستبعدون من كشف الشعبة (الباقون يُطبعون)، وقائمة
+  // طلاب الشعبة كاملة لعدّ المحددين — تُصفَّر عند تغيير الشعبة.
+  let excludedIds = new Set();
+  let sectionStudents = [];
+  let sectionLoadVersion = 0;
+  const selectedCount = () => sectionStudents.filter((s) => !excludedIds.has(String(s.id))).length;
+  const updatePrintButton = () => {
+    const button = container.querySelector("#students-print-section");
+    if (!button) return;
+    button.disabled = !state.section.trim() || (sectionStudents.length > 0 && !selectedCount());
+    button.textContent = state.section.trim() && sectionStudents.length
+      ? `طباعة الشعبة (${selectedCount()} من ${sectionStudents.length})`
+      : "طباعة الشعبة";
+  };
+  const loadSectionStudents = async () => {
+    const version = ++sectionLoadVersion;
+    excludedIds = new Set();
+    sectionStudents = [];
+    updatePrintButton();
+    if (!state.section.trim()) return;
+    const list = await listStudentsForSection(state.section.trim()).catch(() => []);
+    if (version !== sectionLoadVersion) return;
+    sectionStudents = list;
+    updatePrintButton();
+  };
+  const selection = {
+    isSelected: (id) => !excludedIds.has(String(id)),
+    toggle: (id, on) => { if (on) excludedIds.delete(String(id)); else excludedIds.add(String(id)); updatePrintButton(); draw(); },
+    toggleAll: (ids, on) => { for (const id of ids) { if (on) excludedIds.delete(String(id)); else excludedIds.add(String(id)); } updatePrintButton(); draw(); },
+  };
 
   const ratingChipsRoot = container.querySelector("#students-rating-chips");
 
@@ -620,6 +660,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
         matchingTotal = page.total;
         draw();
       },
+      state.section.trim() ? selection : null,
     );
     void hydrateStudentPhotos(resultsRoot, displayResults, { prompt: false }).catch(() => {});
   };
@@ -660,6 +701,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
     state = next;
     drawStats();
     renderFilters(container.querySelector("#students-filters"), options, state, onChange, onQueryChange, onSectionChange, onPrintSection, onPrintSettingsChange, onLoadPhotos);
+    updatePrintButton();
     await refresh();
   };
 
@@ -671,8 +713,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
 
   const onSectionChange = (section) => {
     state = { ...state, section };
-    const printButton = container.querySelector("#students-print-section");
-    if (printButton) printButton.disabled = !section.trim();
+    void loadSectionStudents();
     clearTimeout(searchTimer);
     searchTimer = setTimeout(refresh, 250);
   };
@@ -703,7 +744,8 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
       return;
     }
     try {
-      const students = await listStudentsForSection(section);
+      // المحددون فقط (كل الشعبة ما لم يُلغَ تحديد بعضهم).
+      const students = (await listStudentsForSection(section)).filter((s) => !excludedIds.has(String(s.id)));
       if (!students.length) {
         popup.close();
         notify("لم يتم العثور على طلبة في هذه الشعبة.");
