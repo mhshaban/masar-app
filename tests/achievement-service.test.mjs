@@ -142,3 +142,18 @@ test("achievement rows carry the student's academic ID and up to 3 distinct cont
   const [subject] = await computeSubjectAchievement();
   assert.deepEqual(subject.students[0].phones, ["111", "222", "333"]);
 });
+
+test("classification uses the exact average: 89.5–89.99 is not top-achieving, 59.5–59.99 is low (no rounding up)", async () => {
+  await bulkPut("students", [{ id: "a", name: "أ" }, { id: "b", name: "ب" }, { id: "c", name: "ج" }, { id: "d", name: "د" }]);
+  await bulkPut("academicFlags", [
+    { id: "a", studentId: "a", finalCumulativeAverage: 90, subjects: [{ subject: "رياضيات", pct: 89.6 }] },
+    { id: "b", studentId: "b", finalCumulativeAverage: 89.95, subjects: [] },
+    { id: "c", studentId: "c", finalCumulativeAverage: 59.7, subjects: [] },
+    { id: "d", studentId: "d", finalCumulativeAverage: 60, subjects: [] },
+  ]);
+  const tiers = Object.fromEntries((await computeStudentAchievement()).map((r) => [r.studentId, `${r.tier}/${r.rating}`]));
+  assert.deepEqual(tiers, { a: "high/ممتاز", b: "medium/جيد جدًا", c: "low/مقبول", d: "medium/متوسط" });
+  const [math] = await computeSubjectAchievement();
+  assert.equal(math.students[0].tier, "medium");
+  assert.equal(math.students[0].pct, 89.6);
+});

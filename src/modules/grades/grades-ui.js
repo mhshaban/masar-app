@@ -1,5 +1,5 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-11-03-grades-phones-1";
+import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-11-03-exact-tiers-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-11-03-grades-phones-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
@@ -257,7 +257,7 @@ function renderSubjectClassification(root, subjectAchievement) {
                 <td>${esc(s.studentName) || esc(s.studentId)}</td>
                 <td>${esc(s.level) || "—"} ${esc(s.section) || ""}</td>
                 <td>${phonesCell(s)}</td>
-                <td class="num" style="font-weight:700;">${s.pct}٪</td>
+                <td class="num" style="font-weight:700;">${Number.isInteger(s.pct) ? s.pct : formatPct(s.pct)}٪</td>
                 <td><span class="pill ${tierPill(s.tier)}">${esc(s.rating)}</span></td>
               </tr>
             `).join("")}
