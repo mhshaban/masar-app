@@ -9,7 +9,7 @@ import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-l
 import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-10-01-avg-decimals-1";
+import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-11-03-grades-phones-1";
 import { listCasesForStudent, listSessions as listCaseSessions } from "../cases/guidance-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { listPlansForStudent, listActions as listPlanActions } from "../support/support-service.js?v=2026-09-14-cumulative-average-fix-1";
 import { getStudentSessions as getCareerSessionsForStudent } from "../career/career-service.js";
