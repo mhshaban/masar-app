@@ -25,12 +25,13 @@ const FAIL_THRESHOLD_PCT = 50;
 // only had a handful of subject rows matched.
 export async function computeStudentGradeSummaries() {
   const [flags, students] = await Promise.all([listAll("academicFlags"), listStudents()]);
-  const currentStudentIds = new Set(students.map((student) => String(student.id)));
+  const studentById = new Map(students.map((student) => [String(student.id), student]));
 
   const summaries = [];
   for (const f of flags) {
     if (!f.studentId) continue;
-    if (!currentStudentIds.has(String(f.studentId))) continue;
+    const student = studentById.get(String(f.studentId));
+    if (!student) continue;
     const overallSource = f.finalCumulativeAverage ?? f.overallPct;
     const overallPct = overallSource == null ? null : Number(overallSource);
     const failingSubjects = (f.subjects || []).filter((s) => s.pct != null && Math.round(Number(s.pct)) < FAIL_THRESHOLD_PCT);
@@ -43,8 +44,15 @@ export async function computeStudentGradeSummaries() {
     if (barredCount) reasons.push(`محروم في ${barredCount} ${barredCount === 1 ? "مادة" : "مواد"}`);
     if (!reasons.length) continue;
 
+    // بيانات الطالب من سجل الطلبة نفسه: طالب بلا معدل عام (محروم بكل مواده
+    // مثلًا) لا يظهر بقائمة التصنيف، فلا يصح الاعتماد عليها لاسمه.
     summaries.push({
       studentId: f.studentId,
+      studentName: student.name || "",
+      academicId: student.academicId || student.id,
+      level: student.level || "",
+      section: student.section || "",
+      phones: [...new Set((student.phones || []).map((p) => String(p).trim()).filter(Boolean))].slice(0, 3),
       avgPct: overallPct,
       failingSubjects: failingSubjects.map((s) => s.subject),
       absentCount,

@@ -1,8 +1,11 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
-import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-10-01-avg-decimals-1";
+import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-11-03-grades-phones-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-10-01-avg-decimals-1";
+import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-11-03-grades-phones-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
+import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
+import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
+import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -67,6 +70,45 @@ async function renderAnalyticsTab(root) {
   `;
 }
 
+const phonesCell = (r) => ((r.phones || []).length ? `<span dir="ltr" style="unicode-bidi:isolate; white-space:nowrap;">${r.phones.map(esc).join(" · ")}</span>` : "—");
+
+// تصدير القائمة المعروضة حاليًا (حسب البطاقة أو المادة المختارة) إلى Excel،
+// بأرقام التواصل في أعمدة مستقلة لسهولة الاتصال أو الدمج.
+async function exportListExcel(rows, { sheetName, fileName, scoreLabel, scoreOf, extra = () => ({}) }) {
+  if (!rows.length) throw new Error("لا يوجد طلاب بهذه القائمة لتصديرهم");
+  const XLSX = await ensureXlsx();
+  const data = rows.map((r, i) => {
+    const phones = r.phones || [];
+    return {
+      "م": i + 1,
+      "اسم الطالب": r.studentName || "",
+      "الرقم الأكاديمي": r.academicId || r.studentId || "",
+      "المستوى": r.level || "",
+      "الشعبة": r.section || "",
+      "رقم التواصل ١": phones[0] || "",
+      "رقم التواصل ٢": phones[1] || "",
+      "رقم التواصل ٣": phones[2] || "",
+      [scoreLabel]: scoreOf(r),
+      "التقدير": r.rating || "",
+      ...extra(r),
+    };
+  });
+  const sheet = XLSX.utils.json_to_sheet(data);
+  sheet["!cols"] = Object.keys(data[0]).map((key) => ({ wch: Math.min(45, Math.max(8, key.length + 3, ...data.map((row) => String(row[key] ?? "").length + 2))) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName.slice(0, 31));
+  workbook.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`.replace(/[\\/:*?"<>|]/g, "-"), { compression: true });
+  await logAuditEvent("export_excel", { tableName: "academicFlags", count: rows.length });
+}
+
+const withBusy = async (button, task) => {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "جارٍ التصدير…";
+  try { await task(); } catch (error) { notify(error.message || "تعذّر التصدير"); } finally { button.disabled = false; button.textContent = original; }
+};
+
 function tierPill(tier) {
   if (tier === "high") return "pill-success";
   if (tier === "medium") return "pill-warning";
@@ -76,8 +118,13 @@ function tierPill(tier) {
 function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   const counts = { high: 0, medium: 0, low: 0 };
   for (const r of achievement) counts[r.tier] += 1;
-  const nameById = new Map(achievement.map((r) => [r.studentId, r.studentName]));
-  const needsSupportIds = new Set(needsSupport.map((s) => s.studentId));
+  // "يحتاجون تدخل" يشمل طلابًا بلا معدل عام (محرومون بكل المواد مثلًا) فلا
+  // صف لهم بقائمة التصنيف: يُكوَّن صفهم من ملخص الدرجات نفسه.
+  const achievementById = new Map(achievement.map((r) => [String(r.studentId), r]));
+  const needsSupportRows = needsSupport.map((s) => achievementById.get(String(s.studentId)) || {
+    studentId: s.studentId, studentName: s.studentName, academicId: s.academicId, level: s.level, section: s.section, phones: s.phones,
+    avgPct: s.avgPct, rating: "", tier: "low", weakSubjects: [], reasons: s.reasons,
+  });
 
   // بطاقات علوية قابلة للضغط — هي نفسها الفلتر (ألغينا شريط الفلاتر
   // المكرَّر تحتها). "يحتاجون تدخل" هنا نفس مرشّحي القائمة التفصيلية أسفل
@@ -108,21 +155,24 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   `;
 
   const drawTable = (tier) => {
-    const rows = tier === "needs-support" ? achievement.filter((r) => needsSupportIds.has(r.studentId))
+    const rows = tier === "needs-support" ? needsSupportRows
       : tier ? achievement.filter((r) => r.tier === tier)
       : achievement;
+    const filter = FILTERS.find((f) => f.key === tier) || FILTERS[0];
     root.querySelector("#tier-table").innerHTML = `
       <div class="card">
+        <div class="card-head"><h2>${esc(filter.label)}</h2><button class="btn btn-ghost" type="button" id="tier-export">تصدير القائمة (Excel)</button></div>
         <div class="tablewrap"><table>
-          <thead><tr><th>الطالب</th><th>الصف</th><th>المعدل العام</th><th>التقدير</th><th>مواد ضعيفة (أقل من 50٪)</th></tr></thead>
+          <thead><tr><th>الطالب</th><th>الصف</th><th>أرقام التواصل</th><th>المعدل العام</th><th>التقدير</th><th>مواد ضعيفة (أقل من 50٪)</th></tr></thead>
           <tbody>
             ${rows.map((r) => `
               <tr data-goto-student="${esc(r.studentId)}">
                 <td>${esc(r.studentName) || esc(r.studentId)}</td>
                 <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
-                <td class="num" style="font-weight:700;">${formatPct(r.avgPct)}٪</td>
-                <td><span class="pill ${tierPill(r.tier)}">${esc(r.rating)}</span></td>
-                <td>${r.weakSubjects.length ? esc(r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ")) : "—"}</td>
+                <td>${phonesCell(r)}</td>
+                <td class="num" style="font-weight:700;">${r.avgPct == null ? "—" : `${formatPct(r.avgPct)}٪`}</td>
+                <td>${r.rating ? `<span class="pill ${tierPill(r.tier)}">${esc(r.rating)}</span>` : "—"}</td>
+                <td>${r.weakSubjects.length ? esc(r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ")) : r.reasons ? esc(r.reasons.join(" · ")) : "—"}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -132,6 +182,14 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
     root.querySelectorAll("#tier-table [data-goto-student]").forEach((row) => {
       row.addEventListener("click", () => onGoto && onGoto("students", { studentId: row.dataset.gotoStudent }));
     });
+    const listName = filter.label.replace(/\s*\(\d+\)$/, "");
+    root.querySelector("#tier-export").addEventListener("click", (e) => withBusy(e.currentTarget, () => exportListExcel(rows, {
+      sheetName: listName,
+      fileName: `تصنيف-الطلاب-${listName}`,
+      scoreLabel: "المعدل العام",
+      scoreOf: (r) => (r.avgPct == null ? "" : Number(formatPct(r.avgPct))),
+      extra: (r) => ({ "مواد ضعيفة (أقل من 50٪)": r.weakSubjects.length ? r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ") : (r.reasons || []).join(" · ") }),
+    })));
   };
   drawTable("");
 
@@ -148,7 +206,7 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
     ? `<ul class="plain">${needsSupport.map((s) => `
         <li class="row-item" data-goto-student="${esc(s.studentId)}">
           <div class="body">
-            <div class="title">${esc(nameById.get(s.studentId)) || esc(s.studentId)}</div>
+            <div class="title">${esc(s.studentName) || esc(s.studentId)}${s.section ? ` <span class="hint">· ${esc(s.level)} ${esc(s.section)}</span>` : ""}</div>
             <div class="meta">${s.reasons.map(esc).join(" · ")}</div>
           </div>
         </li>
@@ -189,15 +247,16 @@ function renderSubjectClassification(root, subjectAchievement) {
         <div class="card stat"><div class="label">${TIER_LABELS.low} (أقل من 60٪)</div><div class="value">${subject.counts.low}</div></div>
       </div>
       <div class="card">
-        <h2>${esc(subject.subject)}</h2>
+        <div class="card-head"><h2>${esc(subject.subject)}</h2><button class="btn btn-ghost" type="button" id="subject-export">تصدير القائمة (Excel)</button></div>
         <p class="hint">مرتبة من الأضعف إلى الأعلى.</p>
         <div class="tablewrap"><table>
-          <thead><tr><th>الطالب</th><th>الصف</th><th>الدرجة</th><th>التقدير</th></tr></thead>
+          <thead><tr><th>الطالب</th><th>الصف</th><th>أرقام التواصل</th><th>الدرجة</th><th>التقدير</th></tr></thead>
           <tbody>
             ${subject.students.map((s) => `
               <tr>
                 <td>${esc(s.studentName) || esc(s.studentId)}</td>
                 <td>${esc(s.level) || "—"} ${esc(s.section) || ""}</td>
+                <td>${phonesCell(s)}</td>
                 <td class="num" style="font-weight:700;">${s.pct}٪</td>
                 <td><span class="pill ${tierPill(s.tier)}">${esc(s.rating)}</span></td>
               </tr>
@@ -206,6 +265,12 @@ function renderSubjectClassification(root, subjectAchievement) {
         </table></div>
       </div>
     `;
+    detailRoot.querySelector("#subject-export").addEventListener("click", (e) => withBusy(e.currentTarget, () => exportListExcel(subject.students, {
+      sheetName: subject.subject,
+      fileName: `درجات-${subject.subject}`,
+      scoreLabel: "الدرجة",
+      scoreOf: (r) => Number(r.pct),
+    })));
   };
   drawSubject(subjectAchievement[0].subject);
   root.querySelector("#subject-select").addEventListener("change", (e) => drawSubject(e.target.value));

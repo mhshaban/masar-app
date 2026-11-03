@@ -132,3 +132,13 @@ test("computeSubjectAchievement skips a subject entry with no numeric pct", asyn
   const subjects = await computeSubjectAchievement();
   assert.equal(subjects.length, 0);
 });
+
+test("achievement rows carry the student's academic ID and up to 3 distinct contact numbers (overall and per subject)", async () => {
+  await bulkPut("students", [{ id: "s1", academicId: "20260002", name: "طالب", level: "الأول", section: "١تجر١", phones: ["111", "111", " 222 ", "333", "444"] }]);
+  await bulkPut("academicFlags", [{ id: "s1", studentId: "s1", overallPct: 80, subjects: [{ subject: "الرياضيات", pct: 80 }] }]);
+  const [overall] = await computeStudentAchievement();
+  assert.equal(overall.academicId, "20260002");
+  assert.deepEqual(overall.phones, ["111", "222", "333"]);
+  const [subject] = await computeSubjectAchievement();
+  assert.deepEqual(subject.students[0].phones, ["111", "222", "333"]);
+});

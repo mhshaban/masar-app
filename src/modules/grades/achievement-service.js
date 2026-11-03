@@ -1,6 +1,9 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
 import { listStudents } from "../students/students-service.js";
 
+// أرقام تواصل الطالب للقوائم: بلا تكرار، و٣ بالكثير (نفس قاعدة كشوف الفعاليات).
+export const studentPhones = (student) => [...new Set((student?.phones || []).map((p) => String(p).trim()).filter(Boolean))].slice(0, 3);
+
 // The rating LABEL comes from Bahrain MOE's own scale, taken verbatim from
 // the legend printed on this school's official transcripts. The broader
 // TIER grouping (متفوق/متوسط/متدني) is the counselor's own working
@@ -65,6 +68,8 @@ export async function computeStudentAchievement() {
       studentName: student ? student.name : null,
       level: student ? student.level : null,
       section: student ? student.section : null,
+      academicId: student ? student.academicId || student.id : f.studentId,
+      phones: student ? studentPhones(student) : [],
       avgPct,
       rating: rating.label,
       tier: rating.tier,
@@ -109,6 +114,8 @@ export async function computeSubjectAchievement() {
         studentName: student ? student.name : null,
         level: student ? student.level : null,
         section: student ? student.section : null,
+        academicId: student ? student.academicId || student.id : studentId,
+        phones: student ? studentPhones(student) : [],
         pct,
         rating: rating.label,
         tier: rating.tier,

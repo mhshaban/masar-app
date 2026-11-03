@@ -73,3 +73,14 @@ test("computeStudentGradeSummaries prefers finalCumulativeAverage (the official 
   const summaries = await computeStudentGradeSummaries();
   assert.equal(summaries.length, 0, "68% is above the failing threshold, so the student should not be flagged");
 });
+
+test("computeStudentGradeSummaries carries the student's name and section from the roster, even with no overall average", async () => {
+  await bulkPut("students", [{ id: "20254348", academicId: "20254348", name: "طالب محروم", level: "الثاني", section: "٣كهر١", phones: ["111", "111", "222"] }]);
+  await bulkPut("academicFlags", [{ id: "20254348", studentId: "20254348", barredCount: 25, subjects: [] }]);
+  const [summary] = await computeStudentGradeSummaries();
+  assert.equal(summary.avgPct, null);
+  assert.equal(summary.studentName, "طالب محروم");
+  assert.equal(summary.section, "٣كهر١");
+  assert.deepEqual(summary.phones, ["111", "222"]);
+  assert.deepEqual(summary.reasons, ["محروم في 25 مواد"]);
+});
