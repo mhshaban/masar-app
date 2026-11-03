@@ -60,9 +60,9 @@ export async function computeStudentAchievement() {
       .map((s) => ({ subject: s.subject, pct: Math.round(Number(s.pct)) }))
       .sort((a, b) => a.pct - b.pct);
 
-    // The rating keeps classifying the rounded average, exactly as before;
-    // only the displayed number gained its decimals.
-    const rating = ratingForPct(Math.round(avgPct));
+    // التصنيف على المعدل الفعلي بلا تقريب: المتفوق من معدله 90 فأكثر فعلًا،
+    // فـ89.50–89.99 لا يُحسب متفوقًا (كان التقريب يرفعه لـ90).
+    const rating = ratingForPct(avgPct);
     rows.push({
       studentId: f.studentId,
       studentName: student ? student.name : null,
@@ -97,7 +97,7 @@ export async function computeSubjectAchievement() {
     for (const s of f.subjects || []) {
       if (s.pct == null) continue;
       if (!bySubject.has(s.subject)) bySubject.set(s.subject, []);
-      bySubject.get(s.subject).push({ studentId: f.studentId, pct: Math.round(Number(s.pct)) });
+      bySubject.get(s.subject).push({ studentId: f.studentId, pct: Number(s.pct) });
     }
   }
 
@@ -106,6 +106,7 @@ export async function computeSubjectAchievement() {
     const counts = { high: 0, medium: 0, low: 0 };
     const studentRows = [];
     for (const { studentId, pct } of rows) {
+      // التصنيف على الدرجة الفعلية بلا تقريب (89.6 ليست ضمن "90٪ فأكثر").
       const rating = ratingForPct(pct);
       counts[rating.tier] += 1;
       const student = studentById.get(String(studentId));
