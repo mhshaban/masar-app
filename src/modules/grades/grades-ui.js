@@ -1,7 +1,7 @@
 import { list as listAll } from "../../services/cloud-runtime.js";
 import { computeStudentAchievement, computeSubjectAchievement, TIER_LABELS } from "./achievement-service.js?v=2026-11-03-grades-phones-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-10-01-avg-decimals-1";
+import { computeStudentGradeSummaries } from "./grade-flags-service.js?v=2026-11-03-grades-phones-1";
 import { listStudents } from "../students/students-service.js?v=2026-08-31-record-edit-1";
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
@@ -118,8 +118,13 @@ function tierPill(tier) {
 function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   const counts = { high: 0, medium: 0, low: 0 };
   for (const r of achievement) counts[r.tier] += 1;
-  const nameById = new Map(achievement.map((r) => [r.studentId, r.studentName]));
-  const needsSupportIds = new Set(needsSupport.map((s) => s.studentId));
+  // "يحتاجون تدخل" يشمل طلابًا بلا معدل عام (محرومون بكل المواد مثلًا) فلا
+  // صف لهم بقائمة التصنيف: يُكوَّن صفهم من ملخص الدرجات نفسه.
+  const achievementById = new Map(achievement.map((r) => [String(r.studentId), r]));
+  const needsSupportRows = needsSupport.map((s) => achievementById.get(String(s.studentId)) || {
+    studentId: s.studentId, studentName: s.studentName, academicId: s.academicId, level: s.level, section: s.section, phones: s.phones,
+    avgPct: s.avgPct, rating: "", tier: "low", weakSubjects: [], reasons: s.reasons,
+  });
 
   // بطاقات علوية قابلة للضغط — هي نفسها الفلتر (ألغينا شريط الفلاتر
   // المكرَّر تحتها). "يحتاجون تدخل" هنا نفس مرشّحي القائمة التفصيلية أسفل
@@ -150,7 +155,7 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
   `;
 
   const drawTable = (tier) => {
-    const rows = tier === "needs-support" ? achievement.filter((r) => needsSupportIds.has(r.studentId))
+    const rows = tier === "needs-support" ? needsSupportRows
       : tier ? achievement.filter((r) => r.tier === tier)
       : achievement;
     const filter = FILTERS.find((f) => f.key === tier) || FILTERS[0];
@@ -165,9 +170,9 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
                 <td>${esc(r.studentName) || esc(r.studentId)}</td>
                 <td>${esc(r.level) || "—"} ${esc(r.section) || ""}</td>
                 <td>${phonesCell(r)}</td>
-                <td class="num" style="font-weight:700;">${formatPct(r.avgPct)}٪</td>
-                <td><span class="pill ${tierPill(r.tier)}">${esc(r.rating)}</span></td>
-                <td>${r.weakSubjects.length ? esc(r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ")) : "—"}</td>
+                <td class="num" style="font-weight:700;">${r.avgPct == null ? "—" : `${formatPct(r.avgPct)}٪`}</td>
+                <td>${r.rating ? `<span class="pill ${tierPill(r.tier)}">${esc(r.rating)}</span>` : "—"}</td>
+                <td>${r.weakSubjects.length ? esc(r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ")) : r.reasons ? esc(r.reasons.join(" · ")) : "—"}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -182,8 +187,8 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
       sheetName: listName,
       fileName: `تصنيف-الطلاب-${listName}`,
       scoreLabel: "المعدل العام",
-      scoreOf: (r) => Number(formatPct(r.avgPct)),
-      extra: (r) => ({ "مواد ضعيفة (أقل من 50٪)": r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ") }),
+      scoreOf: (r) => (r.avgPct == null ? "" : Number(formatPct(r.avgPct))),
+      extra: (r) => ({ "مواد ضعيفة (أقل من 50٪)": r.weakSubjects.length ? r.weakSubjects.map((w) => `${w.subject} (${w.pct}٪)`).join("، ") : (r.reasons || []).join(" · ") }),
     })));
   };
   drawTable("");
@@ -201,7 +206,7 @@ function renderOverallClassification(root, achievement, needsSupport, onGoto) {
     ? `<ul class="plain">${needsSupport.map((s) => `
         <li class="row-item" data-goto-student="${esc(s.studentId)}">
           <div class="body">
-            <div class="title">${esc(nameById.get(s.studentId)) || esc(s.studentId)}</div>
+            <div class="title">${esc(s.studentName) || esc(s.studentId)}${s.section ? ` <span class="hint">· ${esc(s.level)} ${esc(s.section)}</span>` : ""}</div>
             <div class="meta">${s.reasons.map(esc).join(" · ")}</div>
           </div>
         </li>
