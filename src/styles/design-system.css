@@ -22,64 +22,11 @@
     --shadow: 0 1px 2px rgba(26, 39, 68, 0.07), 0 8px 28px rgba(26, 39, 68, 0.08);
     --radius: 12px;
     --font-ui: "Cairo", "Segoe UI", Tahoma, Roboto, Arial, sans-serif;
-    color-scheme: light dark;
-    /* ثابت عمدًا عبر الوضعين الفاتح والداكن (لا يُعاد تعريفه بأي من كتل
-       [data-theme]/@media أدناه) — نص فوق خلفيات ذهبية/كحلية فاتحة
-       (.btn-primary، .navitem.active) يحتاج تباينًا كافيًا (WCAG AA
-       4.5:1) في كلا الوضعين معًا؛ --teal-900 نفسه ينعكس بالوضع الداكن
-       (يصير كريمي فاتح) فيفشل التباين هناك تحديدًا — رُصد هذا فعليًا
-       بحساب نسبة التباين يدويًا (~1.8:1 بالوضع الداكن قبل هذا الإصلاح). */
+    color-scheme: light;
+    /* التطبيق بنمط فاتح فقط (أُزيل الوضع الداكن)؛ نص فوق الخلفيات الذهبية. */
     --on-gold: #1a2744;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-    --teal-900: #f5edd8;
-    --teal-700: #b9c4e0;
-    --teal-600: #93a6d6;
-    --teal-500: #7f93c9;
-    --clay-500: #e2a850;
-    --clay-600: #edbb6f;
-    --paper-50: #101a30;
-    --paper-100: #182444;
-    --paper-200: #2c3e6b;
-    --ink-800: #f5edd8;
-    --ink-600: #c7cfe4;
-    --ink-500: #a9b2c9;
-    --surface: #16213e;
-    --border: #2c3e6b;
-    --success: #6fc491;
-    --success-bg: #1c3226;
-    --warning: #e0b84a;
-    --warning-bg: #3a2f11;
-    --critical: #e2796a;
-    --critical-bg: #3a1f1c;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.4);
-    }
-  }
-  :root[data-theme="dark"] {
-    --teal-900: #f5edd8;
-    --teal-700: #b9c4e0;
-    --teal-600: #93a6d6;
-    --teal-500: #7f93c9;
-    --clay-500: #e2a850;
-    --clay-600: #edbb6f;
-    --paper-50: #101a30;
-    --paper-100: #182444;
-    --paper-200: #2c3e6b;
-    --ink-800: #f5edd8;
-    --ink-600: #c7cfe4;
-    --ink-500: #a9b2c9;
-    --surface: #16213e;
-    --border: #2c3e6b;
-    --success: #6fc491;
-    --success-bg: #1c3226;
-    --warning: #e0b84a;
-    --warning-bg: #3a2f11;
-    --critical: #e2796a;
-    --critical-bg: #3a1f1c;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.4);
-  }
   :root[data-theme="light"] {
     --teal-900: #1a2744;
     --teal-700: #2c3e6b;
@@ -260,8 +207,6 @@
   .stat { display: flex; flex-direction: column; gap: 6px; }
   .stat .label { font-size: 12.5px; color: var(--ink-500); font-weight: 600; }
   .stat .value { font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 700; color: var(--teal-900); line-height: 1; }
-  :root[data-theme="dark"] .stat .value { color: var(--ink-800); }
-  @media (prefers-color-scheme: dark) { .stat .value { color: var(--ink-800); } }
   .stat .delta { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
   .stat .delta.up { color: var(--success); }
   .stat .delta.down { color: var(--critical); }
@@ -932,7 +877,7 @@
 .student-timetable{min-width:900px;width:100%;table-layout:fixed}.student-timetable th,.student-timetable td{border:1px solid var(--border);text-align:center;padding:12px 8px;vertical-align:top}.student-timetable th:first-child{width:11%}.student-timetable td strong{font-size:15px;color:var(--ink-800)}.timetable-teacher{margin:7px 0;font-size:12px;line-height:1.7}.timetable-room{font-size:11px;display:inline-block;padding:3px 6px;background:var(--paper-100);color:var(--teal-900);border-radius:5px}.timetable-period{display:block;font-size:10px;margin-top:5px;color:var(--ink-500)}
 @media(max-width:640px){.students-filter-count{width:100%;margin-inline-start:0}.curriculum-table{min-width:760px}}
 @media print{.curriculum-retaken{color:#7138a8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.curriculum-table,.student-timetable{min-width:0;font-size:8pt}.curriculum-table tr,.student-timetable tr{break-inside:avoid}}
-:root{--retaken-grade:#7138a8}:root[data-theme="dark"]{--retaken-grade:#c5a0ff}:root[data-theme="light"]{--retaken-grade:#7138a8}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--retaken-grade:#c5a0ff}}.curriculum-retaken{color:var(--retaken-grade)}
+:root{--retaken-grade:#7138a8}:root[data-theme="light"]{--retaken-grade:#7138a8}.curriculum-retaken{color:var(--retaken-grade)}
 
 /* Academic documents: complete grid, clear hierarchy, accessible result colors. */
 .curriculum-table,.student-timetable{border-collapse:collapse;border:1px solid var(--border)}
@@ -943,7 +888,7 @@
 .certificate-source{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.certificate-source small{max-width:240px;overflow-wrap:anywhere}
 .cumulative-card{margin-bottom:16px;border-inline-start:4px solid var(--teal-600);display:flex;align-items:center;gap:16px;flex-wrap:wrap}.cumulative-card strong{font-size:30px;color:var(--teal-600)}.cumulative-card small{flex-basis:100%;color:var(--ink-500)}
 .term-average-cards{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.term-average-card{flex:1 1 160px;border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}.term-average-card span{font-size:12px;color:var(--ink-500)}.term-average-card strong{font-size:21px}
-:root{--failed-grade:#b42318}:root[data-theme="dark"]{--failed-grade:#ff9690}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--failed-grade:#ff9690}}
+:root{--failed-grade:#b42318}
 .curriculum-failed,.curriculum-grade.curriculum-failed{color:var(--failed-grade);font-weight:800}.curriculum-grade.curriculum-failed{background:transparent}
 @media print{.curriculum-grade.curriculum-failed,.curriculum-failed{color:#b42318!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.curriculum-table tbody tr:last-child td{border-bottom:1px solid #777}}
 
