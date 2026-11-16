@@ -7,6 +7,7 @@ import { parseStudentsWorkbook, commitStudentsImport } from "../../services/stud
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-local.js?v=2026-09-07-finish-1";
 import { findStudentPhotoFiles, studentPhotoObjectUrl, requestStudentPhotoAccessOnNextGesture } from "./student-photo-local.js?v=2026-11-16-photo-permission-1";
+import { cloudStudentPhotoUrl } from "./student-photo-cloud.js?v=2026-11-16-cloud-photos-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-11-03-exact-tiers-1";
@@ -200,27 +201,41 @@ function printSectionRoster(students, section, popup, { title = "", instructions
   });
 }
 
-async function hydrateStudentPhotos(root, students, { prompt = false, refresh = false } = {}) {
-  const result = await findStudentPhotoFiles(students, { prompt, refresh });
-  if (!result.connected) return { connected: false, count: 0 };
-  let count = 0;
-  for (const student of students) {
-    const match = result.matches.get(String(student.id));
-    if (!match) continue;
-    const targets = [...root.querySelectorAll("[data-student-avatar]")].filter((element) => element.dataset.studentAvatar === String(student.id));
-    if (!targets.length) continue;
-    const url = await studentPhotoObjectUrl(match.handle);
-    for (const target of targets) {
-      target.textContent = "";
-      const image = document.createElement("img");
-      image.src = url;
-      image.alt = `صورة ${student.name || "الطالب"}`;
-      image.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block";
-      target.appendChild(image);
-    }
-    count += 1;
+function placeStudentPhoto(root, student, url) {
+  const targets = [...root.querySelectorAll("[data-student-avatar]")].filter((element) => element.dataset.studentAvatar === String(student.id));
+  if (!targets.length) return false;
+  for (const target of targets) {
+    target.textContent = "";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = `صورة ${student.name || "الطالب"}`;
+    image.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block";
+    target.appendChild(image);
   }
-  return { connected: true, count };
+  return true;
+}
+
+// المصدر الأول مجلد masar المحلي (صور أوضح وأحدث لو موجودة)، ومن لا يجد له
+// صورة هناك — أو لو المجلد غير مربوط أصلًا — تُجلب صورته من Supabase.
+// connected تخص المجلد المحلي فقط (لطلب صلاحيته)، وcount يشمل المصدرين.
+async function hydrateStudentPhotos(root, students, { prompt = false, refresh = false } = {}) {
+  let local = { connected: false, matches: new Map() };
+  try {
+    local = await findStudentPhotoFiles(students, { prompt, refresh });
+  } catch (error) {
+    if (prompt) throw error;
+  }
+  let count = 0;
+  await Promise.all(students.map(async (student) => {
+    const match = local.matches.get(String(student.id));
+    let url = null;
+    if (match) {
+      try { url = await studentPhotoObjectUrl(match.handle); } catch { url = null; }
+    }
+    if (!url) url = await cloudStudentPhotoUrl(student.id);
+    if (url && placeStudentPhoto(root, student, url)) count += 1;
+  }));
+  return { connected: local.connected, count };
 }
 
 const PAGE_SIZE = 50;
@@ -735,7 +750,7 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
     if (button) { button.disabled = true; button.textContent = "جارٍ البحث عن الصور…"; }
     try {
       const result = await hydrateStudentPhotos(resultsRoot, loadedResults, { prompt: true, refresh: true });
-      if (!result.connected) notify("ربط الصور يحتاج فتح التطبيق في Chrome أو Edge.");
+      if (!result.connected && !result.count) notify("ربط مجلد الصور يحتاج فتح التطبيق في Chrome أو Edge.");
       else if (!result.count) notify("لم أجد صورًا بأسماء الأرقام الأكاديمية أو الشخصية للطلبة الظاهرين.");
       else if (button) button.textContent = `تم عرض ${result.count} صورة`;
     } catch (error) {
