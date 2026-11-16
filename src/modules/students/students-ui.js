@@ -6,7 +6,7 @@ import { getPendingSubjectsForStudent } from "../promoted/promoted-service.js?v=
 import { parseStudentsWorkbook, commitStudentsImport } from "../../services/students-import-service.js?v=2026-09-24-batch-remove-fix-1";
 import { getCurrentProfile } from "../../services/auth-service.js";
 import { findStudentScheduleFiles, openScheduleFile } from "./student-schedule-local.js?v=2026-09-07-finish-1";
-import { findStudentPhotoFiles, studentPhotoObjectUrl } from "./student-photo-local.js?v=2026-09-06-polish-1";
+import { findStudentPhotoFiles, studentPhotoObjectUrl, requestStudentPhotoAccessOnNextGesture } from "./student-photo-local.js?v=2026-11-16-photo-permission-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary, getStudentTermTimeline } from "../grades/term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { ratingForPct, RATING_LABELS } from "../grades/achievement-service.js?v=2026-11-03-exact-tiers-1";
@@ -500,7 +500,9 @@ async function renderDetail(container, id, onBack, onGoto) {
     }
   };
   photoButton.addEventListener("click", () => loadDetailPhoto(true, true));
-  void loadDetailPhoto(false, false);
+  void loadDetailPhoto(false, false).then((result) => {
+    if (!result.connected) void requestStudentPhotoAccessOnNextGesture(() => { if (container.isConnected) void loadDetailPhoto(false, false); });
+  });
 
   const scheduleTableRoot = container.querySelector("#student-schedule-table");
   if (s.section) {
@@ -662,7 +664,15 @@ export async function mountStudentsView(container, { onGoto, studentId } = {}) {
       },
       state.section.trim() ? selection : null,
     );
-    void hydrateStudentPhotos(resultsRoot, displayResults, { prompt: false }).catch(() => {});
+    void hydrateStudentPhotos(resultsRoot, displayResults, { prompt: false })
+      .then((result) => {
+        if (result.connected) return;
+        // الصلاحية سقطت (إغلاق المتصفح/تسجيل خروج): نطلبها مع أول نقرة.
+        void requestStudentPhotoAccessOnNextGesture(() => {
+          if (resultsRoot.isConnected) void hydrateStudentPhotos(resultsRoot, displayResults, { prompt: false }).catch(() => {});
+        });
+      })
+      .catch(() => {});
   };
 
   const refresh = async () => {

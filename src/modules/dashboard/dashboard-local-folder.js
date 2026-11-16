@@ -79,6 +79,21 @@ export async function getMasarFolderName() {
   return handle ? handle.name : null;
 }
 
+// حالة صلاحية المجلد المحفوظ بدون فتح أي نافذة: "unsupported" لو المتصفح
+// لا يدعم الميزة، "none" لو ما فيه مجلد محفوظ، وإلا حالة الصلاحية نفسها
+// ("granted" / "prompt" / "denied"). الصلاحية تسقط عادة بعد إغلاق المتصفح،
+// وطلبها من جديد يحتاج نقرة من المستخدم (قيد من المتصفح نفسه).
+export async function getMasarFolderPermissionState() {
+  if (!folderAccessSupported()) return "unsupported";
+  const handle = await getHandle();
+  if (!handle) return "none";
+  try {
+    return await handle.queryPermission({ mode: "read" });
+  } catch {
+    return "prompt";
+  }
+}
+
 export async function getMasarFolderHandle({ prompt = false } = {}) {
   if (!folderAccessSupported()) return null;
   let handle = await getHandle();

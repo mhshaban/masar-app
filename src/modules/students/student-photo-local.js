@@ -1,4 +1,4 @@
-import { getMasarFolderHandle } from "../dashboard/dashboard-local-folder.js?v=2026-09-06-student-photos-1";
+import { getMasarFolderHandle, getMasarFolderPermissionState } from "../dashboard/dashboard-local-folder.js?v=2026-11-16-photo-permission-1";
 
 let cachedImageFiles = null;
 let imageScanInFlight = null;
@@ -64,4 +64,39 @@ export async function findStudentPhotoFiles(students, { prompt = false, refresh 
 export async function studentPhotoObjectUrl(fileHandle) {
   const file = await fileHandle.getFile();
   return URL.createObjectURL(file);
+}
+
+// المتصفح لا يسمح بطلب صلاحية المجلد إلا داخل نقرة من المستخدم، فبدل ما
+// يدوّر المستخدم على زر "عرض صور الطلاب" كل مرة يفتح فيها المتصفح، نطلب
+// الصلاحية مع أول نقرة في الصفحة (لو المجلد محفوظ مسبقًا وصلاحيته سقطت).
+// بعد الموافقة يُستدعى آخر onGranted مسجَّل ليعرض صور ما هو ظاهر حاليًا.
+let pendingGrantCallback = null;
+let gestureListenerArmed = false;
+let permissionRequestInFlight = false;
+
+function handleFirstGesture() {
+  if (permissionRequestInFlight) return;
+  permissionRequestInFlight = true;
+  document.removeEventListener("click", handleFirstGesture, true);
+  gestureListenerArmed = false;
+  getMasarFolderHandle({ prompt: true })
+    .then((handle) => {
+      const callback = pendingGrantCallback;
+      pendingGrantCallback = null;
+      if (handle && callback) callback();
+    })
+    .catch(() => {})
+    .finally(() => { permissionRequestInFlight = false; });
+}
+
+export async function requestStudentPhotoAccessOnNextGesture(onGranted) {
+  if (typeof document === "undefined") return "unsupported";
+  const state = await getMasarFolderPermissionState().catch(() => "unsupported");
+  if (state !== "prompt") return state;
+  pendingGrantCallback = onGranted;
+  if (!gestureListenerArmed) {
+    gestureListenerArmed = true;
+    document.addEventListener("click", handleFirstGesture, true);
+  }
+  return state;
 }
