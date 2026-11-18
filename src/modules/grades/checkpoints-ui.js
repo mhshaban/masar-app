@@ -8,8 +8,10 @@ import { listStudents } from "../students/students-service.js?v=2026-08-31-recor
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
-import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-18-checkpoints-1";
-import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-first-only-1";
+import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
+import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-18-plan-1";
+import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-18-zeros-1";
+import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-plan-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
@@ -185,6 +187,8 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
   const filters = { level: "", section: "", query: "", trend: "", unsent: false };
   const selected = new Set();
   let queue = [];
+  const planState = { open: true, category: "low", group: "", level: "", section: "", query: "", pending: false, expanded: null };
+  const zeroState = { open: false, dept: "", section: "", checkpoint: "", showConfirmed: false };
 
   const render = () => {
     const rows = buildRows(data.records, data.students, term);
@@ -199,6 +203,8 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
     const allOn = visible.length && visible.every((r) => selected.has(r.student.id));
     root.innerHTML = `${importCard()}
       ${rows.length ? summaryCards(rows) : ""}
+      <div id="cp-plan"></div>
+      <div id="cp-zeros"></div>
       <div class="card">
         <div class="card-head">
           <div><h2>اختيار الطلاب لإرسال تقرير التحصيل الأكاديمي</h2><div class="hint">${esc(term)} · اختر طالبًا أو شعبة كاملة أو مستوى، ثم «تجهيز الإرسال».</div></div>
@@ -239,6 +245,8 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
       </div>`;
 
     wireImport(root, async () => { data = await load(); term = data.terms.includes(term) ? term : data.terms[data.terms.length - 1] || DEFAULT_TERM; render(); });
+    mountPlanCard(root.querySelector("#cp-plan"), { records: data.records, students: data.students, term, state: planState });
+    mountZeroReview(root.querySelector("#cp-zeros"), { records: data.records, term, state: zeroState, onChanged: () => mountPlanCard(root.querySelector("#cp-plan"), { records: data.records, students: data.students, term, state: planState }) });
     const on = (sel, ev, fn) => root.querySelector(sel)?.addEventListener(ev, fn);
     on("#cp-term", "change", (e) => { term = e.target.value; selected.clear(); render(); });
     on("#cp-f-level", "change", (e) => { filters.level = e.target.value; filters.section = ""; render(); });
