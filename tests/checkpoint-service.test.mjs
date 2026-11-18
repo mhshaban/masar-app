@@ -12,12 +12,13 @@ const students = [
   { id: 's2', academicId: '2025002', name: 'سالم حسن', level: 'الأول', section: '١صناعي١', email: 'b@x' },
 ];
 
-test('long format: one row per student × subject, absence encoded as 0.5', () => {
+test('long format: one row per student × subject; 0.5 is a real half mark, غ is absent', () => {
   const rows = [
     ['كشف درجات الوقفة التقويمية الأولى'],
     ['رقم الطالب', 'اسم الطالب', 'رمز المقرر', 'اسم المقرر', 'الدرجة', 'الدرجة النهائية'],
     ['2025001', 'أحمد علي', 'عرب101', 'اللغة العربية', 15, 20],
-    ['2025001', 'أحمد علي', 'ريض101', 'الرياضيات', 0.5, 20],
+    ['2025001', 'أحمد علي', 'ريض101', 'الرياضيات', 'غ', 20],
+    ['2025002', 'سالم حسن', 'ريض101', 'الرياضيات', 0.5, 20],
     ['2025002', 'سالم حسن', 'عرب101', 'اللغة العربية', 8, 20],
     ['9999999', 'غير مسجل', 'عرب101', 'اللغة العربية', 10, 20],
   ];
@@ -26,6 +27,7 @@ test('long format: one row per student × subject, absence encoded as 0.5', () =
   const ahmed = parsed.get('2025001');
   assert.equal(ahmed.subjects[0].pct, 75);
   assert.equal(ahmed.subjects[1].status, 'absent');
+  assert.equal(parsed.get('2025002').subjects.find((s) => s.code === 'ريض101').pct, 2.5);
   const { records, unmatched } = buildCheckpointRecords(parsed, students, { checkpoint: 1, term: 'ف1' });
   assert.equal(records.length, 2);
   assert.equal(unmatched.length, 1);

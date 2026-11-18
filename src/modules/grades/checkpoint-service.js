@@ -4,7 +4,6 @@
 // القراءة والمقارنة هنا دوال نقية قابلة للاختبار؛ الاستيراد يقرأ ملف Excel
 // المصدَّر من النظام (صف لكل طالب × مقرر، أو صف لكل طالب بأعمدة المقررات).
 import { listWhere, list as listAll, bulkPut, removeMany } from "../../services/cloud-runtime.js";
-import { isEncodedAbsenceScore } from "../../../scripts/lib/score-conventions.mjs";
 import { normalizeKey } from "../../services/text-normalize.js";
 
 export const COLLECTION = "checkpointGrades";
@@ -43,10 +42,11 @@ function detectColumns(row) {
 }
 
 function scoreEntry({ code, name, score, maxScore, percentage }) {
-  const rawScore = num(score);
-  if (rawScore != null && isEncodedAbsenceScore(rawScore)) return { code, name, score: null, maxScore: num(maxScore), pct: null, status: "absent" };
+  // ملفات الوقفة (من المعلمين) لا ترمّز الغياب بـ0.5 كالشهادات: 0.5 هنا
+  // نصف درجة فعلية، و«1/2» كذلك. الغياب يُقرأ من النص فقط (غ/غائب/محروم).
+  const rawScore = /^\s*1\s*\/\s*2\s*$/.test(String(score ?? "")) ? 0.5 : num(score);
   const text = clean(score);
-  if (rawScore == null && /غائب|غياب/.test(text)) return { code, name, score: null, maxScore: num(maxScore), pct: null, status: "absent" };
+  if (rawScore == null && /^غ$|غائب|غياب/.test(text)) return { code, name, score: null, maxScore: num(maxScore), pct: null, status: "absent" };
   if (rawScore == null && /محروم/.test(text)) return { code, name, score: null, maxScore: num(maxScore), pct: null, status: "barred" };
   if (rawScore == null) return null;
   const max = num(maxScore);
