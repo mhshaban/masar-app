@@ -9,7 +9,7 @@ import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-18-checkpoints-1";
-import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-checkpoints-1";
+import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-eml-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
@@ -77,7 +77,7 @@ export async function renderStudentCheckpointsCard(root, student) {
     root.querySelector("#cp-pdf").addEventListener("click", (e) => withBusy(e.currentTarget, "جارٍ التجهيز…", () => downloadStudentReport(student, term)));
     root.querySelector("#cp-send").addEventListener("click", (e) => withBusy(e.currentTarget, "جارٍ التجهيز…", async () => {
       await sendStudentReport(student, term, { records });
-      notify("تم تنزيل التقرير وفتح رسالة البريد. اسحب ملف PDF إلى الرسالة ثم اضغط إرسال.");
+      notify("تم تنزيل رسالة البريد والتقرير مرفق فيها. افتح الملف المنزَّل (.eml) يفتح في Outlook، ثم اضغط إرسال.");
       const fresh = await getStudentCheckpoints(student);
       records.splice(0, records.length, ...fresh);
       draw();
@@ -263,11 +263,23 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
       const doneCount = queue.filter((q) => q.done).length;
       panel.innerHTML = `<div class="card" style="margin-bottom:12px;border-color:var(--clay-500);">
         <div class="card-head"><h3 style="margin:0;font-size:14px;">قائمة الإرسال: ${doneCount} من ${queue.length}</h3><button class="link-btn" id="cp-queue-close">إغلاق</button></div>
-        <p class="hint">كل ضغطة تنزّل تقرير الطالب PDF وتفتح رسالة Outlook لإيميله بالعنوان والنص جاهزين. اسحب الملف إلى الرسالة واضغط إرسال، ثم ارجع هنا للطالب التالي.</p>
-        ${next ? `<div class="forms-actions"><button class="btn btn-primary" id="cp-queue-next">إرسال إلى: ${esc(next.row.student.name)} (${esc(next.row.student.section)})</button><button class="btn btn-ghost" id="cp-queue-skip">تخطّي</button></div>` : '<p class="hint" role="status">انتهت القائمة.</p>'}
+        <p class="hint">كل ضغطة تنزّل رسالة بريد جاهزة (.eml) لإيميل الطالب، والتقرير PDF مرفق فيها. افتح الملف المنزَّل يفتح في Outlook، اضغط إرسال، ثم ارجع هنا للطالب التالي. أو نزّل رسائل القائمة كلها مرة وحدة وافتحها واحدة واحدة.</p>
+        ${next ? `<div class="forms-actions"><button class="btn btn-primary" id="cp-queue-next">إرسال إلى: ${esc(next.row.student.name)} (${esc(next.row.student.section)})</button><button class="btn btn-ghost" id="cp-queue-skip">تخطّي</button><button class="btn btn-ghost" id="cp-queue-all">تنزيل رسائل الباقين (${queue.length - doneCount})</button></div>` : '<p class="hint" role="status">انتهت القائمة.</p>'}
       </div>`;
       panel.querySelector("#cp-queue-close").addEventListener("click", () => { queue = []; selected.clear(); render(); });
       panel.querySelector("#cp-queue-skip")?.addEventListener("click", () => { next.done = true; next.skipped = true; drawQueue(); });
+      panel.querySelector("#cp-queue-all")?.addEventListener("click", (e) => withBusy(e.currentTarget, "جارٍ تجهيز الرسائل…", async () => {
+        for (const q of queue.filter((item) => !item.done)) {
+          try {
+            await sendStudentReport(q.row.student, term, { records: q.row.records });
+            q.done = true;
+            selected.delete(q.row.student.id);
+          } catch (err) { q.done = true; q.skipped = true; notify(`${q.row.student.name}: ${err.message}`); }
+          await new Promise((r) => setTimeout(r, 400));
+        }
+        data = await load();
+        render();
+      }));
       panel.querySelector("#cp-queue-next")?.addEventListener("click", (e) => withBusy(e.currentTarget, "جارٍ التجهيز…", async () => {
         await sendStudentReport(next.row.student, term, { records: next.row.records });
         next.done = true;
