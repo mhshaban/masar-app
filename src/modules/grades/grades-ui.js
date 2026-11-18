@@ -6,7 +6,7 @@ import { listStudents } from "../students/students-service.js?v=2026-08-31-recor
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
-import { mountCheckpointsTab } from "./checkpoints-ui.js?v=2026-11-18-checkpoints-1";
+import { mountCheckpointsTab } from "./checkpoints-ui.js?v=2026-11-18-eml-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({

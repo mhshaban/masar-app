@@ -1,12 +1,12 @@
-// تجهيز تقرير التحصيل الأكاديمي PDF وإرساله عبر برنامج البريد (Outlook):
-// المتصفح لا يستطيع إرفاق ملف في رابط mailto، لذا الزر ينزّل ملف PDF باسم
-// الطالب ثم يفتح رسالة جديدة لإيميل الطالب بالعنوان والنص جاهزين — المرشد
-// يسحب الملف المنزَّل إلى الرسالة ويضغط إرسال. لا إرسال تلقائي إطلاقًا.
+// تجهيز تقرير التحصيل الأكاديمي PDF وإرساله عبر Outlook: الزر ينزّل رسالة
+// جاهزة (.eml) فيها إيميل الطالب والعنوان والنص والتقرير مرفقًا؛ فتحها في
+// Outlook يعرضها كمسودة وما يبقى إلا «إرسال». لا إرسال تلقائي إطلاقًا.
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { COLLECTION, compareCheckpoints, getStudentCheckpoints } from "./checkpoint-service.js?v=2026-11-18-checkpoints-1";
 import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-18-checkpoints-1";
+import { buildEml } from "./checkpoint-eml.js?v=2026-11-18-eml-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 export async function buildStudentReport(student, term, records = null) {
@@ -90,18 +90,6 @@ export function downloadBlob(blob, fileName) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export function mailtoUrl(to, subject, body) {
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-export function openMail(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
 async function markSent(comparison) {
   const at = new Date().toISOString();
   for (const rec of [comparison.first, comparison.second].filter(Boolean)) {
@@ -116,12 +104,18 @@ export async function sendStudentReport(student, term, { records = null } = {}) 
   if (!student.email) throw new Error(`لا يوجد بريد إلكتروني مسجَّل للطالب ${student.name || ""}.`);
   const { comparison, html, fileName } = await buildStudentReport(student, term, records);
   if (!comparison.first && !comparison.second) throw new Error("لا توجد درجات وقفات تقويمية لهذا الطالب.");
-  const blob = await reportPdfBlob(html);
-  downloadBlob(blob, fileName);
-  openMail(mailtoUrl(student.email, emailSubject(student, comparison), emailBody(student)));
+  const pdf = new Uint8Array(await (await reportPdfBlob(html)).arrayBuffer());
+  const eml = buildEml({
+    to: student.email,
+    subject: emailSubject(student, comparison),
+    text: emailBody(student),
+    attachment: { name: fileName, bytes: pdf, type: "application/pdf" },
+  });
+  const emlName = fileName.replace(/\.pdf$/i, ".eml");
+  downloadBlob(new Blob([eml], { type: "message/rfc822" }), emlName);
   const sentAt = await markSent(comparison);
   await logAuditEvent("checkpoint_report_email", { tableName: COLLECTION, recordId: String(student.academicId || student.id) });
-  return { sentAt, fileName };
+  return { sentAt, fileName: emlName };
 }
 
 export async function downloadStudentReport(student, term) {
