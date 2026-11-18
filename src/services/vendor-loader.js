@@ -40,3 +40,9 @@ export async function ensurePdfJs() {
   library.GlobalWorkerOptions.workerSrc = absoluteAsset("src/vendor/pdf.worker.min.js");
   return library;
 }
+
+// html2pdf (html2canvas + jsPDF) — لتحويل تقرير التحصيل الأكاديمي إلى PDF
+// داخل المتصفح بلا خادم. يُحمَّل عند الطلب فقط (حجمه ~900KB).
+export function ensureHtml2Pdf() {
+  return loadScript("src/vendor/html2pdf.bundle.min.js", "html2pdf");
+}

@@ -3,6 +3,7 @@ import { getStudentTermTimeline, getStudentAcademicSummary, officialAverage } fr
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
+import { renderStudentCheckpointsCard } from "./checkpoints-ui.js?v=2026-11-18-checkpoints-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const statusLabels = { absent: "غائب", barred: "محروم" };
@@ -169,6 +170,7 @@ export async function renderAcademicPath(container, student) {
       <div class="term-average-cards" data-term-slots></div>
       <div id="term-chart-root"></div>
     </div>
+    <div id="student-checkpoints"></div>
     <div class="card" style="margin-bottom:16px;">
       <div class="card-head">
         <div><h2>سجل المقررات</h2></div>
@@ -202,5 +204,10 @@ export async function renderAcademicPath(container, student) {
   }
   drawAcademic();
   wireCertificateOriginal(container, student);
-  await mountCourseGradesTable(container.querySelector("#student-course-grades"), student);
+  await Promise.all([
+    mountCourseGradesTable(container.querySelector("#student-course-grades"), student),
+    renderStudentCheckpointsCard(container.querySelector("#student-checkpoints"), student).catch((error) => {
+      container.querySelector("#student-checkpoints").innerHTML = `<p class="hint">تعذّر تحميل الوقفات التقويمية: ${esc(error.message)}</p>`;
+    }),
+  ]);
 }
