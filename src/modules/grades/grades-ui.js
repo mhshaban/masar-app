@@ -6,6 +6,7 @@ import { listStudents } from "../students/students-service.js?v=2026-08-31-recor
 import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academic-fix-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
+import { mountCheckpointsTab } from "./checkpoints-ui.js?v=2026-11-18-checkpoints-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -318,15 +319,18 @@ export async function mountGradesView(container, { onGoto } = {}) {
     </div>
     <div class="tabs">
       <div class="tab active" data-tab="classification">تصنيف الطلاب</div>
+      <div class="tab" data-tab="checkpoints">الوقفات التقويمية</div>
       <div class="tab" data-tab="analytics">التحليلات</div>
     </div>
     <div id="grades-classification-root"></div>
+    <div id="grades-checkpoints-root" style="display:none;"></div>
     <div id="grades-analytics-root" style="display:none;"></div>
   `;
 
   const analyticsRoot = container.querySelector("#grades-analytics-root");
   const classificationRoot = container.querySelector("#grades-classification-root");
-  const roots = { analytics: analyticsRoot, classification: classificationRoot };
+  const checkpointsRoot = container.querySelector("#grades-checkpoints-root");
+  const roots = { analytics: analyticsRoot, classification: classificationRoot, checkpoints: checkpointsRoot };
 
   await renderClassificationTab(classificationRoot, onGoto);
 
@@ -338,6 +342,7 @@ export async function mountGradesView(container, { onGoto } = {}) {
       Object.entries(roots).forEach(([key, root]) => { root.style.display = key === active ? "" : "none"; });
       if (active === "analytics") await renderAnalyticsTab(analyticsRoot);
       if (active === "classification") await renderClassificationTab(classificationRoot, onGoto);
+      if (active === "checkpoints") await mountCheckpointsTab(checkpointsRoot, { onGoto });
     });
   });
 }
