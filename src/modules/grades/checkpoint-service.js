@@ -205,3 +205,46 @@ export function compareCheckpoints(records, term) {
 export function termsOf(records) {
   return [...new Set(records.map((r) => r.term))].sort();
 }
+
+// ── مراجعة الأصفار ─────────────────────────────────────────────────────────
+// الصفر في ملفات الوقفة كثيرًا ما يعني «لم يُرصد بعد»، لذا يُعرض للقسم ليؤكده
+// (zeroConfirmed) أو يصحح الدرجة أو يسجله غيابًا.
+export const departmentOf = (subject) => {
+  const name = String(subject?.name || subject?.code || "");
+  return name.startsWith("المواد التجارية") ? "المواد التجارية" : name;
+};
+const isOpenZero = (s) => s && s.score === 0 && !s.zeroConfirmed && !s.status;
+export const subjectKey = (s) => normalizeKey(s?.code || s?.name || "");
+
+export function listZeroEntries(records, { term = null, checkpoint = null, includeConfirmed = false } = {}) {
+  const out = [];
+  for (const r of records) {
+    if (term && r.term !== term) continue;
+    if (checkpoint && Number(r.checkpoint) !== Number(checkpoint)) continue;
+    for (const s of r.subjects || []) {
+      if (!(isOpenZero(s) || (includeConfirmed && s.score === 0 && s.zeroConfirmed))) continue;
+      out.push({ recordId: r.id, studentId: r.studentId, studentName: r.studentName, level: r.level, section: r.section, checkpoint: Number(r.checkpoint), department: departmentOf(s), subject: s, key: subjectKey(s), confirmed: !!s.zeroConfirmed });
+    }
+  }
+  const order = { "الأول": 1, "الثاني": 2, "الثالث": 3 };
+  return out.sort((a, b) => a.department.localeCompare(b.department, "ar") || (order[a.level] || 9) - (order[b.level] || 9)
+    || String(a.section).localeCompare(String(b.section), "ar") || String(a.studentName).localeCompare(String(b.studentName), "ar"));
+}
+
+// action: { type: "score", score } | { type: "confirm" } | { type: "absent" }
+export function resolveZero(record, key, action, { by = "", at = new Date().toISOString() } = {}) {
+  let found = false;
+  const subjects = (record.subjects || []).map((s) => {
+    if (found || subjectKey(s) !== key || s.score !== 0) return s;
+    found = true;
+    const audit = { zeroReviewedAt: at, zeroReviewedBy: by };
+    if (action.type === "confirm") return { ...s, zeroConfirmed: true, ...audit };
+    if (action.type === "absent") return { ...s, score: null, pct: null, status: "absent", ...audit };
+    const score = num(action.score);
+    if (score == null || score < 0 || (s.maxScore && score > s.maxScore)) throw new Error(`الدرجة غير صحيحة${s.maxScore ? ` (من 0 إلى ${s.maxScore})` : ""}.`);
+    if (score === 0) return { ...s, zeroConfirmed: true, ...audit };
+    return { ...s, score, pct: s.maxScore ? round2((score / s.maxScore) * 100) : score, zeroCorrectedFrom: 0, ...audit };
+  });
+  if (!found) throw new Error("لم أجد هذه الدرجة الصفرية في السجل (ربما عُدّلت).");
+  return { ...record, subjects, averagePct: averageOf(subjects) };
+}
