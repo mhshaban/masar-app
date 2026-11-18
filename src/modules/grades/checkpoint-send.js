@@ -5,7 +5,7 @@ import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-che
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { COLLECTION, compareCheckpoints, getStudentCheckpoints } from "./checkpoint-service.js?v=2026-11-18-checkpoints-1";
-import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-18-checkpoints-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-18-first-only-1";
 import { buildEml } from "./checkpoint-eml.js?v=2026-11-18-eml-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
@@ -108,7 +108,7 @@ export async function sendStudentReport(student, term, { records = null } = {}) 
   const eml = buildEml({
     to: student.email,
     subject: emailSubject(student, comparison),
-    text: emailBody(student),
+    text: emailBody(student, comparison),
     attachment: { name: fileName, bytes: pdf, type: "application/pdf" },
   });
   const emlName = fileName.replace(/\.pdf$/i, ".eml");
