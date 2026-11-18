@@ -58,8 +58,8 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     <tr style="background:${i % 2 ? SOFT : "#fff"};">
       <td style="border:1px solid ${LINE};padding:7px 8px;text-align:right;">${esc(s.name || s.code)}${s.code && s.name ? `<br><span style="color:${MUTED};font-size:11px;" dir="ltr">${esc(s.code)}</span>` : ""}</td>
       <td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${cell(s.first)}</td>
-      <td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${hasSecond ? cell(s.second) : `<span style="color:${MUTED};">لم تُرصد بعد</span>`}</td>
-      <td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${deltaCell(s)}</td>
+      ${hasSecond ? `<td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${cell(s.second)}</td>
+      <td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${deltaCell(s)}</td>` : ""}
     </tr>`).join("");
   const advice = adviceLines(comparison);
   const th = `style="border:1px solid ${NAVY};background:${NAVY};color:#fff;padding:8px 6px;font-weight:700;font-size:12.5px;"`;
@@ -68,7 +68,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     <tr><td style="padding:18px 20px;color:#fff;">
       <div style="font-size:12px;color:#d6c08a;">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
       <div style="font-size:22px;font-weight:800;margin-top:2px;">تقرير التحصيل الأكاديمي</div>
-      <div style="font-size:12.5px;color:#e5e7eb;">درجات الوقفات التقويمية · ${esc(comparison.term)}</div>
+      <div style="font-size:12.5px;color:#e5e7eb;">${hasSecond ? "درجات الوقفات التقويمية" : `درجات ${CHECKPOINT_LABELS[1]}`} · ${esc(comparison.term)}</div>
     </td></tr>
     <tr><td style="height:5px;background:${GOLD};padding:0;"></td></tr>
   </table>
@@ -86,15 +86,15 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
 
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:10px;"><tr>
     ${tile(CHECKPOINT_LABELS[1], pct(comparison.firstAvg))}
-    ${tile(CHECKPOINT_LABELS[2], hasSecond ? pct(comparison.secondAvg) : "—")}
-    ${tile("التغيّر بين الوقفتين", comparison.delta == null ? "—" : `<span dir="ltr" style="color:${TREND_COLOR[comparison.trend]};">${comparison.delta > 0 ? "+" : ""}${formatPct(comparison.delta)}</span>`, GOLD)}
+    ${hasSecond ? tile(CHECKPOINT_LABELS[2], pct(comparison.secondAvg)) : ""}
+    ${hasSecond ? tile("التغيّر بين الوقفتين", comparison.delta == null ? "—" : `<span dir="ltr" style="color:${TREND_COLOR[comparison.trend]};">${comparison.delta > 0 ? "+" : ""}${formatPct(comparison.delta)}</span>`, GOLD) : ""}
     ${tile("المعدل التراكمي", pct(cumulative), GOLD)}
   </tr></table>
 
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">درجات المقررات</div>
   <table style="width:100%;border-collapse:collapse;font-size:13px;">
-    <thead><tr><th ${th} style="text-align:right;">المقرر</th><th ${th}>${CHECKPOINT_LABELS[1]}</th><th ${th}>${CHECKPOINT_LABELS[2]}</th><th ${th}>التغيّر</th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="4" style="border:1px solid ${LINE};padding:10px;text-align:center;color:${MUTED};">لا توجد درجات مرصودة</td></tr>`}</tbody>
+    <thead><tr><th ${th} style="text-align:right;">المقرر</th><th ${th}>${CHECKPOINT_LABELS[1]}</th>${hasSecond ? `<th ${th}>${CHECKPOINT_LABELS[2]}</th><th ${th}>التغيّر</th>` : ""}</tr></thead>
+    <tbody>${rows || `<tr><td colspan="${hasSecond ? 4 : 2}" style="border:1px solid ${LINE};padding:10px;text-align:center;color:${MUTED};">لا توجد درجات مرصودة</td></tr>`}</tbody>
   </table>
 
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">توجيهات قسم الإرشاد الأكاديمي</div>
@@ -112,11 +112,12 @@ export function emailSubject(student, comparison) {
   return `تقرير التحصيل الأكاديمي — ${student.name || ""} — ${comparison.term}`;
 }
 
-export function emailBody(student) {
+export function emailBody(student, comparison = null) {
+  const scope = comparison && !comparison.second ? `درجات ${CHECKPOINT_LABELS[1]}` : "درجات الوقفات التقويمية والمقارنة بينها";
   return [
     `عزيزي الطالب ${student.name || ""}،`,
     "",
-    "تجد مرفقًا تقرير التحصيل الأكاديمي الخاص بك، ويتضمن درجات الوقفات التقويمية والمقارنة بينها، مع توجيهات قسم الإرشاد الأكاديمي.",
+    `تجد مرفقًا تقرير التحصيل الأكاديمي الخاص بك، ويتضمن ${scope}، مع توجيهات قسم الإرشاد الأكاديمي.`,
     "نتمنى لك التوفيق، ولا تتردد في مراجعة القسم عند الحاجة.",
     "",
     "قسم الإرشاد الأكاديمي والتوجيه المهني",

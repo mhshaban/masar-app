@@ -9,7 +9,7 @@ import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-18-checkpoints-1";
-import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-eml-1";
+import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-first-only-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
