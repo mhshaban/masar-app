@@ -143,16 +143,16 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     <tbody>${rows || `<tr><td colspan="${hasSecond ? 4 : 2}" style="border:1px solid ${LINE};padding:10px;text-align:center;color:${MUTED};">لا توجد درجات مرصودة</td></tr>`}</tbody>
   </table>
 
+  <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">توجيهات قسم الإرشاد الأكاديمي</div>
+  <div style="background:${SOFT};border:1px solid ${LINE};border-radius:8px;padding:10px 14px;">
+    ${advice.map((line) => `<p style="margin:4px 0;">• ${esc(line)}</p>`).join("")}
+  </div>
+
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">رسالة إلى ولي الأمر</div>
   <div style="border:1px solid ${LINE};border-right:5px solid ${accent};border-radius:8px;padding:10px 14px;background:#fff;">
     <p style="margin:2px 0 6px;font-weight:800;color:${accent};">${esc(parent.title)}</p>
     <p style="margin:4px 0;">ولي أمر الطالب المحترم،</p>
     ${parent.lines.map((line) => `<p style="margin:4px 0;">${esc(line)}</p>`).join("")}
-  </div>
-
-  <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">توجيهات قسم الإرشاد الأكاديمي</div>
-  <div style="background:${SOFT};border:1px solid ${LINE};border-radius:8px;padding:10px 14px;">
-    ${advice.map((line) => `<p style="margin:4px 0;">• ${esc(line)}</p>`).join("")}
   </div>
 
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:22px;font-size:12px;color:${MUTED};">
