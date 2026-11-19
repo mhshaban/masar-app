@@ -32,9 +32,10 @@ test("manifest csv quotes fields; result csv parses", () => {
   assert.equal(rows[1].error, "No, bad");
 });
 
-test("email html embeds the report with greeting, eml carries it", () => {
+test("email html embeds the report without the greeting line, eml carries it", () => {
   const html = emailHtml({ name: "طالب" }, { second: null }, "<table><tr><td>REPORT</td></tr></table>");
-  assert.match(html, /عزيزي الطالب طالب/);
+  assert.ok(!/عزيزي الطالب طالب/.test(html));
+  assert.match(html, /فيما يلي تقرير/);
   assert.match(html, /REPORT/);
   assert.match(html, /family=Cairo/);
   assert.ok(!/قسم الإرشاد الأكاديمي والتوجيه المهني<\/div>/.test(html));
