@@ -3,7 +3,7 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-bulk-1";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-email-2";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -132,7 +132,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
 
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:14px;">
     <tr>
-      <td style="padding:3px 0;width:50%;"><span style="color:${MUTED};">اسم الطالب: </span><strong>${esc(student.name)}</strong></td>
+      <td style="padding:3px 0;width:50%;"><span style="color:${MUTED};">عزيزي الطالب: </span><strong>${esc(student.name)}</strong></td>
       <td style="padding:3px 0;"><span style="color:${MUTED};">الرقم الأكاديمي: </span><strong dir="ltr">${esc(student.academicId || student.id)}</strong></td>
     </tr>
     <tr>
@@ -140,6 +140,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
       <td style="padding:3px 0;"><span style="color:${MUTED};">التخصص: </span><strong>${esc([student.department, student.track].filter(Boolean).join(" — ")) || "—"}</strong></td>
     </tr>
   </table>
+  <!--email-intro-->
 
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:10px;"><tr>
     ${tile(CHECKPOINT_LABELS[1], pct(comparison.firstAvg))}
@@ -165,6 +166,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     ${parent.lines.map((line) => `<p style="margin:4px 0;">${esc(line)}</p>`).join("")}
   </div>
 
+  <!--email-closing-->
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:22px;font-size:12px;color:${MUTED};">
     <tr><td>تاريخ الإصدار: ${esc(date)}</td><td style="text-align:left;color:${INK};"><strong>قسم الإرشاد الأكاديمي والتوجيه المهني</strong></td></tr>
   </table>
@@ -181,24 +183,32 @@ export function emailBody(student, comparison = null) {
     `عزيزي الطالب ${student.name || ""}،`,
     "",
     `فيما يلي تقرير التحصيل الأكاديمي الخاص بك، ويتضمن ${scope}، مع توجيهات قسم الإرشاد الأكاديمي.`,
-    "يُرجى اطلاع ولي أمرك على التقرير، ففيه رسالة موجهة إليه.",
     "نتمنى لك التوفيق، ولا تتردد في مراجعة القسم عند الحاجة.",
     "",
     "قسم الإرشاد الأكاديمي والتوجيه المهني",
   ].join("\n");
 }
 
-// نص البريد بصيغة HTML: التحية ثم التقرير نفسه مدمجًا (بدون مرفق)، بنفس
-// التصميم وخط Cairo (يُحمَّل من Google Fonts حيث يسمح برنامج البريد).
+function injectAt(reportHtml, marker, html, fallbackFirst) {
+  if (reportHtml.includes(marker)) return reportHtml.replace(marker, html);
+  return fallbackFirst ? html + reportHtml : reportHtml + html;
+}
+
+// نص البريد بصيغة HTML: التقرير نفسه مدمجًا (بدون مرفق)، بنفس التصميم وخط
+// Cairo. المقدمة بعد بيانات الطالب، وسطر الختام في آخر التقرير قبل التوقيع.
 export function emailHtml(student, comparison, reportHtml) {
-  const lines = emailBody(student, comparison).split("\n");
-  lines.pop(); lines.pop(); // التوقيع موجود أصلًا في ذيل التقرير
-  const intro = lines.filter((l, i) => l || i < lines.length - 1).map((l) => (l ? `<p style="margin:0 0 6px;">${esc(l)}</p>` : "")).join("");
+  const lines = emailBody(student, comparison).split("\n").filter(Boolean);
+  lines.pop(); // التوقيع موجود أصلًا في ذيل التقرير
+  lines.shift(); // بدون سطر «عزيزي الطالب»: الاسم موجود في بيانات التقرير
+  const closing = lines.pop();
+  const p = (l) => `<p style="margin:0 0 6px;">${esc(l)}</p>`;
+  const box = (inner, margin) => `<div dir="rtl" style="font-size:14px;line-height:1.8;color:#1f2937;margin:${margin};text-align:right;">${inner}</div>`;
+  let body = injectAt(reportHtml, "<!--email-intro-->", box(lines.map(p).join(""), "14px 0 4px"), true);
+  body = injectAt(body, "<!--email-closing-->", box(p(closing), "18px 0 0"), false);
   return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
 <style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
-  <div dir="rtl" style="font-family:Cairo,'Segoe UI',Tahoma,Arial,sans-serif;font-size:14px;line-height:1.8;color:#1f2937;max-width:720px;margin:0 auto 14px;text-align:right;">${intro}</div>
-  ${reportHtml}
+  ${body}
 </body></html>`;
 }
 

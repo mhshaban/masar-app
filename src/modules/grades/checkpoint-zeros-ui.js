@@ -5,7 +5,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-11-18-checkpo
 import { get, save } from "../../services/cloud-runtime.js";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
-import { COLLECTION, CHECKPOINT_LABELS, listAbsentEntries, setAbsentScore } from "./checkpoint-service.js?v=2026-11-19-bulk-1";
+import { COLLECTION, CHECKPOINT_LABELS, listAbsentEntries, setAbsentScore } from "./checkpoint-service.js?v=2026-11-19-email-2";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FIELD = "padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;background:var(--surface);color:inherit;";
