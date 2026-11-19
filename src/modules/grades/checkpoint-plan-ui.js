@@ -5,17 +5,23 @@ import { get, save } from "../../services/cloud-runtime.js";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { COLLECTION } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
-import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-19-absent-1";
+import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-19-missing-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FIELD = "padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;background:var(--surface);color:inherit;";
 const LEVELS = ["الأول", "الثاني", "الثالث"];
-const CAT_PILL = { low: "pill-critical", mid: "pill-warning", top: "pill-success", none: "" };
+const CAT_PILL = { low: "pill-critical", mid: "pill-warning", top: "pill-success", none: "", missing: "" };
+const MISSING_CLS = { category: "missing", group: "", average: null, weak: [], weakCount: 0 };
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
 
 function buildPlanRows(records, students, term) {
   const byId = new Map(students.map((s) => [String(s.academicId || s.id), s]));
-  return records.filter((r) => r.term === term && Number(r.checkpoint) === 1).map((record) => {
+  const own = records.filter((r) => r.term === term && Number(r.checkpoint) === 1);
+  const withRecord = new Set(own.map((r) => String(r.studentId)));
+  // طلاب مسجلون في المدرسة ولم ترد أسماؤهم في أي كشف من كشوف الوقفة.
+  const missing = own.length ? students.filter((s) => LEVELS.includes(s.level) && !withRecord.has(String(s.academicId || s.id)))
+    .map((student) => ({ record: { id: `missing-${student.id}`, studentId: String(student.academicId || student.id), subjects: [] }, student, cls: MISSING_CLS, sessions: [], log: {}, done: 0 })) : [];
+  return own.map((record) => {
     const student = byId.get(String(record.studentId));
     if (!student) return null;
     const cls = classifyRecord(record);
@@ -23,7 +29,7 @@ function buildPlanRows(records, students, term) {
     const log = record.plan?.sessions || {};
     const done = sessions.filter((s) => log[s.id]?.date).length;
     return { record, student, cls, sessions, log, done };
-  }).filter(Boolean).sort((a, b) => LEVELS.indexOf(a.student.level) - LEVELS.indexOf(b.student.level)
+  }).filter(Boolean).concat(missing).sort((a, b) => LEVELS.indexOf(a.student.level) - LEVELS.indexOf(b.student.level)
     || String(a.student.section).localeCompare(String(b.student.section), "ar") || String(a.student.name).localeCompare(String(b.student.name), "ar"));
 }
 
@@ -48,6 +54,9 @@ export function mountPlanCard(container, { records, students, term, state, userN
   const rows = buildPlanRows(records, students, term);
   if (!rows.length) { container.innerHTML = ""; return; }
   const count = (cat, level) => rows.filter((r) => r.cls.category === cat && (!level || r.student.level === level)).length;
+  // «بلا درجات مرصودة» و«غير مدرج» تظهران فقط إذا فيها طلاب.
+  const cats = ["low", "mid", "top", "none", "missing"].filter((c) => ["low", "mid", "top"].includes(c) || count(c));
+  if (!cats.includes(state.category)) state.category = "low";
   const inCat = rows.filter((r) => r.cls.category === state.category);
   const groups = [...new Set(inCat.map((r) => r.cls.group).filter(Boolean))];
   const sections = [...new Set(inCat.filter((r) => !state.level || r.student.level === state.level).map((r) => r.student.section).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "ar"));
@@ -63,13 +72,13 @@ export function mountPlanCard(container, { records, students, term, state, userN
     <summary style="cursor:pointer;list-style:revert;"><h2 style="display:inline;">خطة تحسين التحصيل</h2> <span class="hint">تصنيف الطلبة حسب ${esc("الوقفة التقويمية الأولى")} وجلسات كل فئة</span></summary>
     <p class="hint" style="margin-top:8px;">متدني: النسبة أقل من 60٪ أو أقل من 50٪ في مقررين فأكثر. متفوق: 90٪ فأكثر بلا أي مقرر أقل من 50٪. متوسط: الباقي. الأصفار غير المؤكدة لا تُحسب حتى تُراجَع.</p>
     <div style="overflow:auto;"><table class="table" style="margin-bottom:12px;">
-      <thead><tr><th>المستوى</th>${["low", "mid", "top", "none"].map((c) => `<th>${CATEGORY_LABELS[c]}</th>`).join("")}<th>المجموع</th></tr></thead>
-      <tbody>${LEVELS.map((l) => `<tr><td>${l}</td>${["low", "mid", "top", "none"].map((c) => `<td class="num"><button class="link-btn" data-pc="${c}" data-pl="${l}">${count(c, l)}</button></td>`).join("")}<td class="num">${rows.filter((r) => r.student.level === l).length}</td></tr>`).join("")}
-      <tr><th>المجموع</th>${["low", "mid", "top", "none"].map((c) => `<th class="num"><button class="link-btn" data-pc="${c}" data-pl="">${count(c)}</button></th>`).join("")}<th class="num">${rows.length}</th></tr></tbody>
+      <thead><tr><th>المستوى</th>${cats.map((c) => `<th>${CATEGORY_LABELS[c]}</th>`).join("")}<th>المجموع</th></tr></thead>
+      <tbody>${LEVELS.map((l) => `<tr><td>${l}</td>${cats.map((c) => `<td class="num"><button class="link-btn" data-pc="${c}" data-pl="${l}">${count(c, l)}</button></td>`).join("")}<td class="num">${rows.filter((r) => r.student.level === l).length}</td></tr>`).join("")}
+      <tr><th>المجموع</th>${cats.map((c) => `<th class="num"><button class="link-btn" data-pc="${c}" data-pl="">${count(c)}</button></th>`).join("")}<th class="num">${rows.length}</th></tr></tbody>
     </table></div>
 
     <div class="forms-actions" style="margin-bottom:10px;">
-      <select style="${FIELD}" id="cp-p-cat">${["low", "mid", "top", "none"].map((c) => `<option value="${c}" ${c === state.category ? "selected" : ""}>${CATEGORY_LABELS[c]} (${count(c)})</option>`).join("")}</select>
+      <select style="${FIELD}" id="cp-p-cat">${cats.map((c) => `<option value="${c}" ${c === state.category ? "selected" : ""}>${CATEGORY_LABELS[c]} (${count(c)})</option>`).join("")}</select>
       ${groups.length ? `<select style="${FIELD}" id="cp-p-group"><option value="">كل المجموعات</option>${groups.map((g) => `<option value="${g}" ${g === state.group ? "selected" : ""}>${esc(GROUP_LABELS[g])}</option>`).join("")}</select>` : ""}
       <select style="${FIELD}" id="cp-p-level"><option value="">كل المستويات</option>${LEVELS.map((l) => `<option ${l === state.level ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select style="${FIELD}" id="cp-p-section"><option value="">كل الشعب</option>${sections.map((s) => `<option ${s === state.section ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>
@@ -83,7 +92,9 @@ export function mountPlanCard(container, { records, students, term, state, userN
       <p class="hint" style="margin:0 0 8px;">الهدف: ${esc(PLAN_GOALS[state.category])}</p>
       <div style="overflow:auto;"><table class="table"><thead><tr><th>الجلسة</th><th>لمن</th><th>الحضور</th><th>المدة</th><th>المحتوى</th><th>المخرج</th><th>المنعقدة</th></tr></thead>
       <tbody>${catSessions.map((s) => `<tr><td><strong>${esc(s.title)}</strong></td><td>${s.groups.length ? s.groups.map((g) => esc(GROUP_LABELS[g])).join("، ") : "كل الفئة"}${s.levels ? ` · المستوى ${s.levels.join("، ")}` : ""}</td><td>${esc(s.attendees)}</td><td>${esc(s.duration)}</td><td>${esc(s.content)}</td><td>${esc(s.output)}</td><td class="num">${held(s)} / ${eligible(s).length}</td></tr>`).join("")}</tbody></table></div>
-    </div>` : '<p class="hint">هؤلاء الطلبة كل درجاتهم أصفار غير مؤكدة؛ راجِعها أولًا في «مراجعة الدرجات الصفرية».</p>'}
+    </div>` : state.category === "missing"
+      ? '<p class="hint">هؤلاء الطلبة مسجلون في المدرسة ولم ترد أسماؤهم في أي كشف من كشوف الوقفة الأولى، فلا توجد لهم درجات أصلًا؛ تحقّق منهم مع الأقسام.</p>'
+      : '<p class="hint">هؤلاء الطلبة كل درجاتهم أصفار غير مؤكدة؛ راجِعها أولًا في «مراجعة الدرجات الصفرية».</p>'}
 
     ${visible.length ? `<div style="overflow:auto;max-height:620px;"><table class="table">
       <thead><tr><th>الطالب</th><th>الشعبة</th><th>النسبة</th><th>مقررات أقل من 50٪</th><th>المجموعة</th><th>الجلسات</th></tr></thead>

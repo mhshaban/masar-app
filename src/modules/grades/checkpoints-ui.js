@@ -9,7 +9,7 @@ import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
-import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-absent-1";
+import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-missing-1";
 import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-18-zeros-1";
 import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-18-plan-1";
 
