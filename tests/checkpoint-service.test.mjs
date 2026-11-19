@@ -99,3 +99,11 @@ test('parentMessage mentions courses the student was absent from', () => {
   assert.equal(m.level, 'low');
   assert.match(m.lines[0], /تغيّب عن الوقفة التقويمية في: العلوم/);
 });
+
+test('missingSectionCourses ignores the same course under another code', async () => {
+  const { missingSectionCourses } = await import('../src/modules/grades/checkpoint-service.js');
+  const rec = (id, subs) => ({ id, section: 'س1', term: 'ت', checkpoint: 1, subjects: subs.map(([name, code]) => ({ name, code, pct: 50 })) });
+  const me = rec('me', [['اللغة الإنجليزية', 'انج 811'], ['المواد التجارية (محا 803)', '']]);
+  const all = [me, rec('a', [['اللغة الإنجليزية', 'انج 801'], ['المواد التجارية (قصد 805)', '']]), rec('b', [['اللغة الإنجليزية', 'انج 801'], ['المواد التجارية (قصد 805)', '']])];
+  assert.deepEqual(missingSectionCourses(all, me), []);
+});
