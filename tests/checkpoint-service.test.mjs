@@ -84,3 +84,18 @@ test('parentMessage picks the tier from the latest checkpoint', () => {
   assert.equal(parentMessage(mk([95, 92, 98], 95)).level, 'top');
   assert.match(parentMessage(mk([40, 45, 80], 55)).lines.join(' '), /م0، م1/);
 });
+
+test('missingSectionCourses lists section courses the student has no grade in', async () => {
+  const { missingSectionCourses } = await import('../src/modules/grades/checkpoint-service.js');
+  const rec = (id, names) => ({ id, section: 'س1', term: 'ت', checkpoint: 1, subjects: names.map((name) => ({ name, code: '', pct: 50 })) });
+  const me = rec('me', ['الرسم الفني', 'اللغة العربية']);
+  const all = [me, rec('a', ['الرسم الفني', 'اللغة العربية', 'العلوم', 'الرياضيات']), rec('b', ['الرسم الفني', 'اللغة العربية', 'العلوم', 'الرياضيات']), rec('c', ['الرسم الفني', 'العلوم', 'نادر'])];
+  assert.deepEqual(missingSectionCourses(all, me).map((m) => m.name).sort(), ['الرياضيات', 'العلوم']);
+});
+
+test('parentMessage mentions courses the student was absent from', () => {
+  const c = { firstAvg: 18, subjects: [{ name: 'الرسم الفني', first: { pct: 0 } }, { name: 'اللغة العربية', first: { pct: 36 } }, { name: 'العلوم', first: { status: 'absent', missing: true, pct: null } }] };
+  const m = parentMessage(c);
+  assert.equal(m.level, 'low');
+  assert.match(m.lines[0], /تغيّب عن الوقفة التقويمية في: العلوم/);
+});
