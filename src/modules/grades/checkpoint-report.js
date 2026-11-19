@@ -103,7 +103,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
   </div>
 
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:22px;font-size:12px;color:${MUTED};">
-    <tr><td>تاريخ الإصدار: ${esc(date)}</td><td style="text-align:left;color:${INK};"><strong>رئيس قسم الإرشاد الأكاديمي والتوجيه المهني</strong></td></tr>
+    <tr><td>تاريخ الإصدار: ${esc(date)}</td><td style="text-align:left;color:${INK};"><strong>قسم الإرشاد الأكاديمي والتوجيه المهني</strong></td></tr>
   </table>
 </div>`;
 }
