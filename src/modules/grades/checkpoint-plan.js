@@ -1,7 +1,7 @@
 // تصنيف الطلبة حسب الوقفة التقويمية الأولى وخطة جلسات التحسين لكل فئة.
 // دوال نقية: التصنيف يستبعد الأصفار غير المؤكدة (قد تكون «لم تُرصد»).
 export const CATEGORY_LABELS = { low: "متدني", mid: "متوسط", top: "متفوق", none: "بلا درجات مرصودة" };
-export const GROUP_LABELS = { A: "المجموعة (أ): 3 مقررات فأكثر", B: "المجموعة (ب)", oneWeak: "ضعيف في مقرر واحد", "": "" };
+export const GROUP_LABELS = { absentAll: "غائب عن كل المقررات", A: "المجموعة (أ): 3 مقررات فأكثر", B: "المجموعة (ب)", oneWeak: "ضعيف في مقرر واحد", "": "" };
 
 export function classifyRecord(record) {
   const subjects = (record?.subjects || []).filter((s) => s.pct != null && !(s.score === 0 && !s.zeroConfirmed));
@@ -12,6 +12,8 @@ export function classifyRecord(record) {
   const weakSubjects = subjects.filter((s) => s.pct < 50);
   const n = weakSubjects.length;
   const weak = [...new Set(weakSubjects.map((s) => (s.code && !String(s.name || "").includes(s.code) ? `${s.name} (${s.code})` : s.name || s.code)))];
+  // غائب عن الوقفة كاملة (كل درجاته أصفار مؤكدة): مجموعة بروحها داخل المتدنين.
+  if (subjects.every((s) => s.pct === 0)) return { category: "low", group: "absentAll", average, weak, weakCount: n };
   if (raw < 60 || n >= 2) return { category: "low", group: n >= 3 ? "A" : "B", average, weak, weakCount: n };
   if (raw >= 90 && !n) return { category: "top", group: "", average, weak, weakCount: n };
   return { category: "mid", group: n ? "oneWeak" : "", average, weak, weakCount: n };
@@ -21,7 +23,7 @@ export function classifyRecord(record) {
 export const PLAN_SESSIONS = {
   low: [
     { id: "low-group", title: "جلسة «درجاتي وخطة مذاكرتي»", groups: [], attendees: "كل المتدنين، جلسة لكل مستوى", duration: "40 دقيقة", content: "قراءة الطالب لدرجاته، وأسباب الضعف (منها الغياب)، وتنظيم المذاكرة، والساعات المكتبية", output: "خطة مذاكرة يكتبها كل طالب" },
-    { id: "low-parents", title: "لقاء أولياء الأمور الجماعي", groups: ["A"], parent: true, attendees: "أولياء أمور المجموعة (أ)، لقاء لكل مستوى", duration: "45 دقيقة", content: "عرض تقرير التحصيل، ودور الأسرة في المتابعة والحضور، وتعهد تحسين", output: "تعهد موقّع من ولي الأمر" },
+    { id: "low-parents", title: "لقاء أولياء الأمور الجماعي", groups: ["A", "absentAll"], parent: true, attendees: "أولياء أمور المجموعة (أ) والغائبين عن كل المقررات، لقاء لكل مستوى", duration: "45 دقيقة", content: "عرض تقرير التحصيل، ودور الأسرة في المتابعة والحضور، وتعهد تحسين", output: "تعهد موقّع من ولي الأمر" },
     { id: "low-tutoring", title: "الإحالة إلى دروس التقوية", groups: [], attendees: "كل المتدنين، تنفذها الأقسام", duration: "حصة أسبوعيًا", content: "الإنجليزي والرياضيات والرسم الفني أولًا، والقسم يتابع الحضور فقط", output: "كشف حضور من الأقسام" },
   ],
   mid: [

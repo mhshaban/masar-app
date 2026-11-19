@@ -14,6 +14,9 @@ test("classification bands and groups, open zeros ignored", () => {
   assert.equal(classifyRecord({ subjects: [sub("أ", 24), sub("ب", 0)] }).category, "top");
   assert.equal(classifyRecord({ subjects: [sub("أ", 24), { ...sub("ب", 0), zeroConfirmed: true }] }).category, "low");
   assert.equal(classifyRecord({ subjects: [sub("أ", 0)] }).category, "none");
+  const gone = classifyRecord({ subjects: [{ ...sub("أ", 0), zeroConfirmed: true }, { ...sub("ب", 0), zeroConfirmed: true }] });
+  assert.deepEqual([gone.category, gone.group], ["low", "absentAll"]);
+  assert.ok(sessionsFor(gone).some((s) => s.id === "low-parents"));
 });
 
 test("sessions follow group and level", () => {
