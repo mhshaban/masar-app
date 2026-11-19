@@ -17,17 +17,17 @@ test("classification bands and groups, open zeros ignored", () => {
 });
 
 test("sessions follow group and level", () => {
-  assert.ok(sessionsFor({ category: "low", group: "A" }).some((s) => s.id === "low-parent"));
-  assert.ok(!sessionsFor({ category: "low", group: "B" }).some((s) => s.id === "low-parent"));
-  assert.ok(!sessionsFor({ category: "top", group: "" }, "الأول").some((s) => s.id === "top-future"));
-  assert.ok(sessionsFor({ category: "top", group: "" }, "الثالث").some((s) => s.id === "top-future"));
+  assert.deepEqual(sessionsFor({ category: "low", group: "A" }).map((s) => s.id), ["low-group", "low-parents", "low-tutoring"]);
+  assert.deepEqual(sessionsFor({ category: "low", group: "B" }).map((s) => s.id), ["low-group", "low-tutoring"]);
+  assert.equal(sessionsFor({ category: "mid", group: "oneWeak" }).length, 1);
+  assert.equal(sessionsFor({ category: "top", group: "" }).length, 1);
 });
 
 test("session log add and clear", () => {
-  let r = withSessionLog({ id: "x" }, "low-diag", { date: "2026-11-30", parentAttended: false });
-  assert.equal(r.plan.sessions["low-diag"].date, "2026-11-30");
-  r = withSessionLog(r, "low-diag", null);
-  assert.equal(r.plan.sessions["low-diag"], undefined);
+  let r = withSessionLog({ id: "x" }, "low-group", { date: "2026-11-30", parentAttended: false });
+  assert.equal(r.plan.sessions["low-group"].date, "2026-11-30");
+  r = withSessionLog(r, "low-group", null);
+  assert.equal(r.plan.sessions["low-group"], undefined);
 });
 
 test("zero review: correct, confirm, absent", () => {
