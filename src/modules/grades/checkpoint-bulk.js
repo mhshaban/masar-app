@@ -1,17 +1,17 @@
-// الإرسال الجماعي لتقارير التحصيل: مسار يجهّز حزمة ZIP (تقارير PDF + قائمة
-// الإيميلات + سكربت PowerShell)، والسكربت على جهاز المرشد يرسلها كلها من
+// الإرسال الجماعي لتقارير التحصيل: مسار يجهّز حزمة ZIP (تقرير كل طالب HTML
+// يُدمج في نص البريد + قائمة الإيميلات + سكربت PowerShell)، والسكربت على جهاز المرشد يرسلها كلها من
 // Outlook بعد تأكيده هو. لا يرسل مسار أي بريد بنفسه. بعد الإرسال يُرفع ملف
 // النتيجة إلى مسار فيُعلَّم الطلاب «أُرسل».
 import { get, save } from "../../services/cloud-runtime.js";
-import { buildStudentReport, reportPdfBlob, downloadBlob } from "./checkpoint-send.js?v=2026-11-19-bulk-1";
-import { emailSubject, emailBody } from "./checkpoint-report.js?v=2026-11-19-bulk-1";
+import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-19-bulk-1";
+import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-19-bulk-1";
 import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-bulk-1";
 import { createZip } from "./zip-writer.js?v=2026-11-19-bulk-1";
 
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 export function manifestCsv(rows) {
-  const header = ["academicId", "name", "email", "subject", "pdf", "attachName", "body"];
+  const header = ["academicId", "name", "email", "subject", "htmlFile"];
   const lines = [header.join(","), ...rows.map((r) => header.map((h) => csvCell(r[h])).join(","))];
   return "﻿" + lines.join("\r\n") + "\r\n";
 }
@@ -53,7 +53,7 @@ const README = `إرسال تقارير التحصيل الأكاديمي من O
 1) فك ضغط هذا الملف أولًا (زر يمين > استخراج الكل) في أي مجلد.
 2) افتح المجلد واضغط مرتين على SEND.bat
 3) تظهر لك رسالة فيها عدد الرسائل وأول اسمين: اضغط «نعم» للإرسال أو «لا» للإلغاء.
-4) يُرسل كل طالب تقريره من بريدك في Outlook (Outlook لازم يكون مثبتًا ومسجّل الدخول).
+4) يُرسل لكل طالب تقريره مدمجًا في نص البريد من بريدك في Outlook (Outlook لازم يكون مثبتًا ومسجّل الدخول).
 5) في النهاية يُحفظ ملف result.csv في نفس المجلد: ارفعه في مسار من «رفع نتيجة الإرسال» ليُعلَّم الطلاب «أُرسل».
 `;
 
@@ -67,13 +67,12 @@ export async function buildBulkPackage(rows, term, onProgress = () => {}) {
     onProgress(i + 1, rows.length, student.name);
     try {
       if (!student.email) throw new Error("لا يوجد بريد إلكتروني");
-      const { comparison, html, fileName } = await buildStudentReport(student, term, records);
+      const { comparison, html } = await buildStudentReport(student, term, records);
       if (!comparison.first && !comparison.second) throw new Error("لا توجد درجات");
-      const pdf = new Uint8Array(await (await reportPdfBlob(html)).arrayBuffer());
       const id = String(student.academicId || student.id);
-      const pdfName = `reports/${id}.pdf`;
-      files.push({ name: pdfName, bytes: pdf });
-      manifest.push({ academicId: id, name: student.name || "", email: student.email, subject: emailSubject(student, comparison), pdf: pdfName.replace("/", "\\"), attachName: fileName, body: emailBody(student, comparison) });
+      const htmlName = `reports/${id}.html`;
+      files.push({ name: htmlName, bytes: emailHtml(student, comparison, html) });
+      manifest.push({ academicId: id, name: student.name || "", email: student.email, subject: emailSubject(student, comparison), htmlFile: htmlName.replace("/", "\\") });
     } catch (err) {
       failed.push({ name: student.name, error: err.message });
     }

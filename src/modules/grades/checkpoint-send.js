@@ -1,12 +1,12 @@
-// تجهيز تقرير التحصيل الأكاديمي PDF وإرساله عبر Outlook: الزر ينزّل رسالة
-// جاهزة (.eml) فيها إيميل الطالب والعنوان والنص والتقرير مرفقًا؛ فتحها في
+// تجهيز تقرير التحصيل الأكاديمي وإرساله عبر Outlook: الزر ينزّل رسالة
+// جاهزة (.eml) فيها إيميل الطالب والعنوان والتقرير مدمجًا في النص؛ فتحها في
 // Outlook يعرضها كمسودة وما يبقى إلا «إرسال». لا إرسال تلقائي إطلاقًا.
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-19-absent-2";
-import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-19-absent-2";
-import { buildEml } from "./checkpoint-eml.js?v=2026-11-18-eml-1";
+import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-19-bulk-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-19-bulk-1";
+import { buildEml } from "./checkpoint-eml.js?v=2026-11-19-bulk-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 // كل السجلات (لمعرفة مقررات الشعبة) تُحمَّل مرة وتُخزَّن دقيقتين لقائمة الإرسال.
@@ -127,12 +127,12 @@ export async function sendStudentReport(student, term, { records = null } = {}) 
   if (!student.email) throw new Error(`لا يوجد بريد إلكتروني مسجَّل للطالب ${student.name || ""}.`);
   const { comparison, html, fileName } = await buildStudentReport(student, term, records);
   if (!comparison.first && !comparison.second) throw new Error("لا توجد درجات وقفات تقويمية لهذا الطالب.");
-  const pdf = new Uint8Array(await (await reportPdfBlob(html)).arrayBuffer());
+  // التقرير مدمج في نص البريد (HTML) بدل مرفق PDF.
   const eml = buildEml({
     to: student.email,
     subject: emailSubject(student, comparison),
     text: emailBody(student, comparison),
-    attachment: { name: fileName, bytes: pdf, type: "application/pdf" },
+    html: emailHtml(student, comparison, html),
   });
   const emlName = fileName.replace(/\.pdf$/i, ".eml");
   downloadBlob(new Blob([eml], { type: "message/rfc822" }), emlName);
