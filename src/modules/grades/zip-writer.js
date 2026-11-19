@@ -22,7 +22,8 @@ function dosTime(date) {
   return { time, day };
 }
 
-// files: [{ name, bytes: Uint8Array | string }] → Uint8Array
+// files: [{ name, bytes: Uint8Array | string, mode? }] → Uint8Array
+// mode (مثل 0o755): صلاحيات يونكس، حتى يبقى سكربت الماك قابلًا للتشغيل بعد فك الضغط.
 export function createZip(files, date = new Date()) {
   const enc = new TextEncoder();
   const { time, day } = dosTime(date);
@@ -48,7 +49,7 @@ export function createZip(files, date = new Date()) {
     parts.push(new Uint8Array(local.buffer), name, data);
     const cd = new DataView(new ArrayBuffer(46));
     cd.setUint32(0, 0x02014b50, true);
-    cd.setUint16(4, 20, true);
+    cd.setUint16(4, file.mode ? (3 << 8) | 20 : 20, true);
     cd.setUint16(6, 20, true);
     cd.setUint16(8, 0x0800, true);
     cd.setUint16(10, 0, true);
@@ -58,6 +59,7 @@ export function createZip(files, date = new Date()) {
     cd.setUint32(20, data.length, true);
     cd.setUint32(24, data.length, true);
     cd.setUint16(28, name.length, true);
+    if (file.mode) cd.setUint32(38, ((0o100000 | file.mode) << 16) >>> 0, true);
     cd.setUint32(42, offset, true);
     central.push(new Uint8Array(cd.buffer), name);
     offset += 30 + name.length + data.length;
