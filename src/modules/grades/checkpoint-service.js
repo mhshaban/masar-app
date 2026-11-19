@@ -221,11 +221,14 @@ export const subjectKey = (s) => normalizeKey(s?.code || s?.name || "");
 export function missingSectionCourses(allRecords, record) {
   if (!record?.section) return [];
   const peers = allRecords.filter((r) => r.section === record.section && r.term === record.term && Number(r.checkpoint) === Number(record.checkpoint));
+  // نفس المقرر برمز آخر (انج 801 / انج 811، المواد التجارية بأنواعها) لا يُعدّ غيابًا.
+  const baseName = (s) => normalizeKey(String(s?.name || "").replace(/\(.*?\)/g, "")).trim();
   const own = new Set((record.subjects || []).map(subjectKey));
+  const ownNames = new Set((record.subjects || []).map(baseName).filter(Boolean));
   const counts = new Map();
   for (const peer of peers) for (const s of peer.subjects || []) {
     const key = subjectKey(s);
-    if (!key || own.has(key)) continue;
+    if (!key || own.has(key) || ownNames.has(baseName(s))) continue;
     const entry = counts.get(key) || { code: s.code || "", name: s.name || s.code, n: 0 };
     entry.n += 1;
     counts.set(key, entry);
