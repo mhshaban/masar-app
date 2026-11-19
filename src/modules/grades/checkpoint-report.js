@@ -3,7 +3,7 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-email-2";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-email-3";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -206,8 +206,9 @@ export function emailHtml(student, comparison, reportHtml) {
   let body = injectAt(reportHtml, "<!--email-intro-->", box(lines.map(p).join(""), "14px 0 4px"), true);
   body = injectAt(body, "<!--email-closing-->", box(p(closing), "18px 0 0"), false);
   return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
-<style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
+<style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');:root{color-scheme:light only;supported-color-schemes:light only;}</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
   ${body}
 </body></html>`;
 }
