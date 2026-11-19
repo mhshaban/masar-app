@@ -1,12 +1,12 @@
 // الإرسال الجماعي لتقارير التحصيل: مسار يجهّز حزمة ZIP (تقرير كل طالب HTML
-// يُدمج في نص البريد + قائمة الإيميلات + سكربت PowerShell)، والسكربت على جهاز المرشد يرسلها كلها من
+// يُدمج في نص البريد + قائمة الإيميلات + سكربت PowerShell للويندوز وسكربت للماك)، والسكربت على جهاز المرشد يرسلها كلها من
 // Outlook بعد تأكيده هو. لا يرسل مسار أي بريد بنفسه. بعد الإرسال يُرفع ملف
 // النتيجة إلى مسار فيُعلَّم الطلاب «أُرسل».
 import { get, save } from "../../services/cloud-runtime.js";
-import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-19-email-3";
-import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-19-email-3";
-import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-email-3";
-import { createZip } from "./zip-writer.js?v=2026-11-19-email-3";
+import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-19-mac-1";
+import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-19-mac-1";
+import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-mac-1";
+import { createZip } from "./zip-writer.js?v=2026-11-19-mac-1";
 
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
@@ -42,19 +42,35 @@ export function parseResultCsv(text) {
   return rows.slice(1).map((r) => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? "").trim()])));
 }
 
-async function scriptText() {
-  const res = await fetch(new URL("../../../tools/send-reports.ps1", import.meta.url));
+async function scriptText(name) {
+  const res = await fetch(new URL(`../../../tools/${name}`, import.meta.url));
   if (!res.ok) throw new Error("تعذّر تحميل سكربت الإرسال.");
-  return res.text();
+  return (await res.text()).replace(/^\uFEFF/, "");
 }
 
 const README = `إرسال تقارير التحصيل الأكاديمي من Outlook
 ==========================================
-1) فك ضغط هذا الملف أولًا (زر يمين > استخراج الكل) في أي مجلد.
-2) افتح المجلد واضغط مرتين على SEND.bat
-3) تظهر لك رسالة فيها عدد الرسائل وأول اسمين: اضغط «نعم» للإرسال أو «لا» للإلغاء.
-4) يُرسل لكل طالب تقريره مدمجًا في نص البريد من بريدك في Outlook (Outlook لازم يكون مثبتًا ومسجّل الدخول).
-5) في النهاية يُحفظ ملف result.csv في نفس المجلد: ارفعه في مسار من «رفع نتيجة الإرسال» ليُعلَّم الطلاب «أُرسل».
+فك ضغط هذا الملف أولًا في أي مجلد.
+
+ويندوز:
+1) افتح المجلد واضغط مرتين على SEND.bat
+2) تظهر رسالة فيها عدد الرسائل وأول اسمين: «نعم» للإرسال أو «لا» للإلغاء.
+
+ماك:
+1) افتح المجلد، اضغط زر يمين على SEND-MAC.command ثم «فتح» (Open)، وأكّد «فتح» إذا سألك.
+   (إذا رفض الماك: افتح Terminal واكتب bash ثم مسافة، واسحب الملف SEND-MAC.command للنافذة واضغط Enter.)
+2) أول مرة يطلب الماك السماح للتحكم في Microsoft Outlook: اضغط «سماح» (OK).
+3) تظهر رسالة فيها عدد الرسائل وأول اسمين: «إرسال» أو «إلغاء».
+   ملاحظة: Outlook الجديد على الماك ما يدعم الإرسال الآلي. إذا وقف السكربت عند أول رسالة،
+   من قائمة Outlook اختر «Legacy Outlook» وشغّل السكربت مرة ثانية.
+
+في الجهازين: يُرسل لكل طالب تقريره مدمجًا في نص البريد من بريدك في Outlook، وفي النهاية يُحفظ
+ملف result.csv في نفس المجلد: ارفعه في مسار من «رفع نتيجة الإرسال» ليُعلَّم الطلاب «أُرسل».
+`;
+
+const MAC_LAUNCHER = `#!/bin/bash
+cd "$(dirname "$0")" || exit 1
+osascript -l JavaScript send-reports-mac.js "$PWD"
 `;
 
 // rows: [{ student, records }]؛ onProgress(i, n, name)
@@ -79,9 +95,11 @@ export async function buildBulkPackage(rows, term, onProgress = () => {}) {
   }
   if (!manifest.length) throw new Error("ما تجهّز ولا تقرير.");
   files.push({ name: "manifest.csv", bytes: manifestCsv(manifest) });
-  files.push({ name: "send-reports.ps1", bytes: "﻿" + (await scriptText()).replace(/^﻿/, "") });
+  files.push({ name: "send-reports.ps1", bytes: "\uFEFF" + (await scriptText("send-reports.ps1")) });
   files.push({ name: "SEND.bat", bytes: '@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0send-reports.ps1"\r\n' });
-  files.push({ name: "README.txt", bytes: "﻿" + README.replace(/\n/g, "\r\n") });
+  files.push({ name: "send-reports-mac.js", bytes: await scriptText("send-reports-mac.js") });
+  files.push({ name: "SEND-MAC.command", bytes: MAC_LAUNCHER, mode: 0o755 });
+  files.push({ name: "README.txt", bytes: "\uFEFF" + README.replace(/\n/g, "\r\n") });
   const zip = createZip(files);
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
   downloadBlob(new Blob([zip], { type: "application/zip" }), `إرسال تقارير التحصيل - ${manifest.length} طالب - ${stamp}.zip`);

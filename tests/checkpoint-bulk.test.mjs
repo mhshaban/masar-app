@@ -44,3 +44,20 @@ test("email html embeds the report without the greeting line, eml carries it", (
   const b64 = eml.split("Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0].replace(/\r\n/g, "");
   assert.match(Buffer.from(b64, "base64").toString("utf8"), /REPORT/);
 });
+
+test("zip keeps the executable bit for the mac launcher", () => {
+  const zip = createZip([{ name: "SEND-MAC.command", bytes: "#!/bin/bash\n", mode: 0o755 }, { name: "a.txt", bytes: "x" }]);
+  const dir = mkdtempSync(join(tmpdir(), "zip-"));
+  const path = join(dir, "t.zip");
+  writeFileSync(path, zip);
+  const out = execFileSync("python3", ["-c", "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);print(oct(z.getinfo('SEND-MAC.command').external_attr>>16), z.getinfo('SEND-MAC.command').create_system)", path]).toString().trim();
+  assert.equal(out, "0o100755 3");
+});
+
+test("mac send script parses the manifest csv", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../tools/send-reports-mac.js", import.meta.url), "utf8").replace('ObjC.import("Foundation");', "");
+  const parseCsv = new Function(src + "; return parseCsv;")();
+  const rows = parseCsv(manifestCsv([{ academicId: "7", name: 'علي "ب"', email: "a@x", subject: "تقرير، ١", htmlFile: "reports\\7.html" }]).replace(/^﻿/, ""));
+  assert.deepEqual(rows, [{ academicId: "7", name: 'علي "ب"', email: "a@x", subject: "تقرير، ١", htmlFile: "reports\\7.html" }]);
+});

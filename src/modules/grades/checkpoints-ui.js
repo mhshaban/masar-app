@@ -8,11 +8,11 @@ import { listStudents } from "../students/students-service.js?v=2026-08-31-recor
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
-import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-19-email-3";
-import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-email-3";
-import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-19-email-3";
-import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-19-email-3";
-import { buildBulkPackage, applyBulkResult } from "./checkpoint-bulk.js?v=2026-11-19-email-3";
+import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-19-mac-1";
+import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-mac-1";
+import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-19-mac-1";
+import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-19-mac-1";
+import { buildBulkPackage, applyBulkResult } from "./checkpoint-bulk.js?v=2026-11-19-mac-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
@@ -274,7 +274,7 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
         <div class="card-head"><h3 style="margin:0;font-size:14px;">قائمة الإرسال: ${doneCount} من ${queue.length}</h3><button class="link-btn" id="cp-queue-close">إغلاق</button></div>
         <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
           <strong>الإرسال الجماعي من Outlook</strong>
-          <p class="hint" style="margin:4px 0 8px;">نزّل حزمة الإرسال، فك ضغطها على جهازك، واضغط SEND.bat. يطلب منك تأكيدًا واحدًا ثم يرسل لكل طالب تقريره داخل الرسالة من بريدك. بعدها ارفع ملف result.csv هنا ليُعلَّم الطلاب «أُرسل».</p>
+          <p class="hint" style="margin:4px 0 8px;">نزّل حزمة الإرسال، فك ضغطها على جهازك، واضغط SEND.bat (ويندوز) أو SEND-MAC.command (ماك). يطلب منك تأكيدًا واحدًا ثم يرسل لكل طالب تقريره داخل الرسالة من بريدك. بعدها ارفع ملف result.csv هنا ليُعلَّم الطلاب «أُرسل».</p>
           <div class="forms-actions">
             ${next ? `<button class="btn btn-primary" id="cp-bulk">تجهيز الإرسال الجماعي (${queue.length - doneCount})</button>` : ""}
             <label class="btn btn-ghost" style="cursor:pointer;">رفع نتيجة الإرسال (result.csv)<input type="file" id="cp-bulk-result" accept=".csv,text/csv" hidden></label>
@@ -300,7 +300,7 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
       panel.querySelector("#cp-bulk")?.addEventListener("click", (e) => { const btn = e.currentTarget; return withBusy(btn, "جارٍ تجهيز الحزمة…", async () => {
         const pending = queue.filter((item) => !item.done);
         const { count, failed } = await buildBulkPackage(pending.map((q) => q.row), term, (i, n) => { btn.textContent = `جارٍ التجهيز ${i} من ${n}…`; });
-        notify(`نزلت حزمة الإرسال (${count} طالب)${failed.length ? `، وما تجهّز ${failed.length}: ${failed.slice(0, 3).map((f) => f.name).join("، ")}` : ""}. فك ضغطها واضغط SEND.bat.`);
+        notify(`نزلت حزمة الإرسال (${count} طالب)${failed.length ? `، وما تجهّز ${failed.length}: ${failed.slice(0, 3).map((f) => f.name).join("، ")}` : ""}. فك ضغطها واضغط SEND.bat (ويندوز) أو SEND-MAC.command (ماك).`);
       }); });
       panel.querySelector("#cp-bulk-result")?.addEventListener("change", async (e) => {
         const file = e.target.files?.[0];
