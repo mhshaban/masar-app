@@ -3,7 +3,7 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-missing-courses-2";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-absent-2";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -18,7 +18,7 @@ const SCHOOL_HEADER = "مدرسة الشيخ عبدالله بن عيسى آل �
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
 const STATUS = { absent: "غائب", barred: "محروم" };
-const statusText = (entry) => (entry.missing ? "غائب عن الوقفة" : STATUS[entry.status] || entry.status);
+const statusText = (entry) => STATUS[entry.status] || entry.status;
 const TREND_COLOR = { up: "#15803d", down: "#b91c1c", steady: MUTED };
 
 function cell(entry) {

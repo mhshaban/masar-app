@@ -50,6 +50,8 @@ function scoreEntry({ code, name, score, maxScore, percentage }) {
   if (rawScore == null && /محروم/.test(text)) return { code, name, score: null, maxScore: num(maxScore), pct: null, status: "barred" };
   if (rawScore == null) return null;
   const max = num(maxScore);
+  // قاعدة القسم (19/11): الصفر في الوقفة = غياب، لا تُرصد له درجة.
+  if (rawScore === 0) return { code, name, score: null, maxScore: max, pct: null, status: "absent", fromZero: true };
   let pct = num(percentage);
   if (pct != null && pct <= 1 && (max == null || rawScore > 1)) pct *= 100;
   if (pct == null) pct = max ? (rawScore / max) * 100 : rawScore;
@@ -229,11 +231,12 @@ export function missingSectionCourses(allRecords, record) {
   for (const peer of peers) for (const s of peer.subjects || []) {
     const key = subjectKey(s);
     if (!key || own.has(key) || ownNames.has(baseName(s))) continue;
-    const entry = counts.get(key) || { code: s.code || "", name: s.name || s.code, n: 0 };
+    const entry = counts.get(key) || { code: s.code || "", name: s.name || s.code, maxScore: null, n: 0 };
     entry.n += 1;
+    if (s.maxScore) entry.maxScore = s.maxScore;
     counts.set(key, entry);
   }
-  return [...counts.values()].filter((c) => c.n * 2 >= peers.length).map(({ code, name }) => ({ code, name }));
+  return [...counts.values()].filter((c) => c.n * 2 >= peers.length).map(({ code, name, maxScore }) => ({ code, name, maxScore }));
 }
 
 export function listZeroEntries(records, { term = null, checkpoint = null, includeConfirmed = false } = {}) {
@@ -249,6 +252,42 @@ export function listZeroEntries(records, { term = null, checkpoint = null, inclu
   const order = { "الأول": 1, "الثاني": 2, "الثالث": 3 };
   return out.sort((a, b) => a.department.localeCompare(b.department, "ar") || (order[a.level] || 9) - (order[b.level] || 9)
     || String(a.section).localeCompare(String(b.section), "ar") || String(a.studentName).localeCompare(String(b.studentName), "ar"));
+}
+
+// قائمة «الغياب وعدم الرصد»: كل مقرر مسجَّل غيابًا، وكل مقرر من مقررات الشعبة
+// ما رُصد فيه شي للطالب (kind: "missing"). منها تُدخَل الدرجة إذا اختبر الطالب.
+export function listAbsentEntries(records, { term = null, checkpoint = null } = {}) {
+  const out = [];
+  const scope = records.filter((r) => (!term || r.term === term) && (!checkpoint || Number(r.checkpoint) === Number(checkpoint)));
+  for (const r of scope) {
+    const base = { recordId: r.id, studentId: r.studentId, studentName: r.studentName, level: r.level, section: r.section, checkpoint: Number(r.checkpoint) };
+    for (const s of r.subjects || []) {
+      if (s.status !== "absent" && !(s.score === 0 && s.zeroConfirmed)) continue;
+      out.push({ ...base, kind: "absent", department: departmentOf(s), subject: s, key: subjectKey(s) });
+    }
+    for (const m of missingSectionCourses(scope, r)) out.push({ ...base, kind: "missing", department: departmentOf(m), subject: { ...m, status: "absent" }, key: subjectKey(m) });
+  }
+  const order = { "الأول": 1, "الثاني": 2, "الثالث": 3 };
+  return out.sort((a, b) => a.department.localeCompare(b.department, "ar") || (order[a.level] || 9) - (order[b.level] || 9)
+    || String(a.section).localeCompare(String(b.section), "ar") || String(a.studentName).localeCompare(String(b.studentName), "ar"));
+}
+
+// يرصد درجة لطالب كان غائبًا (أو مقرر لم يُرصد له): يحدّث المقرر أو يضيفه.
+export function setAbsentScore(record, entry, rawScore, { by = "", at = new Date().toISOString() } = {}) {
+  const score = num(rawScore);
+  const max = entry.subject.maxScore;
+  if (score == null || score < 0 || (max && score > max)) throw new Error(`الدرجة غير صحيحة${max ? ` (من 0 إلى ${max})` : ""}.`);
+  const pct = max ? round2((score / max) * 100) : score;
+  const audit = { absentResolvedAt: at, absentResolvedBy: by };
+  let subjects = record.subjects || [];
+  const idx = subjects.findIndex((s) => subjectKey(s) === entry.key);
+  if (idx >= 0) {
+    subjects = subjects.map((s, i) => (i === idx ? { ...s, score, maxScore: max ?? s.maxScore, pct, status: null, wasAbsent: true, ...audit } : s));
+  } else {
+    if (entry.kind !== "missing") throw new Error("لم أجد هذا المقرر في السجل (ربما عُدّل).");
+    subjects = [...subjects, { code: entry.subject.code || "", name: entry.subject.name, score, maxScore: max, pct, status: null, wasAbsent: true, ...audit }];
+  }
+  return { ...record, subjects, averagePct: averageOf(subjects) };
 }
 
 // action: { type: "score", score } | { type: "confirm" } | { type: "absent" }

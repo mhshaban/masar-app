@@ -4,8 +4,8 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-11-18-checkpo
 import { get, save } from "../../services/cloud-runtime.js";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-missing-courses-2";
-import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-19-missing-1";
+import { COLLECTION, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-19-absent-2";
+import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-19-absent-2";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FIELD = "padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;background:var(--surface);color:inherit;";
@@ -24,7 +24,9 @@ function buildPlanRows(records, students, term) {
   return own.map((record) => {
     const student = byId.get(String(record.studentId));
     if (!student) return null;
-    const cls = classifyRecord(record);
+    // مقررات الشعبة اللي ما رُصد فيها شي تُحسب غيابًا مثل التقرير.
+    const unrecorded = missingSectionCourses(own, record).map((m) => ({ ...m, status: "absent" }));
+    const cls = classifyRecord(unrecorded.length ? { ...record, subjects: [...(record.subjects || []), ...unrecorded] } : record);
     const sessions = sessionsFor(cls, student.level);
     const log = record.plan?.sessions || {};
     const done = sessions.filter((s) => log[s.id]?.date).length;
@@ -38,7 +40,7 @@ async function exportRows(rows, category) {
   const sessionList = PLAN_SESSIONS[category] || [];
   const data = rows.map((r, i) => {
     const row = { "م": i + 1, "المستوى": r.student.level, "الشعبة": r.student.section, "الرقم الأكاديمي": r.record.studentId, "اسم الطالب": r.student.name,
-      "النسبة %": r.cls.average ?? "", "المقررات أقل من 50%": r.cls.weak.join("، "), "المجموعة": GROUP_LABELS[r.cls.group] || "" };
+      "النسبة %": r.cls.average ?? "", "المقررات أقل من 50% أو غياب": r.cls.weak.join("، "), "المجموعة": GROUP_LABELS[r.cls.group] || "" };
     for (const s of sessionList) row[s.title] = r.sessions.some((x) => x.id === s.id) ? (r.log[s.id]?.date || "") : "—";
     return row;
   });
@@ -70,7 +72,7 @@ export function mountPlanCard(container, { records, students, term, state, userN
 
   container.innerHTML = `<details class="card" style="margin-bottom:16px;" ${state.open ? "open" : ""} id="cp-p-details">
     <summary style="cursor:pointer;list-style:revert;"><h2 style="display:inline;">خطة تحسين التحصيل</h2> <span class="hint">تصنيف الطلبة حسب ${esc("الوقفة التقويمية الأولى")} وجلسات كل فئة</span></summary>
-    <p class="hint" style="margin-top:8px;">متدني: النسبة أقل من 60٪ أو أقل من 50٪ في مقررين فأكثر. متفوق: 90٪ فأكثر بلا أي مقرر أقل من 50٪. متوسط: الباقي. الأصفار غير المؤكدة لا تُحسب حتى تُراجَع.</p>
+    <p class="hint" style="margin-top:8px;">متدني: النسبة أقل من 60٪ أو مقرران فأكثر أقل من 50٪ أو غياب. متفوق: 90٪ فأكثر بلا أي مقرر ضعيف أو غياب. متوسط: الباقي. الغياب لا يدخل في النسبة.</p>
     <div style="overflow:auto;"><table class="table" style="margin-bottom:12px;">
       <thead><tr><th>المستوى</th>${cats.map((c) => `<th>${CATEGORY_LABELS[c]}</th>`).join("")}<th>المجموع</th></tr></thead>
       <tbody>${LEVELS.map((l) => `<tr><td>${l}</td>${cats.map((c) => `<td class="num"><button class="link-btn" data-pc="${c}" data-pl="${l}">${count(c, l)}</button></td>`).join("")}<td class="num">${rows.filter((r) => r.student.level === l).length}</td></tr>`).join("")}
@@ -97,7 +99,7 @@ export function mountPlanCard(container, { records, students, term, state, userN
       : '<p class="hint">هؤلاء الطلبة كل درجاتهم أصفار غير مؤكدة؛ راجِعها أولًا في «مراجعة الدرجات الصفرية».</p>'}
 
     ${visible.length ? `<div style="overflow:auto;max-height:620px;"><table class="table">
-      <thead><tr><th>الطالب</th><th>الشعبة</th><th>النسبة</th><th>مقررات أقل من 50٪</th><th>المجموعة</th><th>الجلسات</th></tr></thead>
+      <thead><tr><th>الطالب</th><th>الشعبة</th><th>النسبة</th><th>أقل من 50٪ أو غياب</th><th>المجموعة</th><th>الجلسات</th></tr></thead>
       <tbody>${visible.map((r, i) => `<tr>
         <td>${esc(r.student.name)}<div class="hint" dir="ltr" style="text-align:right;">${esc(r.record.studentId)}</div></td>
         <td>${esc(r.student.section)}</td>

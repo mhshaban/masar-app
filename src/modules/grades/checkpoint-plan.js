@@ -4,16 +4,19 @@ export const CATEGORY_LABELS = { low: "متدني", mid: "متوسط", top: "م�
 export const GROUP_LABELS = { absentAll: "غائب عن كل المقررات", A: "المجموعة (أ): 3 مقررات فأكثر", B: "المجموعة (ب)", oneWeak: "ضعيف في مقرر واحد", "": "" };
 
 export function classifyRecord(record) {
-  const subjects = (record?.subjects || []).filter((s) => s.pct != null && !(s.score === 0 && !s.zeroConfirmed));
+  // الغياب (ومنه الأصفار، قاعدة 19/11) يُعدّ مقررًا ضعيفًا لكنه لا يدخل في النسبة.
+  const isAbsent = (s) => s.status === "absent" || s.status === "barred" || (s.score === 0 && s.zeroConfirmed);
+  const subjects = (record?.subjects || []).filter((s) => isAbsent(s) || (s.pct != null && !(s.score === 0 && !s.zeroConfirmed)));
   if (!subjects.length) return { category: "none", group: "", average: null, weak: [], weakCount: 0 };
-  const raw = subjects.reduce((a, s) => a + s.pct, 0) / subjects.length;
-  const average = Math.round(raw * 10) / 10;
+  const graded = subjects.filter((s) => !isAbsent(s));
+  const raw = graded.length ? graded.reduce((a, s) => a + s.pct, 0) / graded.length : null;
+  const average = raw == null ? null : Math.round(raw * 10) / 10;
   // العدّ بالمقرر (الرمز) لا بالاسم: انج 801 وانج 811 مقرران منفصلان.
-  const weakSubjects = subjects.filter((s) => s.pct < 50);
+  const weakSubjects = subjects.filter((s) => isAbsent(s) || s.pct < 50);
   const n = weakSubjects.length;
   const weak = [...new Set(weakSubjects.map((s) => (s.code && !String(s.name || "").includes(s.code) ? `${s.name} (${s.code})` : s.name || s.code)))];
-  // غائب عن الوقفة كاملة (كل درجاته أصفار مؤكدة): مجموعة بروحها داخل المتدنين.
-  if (subjects.every((s) => s.pct === 0)) return { category: "low", group: "absentAll", average, weak, weakCount: n };
+  // غائب عن الوقفة كاملة: مجموعة بروحها داخل المتدنين.
+  if (!graded.length || graded.every((s) => s.pct === 0)) return { category: "low", group: "absentAll", average, weak, weakCount: n };
   if (raw < 60 || n >= 2) return { category: "low", group: n >= 3 ? "A" : "B", average, weak, weakCount: n };
   if (raw >= 90 && !n) return { category: "top", group: "", average, weak, weakCount: n };
   return { category: "mid", group: n ? "oneWeak" : "", average, weak, weakCount: n };
