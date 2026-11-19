@@ -12,6 +12,9 @@ const MUTED = "#6b7280";
 const LINE = "#d9dee8";
 const SOFT = "#f4f6fa";
 
+// اسم المدرسة في رأس التقرير (نفس SCHOOL_NAME في نموذج اعتماد الفعاليات).
+const SCHOOL_HEADER = "مدرسة الشيخ عبدالله بن عيسى آل خليفة الثانوية الصناعية للبنين";
+
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
 const STATUS = { absent: "غائب", barred: "محروم" };
@@ -50,6 +53,48 @@ export function adviceLines(comparison) {
   return lines;
 }
 
+// رسالة إلى ولي الأمر حسب وضع الطالب في آخر وقفة مرصودة.
+// المستويات: absentAll (كل الدرجات صفر/غياب) ← low (أقل من 60٪ أو أقل من 50٪ في مقررين فأكثر)
+// ← oneWeak (مقرر واحد أقل من 50٪) ← good ← top (90٪ فأكثر بلا مقرر أقل من 50٪).
+export function parentMessage(comparison) {
+  const latest = comparison.second ? "second" : "first";
+  const avg = comparison.second ? comparison.secondAvg : comparison.firstAvg;
+  const graded = comparison.subjects.filter((s) => s[latest]);
+  const failing = graded.filter((s) => s[latest].status || (s[latest].pct != null && s[latest].pct < 50));
+  const names = (list) => [...new Set(list.map((s) => s.name || s.code))].join("، ");
+  const visit = "ونرجو منكم مراجعة قسم الإرشاد الأكاديمي في المدرسة";
+  if (graded.length && graded.every((s) => s[latest].status || s[latest].pct === 0)) {
+    return { level: "absentAll", title: "إشعار عاجل", lines: [
+      "نحيطكم علمًا بأن ابنكم لم يحصل على أي درجة في جميع مقررات الوقفة التقويمية بسبب غيابه عن الاختبارات، وهذا وضع خطير يهدد نجاحه في الفصل الدراسي.",
+      `${visit} بشكل عاجل لتدارك الوضع ومعرفة أسباب الغياب ووضع خطة لتعويض ما فاته.`,
+    ] };
+  }
+  if ((avg != null && avg < 60) || failing.length >= 2) {
+    return { level: "low", title: "إشعار بتدني المستوى", lines: [
+      `نود إحاطتكم بأن مستوى ابنكم الدراسي متدنٍ، إذ جاءت درجاته دون 50٪ في: ${names(failing) || "عدد من المقررات"}، وهذا يعرّضه لخطر الرسوب إذا استمر الوضع.`,
+      `${visit} في أقرب وقت لتدارك الوضع والوقوف على أسباب تدني درجاته، ومتابعته مع معلمي المقررات.`,
+    ] };
+  }
+  if (failing.length === 1) {
+    return { level: "oneWeak", title: "تنبيه", lines: [
+      `نلفت انتباهكم إلى أن درجة ابنكم في مقرر ${names(failing)} جاءت دون 50٪، رغم أن مستواه في بقية المقررات مقبول.`,
+      `${visit} لمعرفة سبب تدني الدرجة ومساعدته على رفعها في الوقفة القادمة.`,
+    ] };
+  }
+  if (avg != null && avg >= 90) {
+    return { level: "top", title: "تهنئة", lines: [
+      "يسرّنا إبلاغكم بتفوق ابنكم في جميع المقررات، ونشكر لكم متابعتكم واهتمامكم.",
+      "نأمل استمرار دعمكم له ليحافظ على هذا المستوى المتميز.",
+    ] };
+  }
+  return { level: "good", title: "طمأنة", lines: [
+    "نطمئنكم بأن مستوى ابنكم جيد ولم تقل درجاته عن 50٪ في أي مقرر.",
+    "نأمل استمرار متابعتكم وتشجيعه على رفع مستواه أكثر في الوقفة القادمة.",
+  ] };
+}
+
+const PARENT_ACCENT = { absentAll: "#b91c1c", low: "#b91c1c", oneWeak: GOLD, good: NAVY, top: "#15803d" };
+
 // student: سجل الطالب؛ comparison: من compareCheckpoints؛ extra: { cumulative, issuedAt }
 export function buildAchievementReportHtml(student, comparison, { cumulative = null, issuedAt = new Date() } = {}) {
   const date = issuedAt.toLocaleDateString("ar-BH-u-nu-latn", { year: "numeric", month: "long", day: "numeric" });
@@ -62,11 +107,13 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
       <td style="border:1px solid ${LINE};padding:7px 6px;text-align:center;">${deltaCell(s)}</td>` : ""}
     </tr>`).join("");
   const advice = adviceLines(comparison);
+  const parent = parentMessage(comparison);
+  const accent = PARENT_ACCENT[parent.level];
   const th = `style="border:1px solid ${NAVY};background:${NAVY};color:#fff;padding:8px 6px;font-weight:700;font-size:12.5px;"`;
   return `<div dir="rtl" lang="ar" style="font-family:Cairo,'Segoe UI',Tahoma,Arial,sans-serif;color:${INK};background:#fff;width:100%;max-width:720px;margin:0 auto;font-size:13px;line-height:1.6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;background:${NAVY};">
     <tr><td style="padding:18px 20px;color:#fff;">
-      <div style="font-size:12px;color:#d6c08a;">قسم الإرشاد الأكاديمي والتوجيه المهني</div>
+      <div style="font-size:12px;color:#d6c08a;">${SCHOOL_HEADER}</div>
       <div style="font-size:22px;font-weight:800;margin-top:2px;">تقرير التحصيل الأكاديمي</div>
       <div style="font-size:12.5px;color:#e5e7eb;">${hasSecond ? "درجات الوقفات التقويمية" : `درجات ${CHECKPOINT_LABELS[1]}`} · ${esc(comparison.term)}</div>
     </td></tr>
@@ -79,7 +126,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
       <td style="padding:3px 0;"><span style="color:${MUTED};">الرقم الأكاديمي: </span><strong dir="ltr">${esc(student.academicId || student.id)}</strong></td>
     </tr>
     <tr>
-      <td style="padding:3px 0;"><span style="color:${MUTED};">المستوى / الشعبة: </span><strong>${esc(student.level) || "—"} · ${esc(student.section) || "—"}</strong></td>
+      <td style="padding:3px 0;"><span style="color:${MUTED};">الشعبة: </span><strong>${esc(student.section) || "—"}</strong></td>
       <td style="padding:3px 0;"><span style="color:${MUTED};">التخصص: </span><strong>${esc([student.department, student.track].filter(Boolean).join(" — ")) || "—"}</strong></td>
     </tr>
   </table>
@@ -88,7 +135,6 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     ${tile(CHECKPOINT_LABELS[1], pct(comparison.firstAvg))}
     ${hasSecond ? tile(CHECKPOINT_LABELS[2], pct(comparison.secondAvg)) : ""}
     ${hasSecond ? tile("التغيّر بين الوقفتين", comparison.delta == null ? "—" : `<span dir="ltr" style="color:${TREND_COLOR[comparison.trend]};">${comparison.delta > 0 ? "+" : ""}${formatPct(comparison.delta)}</span>`, GOLD) : ""}
-    ${tile("المعدل التراكمي", pct(cumulative), GOLD)}
   </tr></table>
 
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">درجات المقررات</div>
@@ -96,6 +142,13 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
     <thead><tr><th ${th} style="text-align:right;">المقرر</th><th ${th}>${CHECKPOINT_LABELS[1]}</th>${hasSecond ? `<th ${th}>${CHECKPOINT_LABELS[2]}</th><th ${th}>التغيّر</th>` : ""}</tr></thead>
     <tbody>${rows || `<tr><td colspan="${hasSecond ? 4 : 2}" style="border:1px solid ${LINE};padding:10px;text-align:center;color:${MUTED};">لا توجد درجات مرصودة</td></tr>`}</tbody>
   </table>
+
+  <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">رسالة إلى ولي الأمر</div>
+  <div style="border:1px solid ${LINE};border-right:5px solid ${accent};border-radius:8px;padding:10px 14px;background:#fff;">
+    <p style="margin:2px 0 6px;font-weight:800;color:${accent};">${esc(parent.title)}</p>
+    <p style="margin:4px 0;">ولي أمر الطالب المحترم،</p>
+    ${parent.lines.map((line) => `<p style="margin:4px 0;">${esc(line)}</p>`).join("")}
+  </div>
 
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">توجيهات قسم الإرشاد الأكاديمي</div>
   <div style="background:${SOFT};border:1px solid ${LINE};border-radius:8px;padding:10px 14px;">
@@ -118,6 +171,7 @@ export function emailBody(student, comparison = null) {
     `عزيزي الطالب ${student.name || ""}،`,
     "",
     `تجد مرفقًا تقرير التحصيل الأكاديمي الخاص بك، ويتضمن ${scope}، مع توجيهات قسم الإرشاد الأكاديمي.`,
+    "يُرجى اطلاع ولي أمرك على التقرير، ففيه رسالة موجهة إليه.",
     "نتمنى لك التوفيق، ولا تتردد في مراجعة القسم عند الحاجة.",
     "",
     "قسم الإرشاد الأكاديمي والتوجيه المهني",

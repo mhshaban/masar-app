@@ -3,7 +3,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { clear, list } from '../src/services/cloud-runtime.js';
 import { parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, COLLECTION } from '../src/modules/grades/checkpoint-service.js';
-import { buildAchievementReportHtml, adviceLines } from '../src/modules/grades/checkpoint-report.js';
+import { buildAchievementReportHtml, adviceLines, parentMessage } from '../src/modules/grades/checkpoint-report.js';
 
 beforeEach(async () => { await clear(COLLECTION); });
 
@@ -73,4 +73,14 @@ test('re-importing a checkpoint replaces it and drops students no longer in the 
   const result = await commitCheckpointRecords(mk(['2025001']), { checkpoint: 1, term: 'ف1' });
   assert.equal(result.removed, 1);
   assert.equal((await list(COLLECTION)).length, 1);
+});
+
+test('parentMessage picks the tier from the latest checkpoint', () => {
+  const mk = (pcts, avg) => ({ firstAvg: avg, subjects: pcts.map((p, i) => ({ name: `م${i}`, first: { pct: p } })) });
+  assert.equal(parentMessage(mk([0, 0, 0], 0)).level, 'absentAll');
+  assert.equal(parentMessage(mk([40, 45, 80], 55)).level, 'low');
+  assert.equal(parentMessage(mk([40, 80, 90], 70)).level, 'oneWeak');
+  assert.equal(parentMessage(mk([70, 80, 75], 75)).level, 'good');
+  assert.equal(parentMessage(mk([95, 92, 98], 95)).level, 'top');
+  assert.match(parentMessage(mk([40, 45, 80], 55)).lines.join(' '), /م0، م1/);
 });
