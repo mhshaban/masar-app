@@ -3,7 +3,7 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-absent-2";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-bulk-1";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -180,12 +180,26 @@ export function emailBody(student, comparison = null) {
   return [
     `عزيزي الطالب ${student.name || ""}،`,
     "",
-    `تجد مرفقًا تقرير التحصيل الأكاديمي الخاص بك، ويتضمن ${scope}، مع توجيهات قسم الإرشاد الأكاديمي.`,
+    `فيما يلي تقرير التحصيل الأكاديمي الخاص بك، ويتضمن ${scope}، مع توجيهات قسم الإرشاد الأكاديمي.`,
     "يُرجى اطلاع ولي أمرك على التقرير، ففيه رسالة موجهة إليه.",
     "نتمنى لك التوفيق، ولا تتردد في مراجعة القسم عند الحاجة.",
     "",
     "قسم الإرشاد الأكاديمي والتوجيه المهني",
   ].join("\n");
+}
+
+// نص البريد بصيغة HTML: التحية ثم التقرير نفسه مدمجًا (بدون مرفق)، بنفس
+// التصميم وخط Cairo (يُحمَّل من Google Fonts حيث يسمح برنامج البريد).
+export function emailHtml(student, comparison, reportHtml) {
+  const lines = emailBody(student, comparison).split("\n");
+  lines.pop(); lines.pop(); // التوقيع موجود أصلًا في ذيل التقرير
+  const intro = lines.filter((l, i) => l || i < lines.length - 1).map((l) => (l ? `<p style="margin:0 0 6px;">${esc(l)}</p>` : "")).join("");
+  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
+<style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
+  <div dir="rtl" style="font-family:Cairo,'Segoe UI',Tahoma,Arial,sans-serif;font-size:14px;line-height:1.8;color:#1f2937;max-width:720px;margin:0 auto 14px;text-align:right;">${intro}</div>
+  ${reportHtml}
+</body></html>`;
 }
 
 export function reportFileName(student, comparison) {

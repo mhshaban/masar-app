@@ -1,4 +1,4 @@
-// رسالة بريد جاهزة (.eml) فيها التقرير مرفقًا. رابط mailto لا يقدر يرفق
+// رسالة بريد جاهزة (.eml) فيها التقرير (مدمجًا في النص أو مرفقًا). رابط mailto لا يقدر يرفق
 // ملفات، لذا نبني الرسالة كاملة بصيغة MIME مع X-Unsent: 1 — فتح الملف في
 // Outlook يعرضها كمسودة جديدة (المستلم والعنوان والنص والمرفق جاهزة) وما
 // يبقى إلا زر «إرسال». لا إرسال تلقائي.
@@ -26,10 +26,11 @@ function encodeHeaderWord(text) {
 const encodeParam = (name) => `UTF-8''${encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
 const escHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-export function buildEml({ to, subject, text, attachment, date = new Date() }) {
+// html (اختياري): نص الرسالة بصيغة HTML (مثل التقرير مدمجًا)؛ وإلا يُبنى من text.
+export function buildEml({ to, subject, text, html: htmlBody = null, attachment, date = new Date() }) {
   const boundary = `masar-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
   const alt = `${boundary}-alt`;
-  const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:1.8;text-align:right;">${escHtml(text).replace(/\n/g, "<br>")}</div>`;
+  const html = htmlBody || `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:1.8;text-align:right;">${escHtml(text).replace(/\n/g, "<br>")}</div>`;
   const lines = [
     `To: ${to}`,
     `Subject: ${encodeHeaderWord(subject)}`,
