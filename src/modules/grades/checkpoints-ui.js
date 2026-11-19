@@ -8,10 +8,10 @@ import { listStudents } from "../students/students-service.js?v=2026-08-31-recor
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
-import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-19-missing-courses-2";
-import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-missing-courses-2";
-import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-19-missing-courses-2";
-import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-19-missing-courses-2";
+import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, buildCheckpointRecords, commitCheckpointRecords, compareCheckpoints, getStudentCheckpoints, termsOf, COLLECTION } from "./checkpoint-service.js?v=2026-11-19-absent-2";
+import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-19-absent-2";
+import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-19-absent-2";
+import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-19-absent-2";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
@@ -188,7 +188,7 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
   const selected = new Set();
   let queue = [];
   const planState = { open: true, category: "low", group: "", level: "", section: "", query: "", pending: false, expanded: null };
-  const zeroState = { open: false, dept: "", section: "", checkpoint: "", showConfirmed: false };
+  const zeroState = { open: false, dept: "", section: "", checkpoint: "", kind: "", query: "" };
 
   const render = () => {
     const rows = buildRows(data.records, data.students, term);
