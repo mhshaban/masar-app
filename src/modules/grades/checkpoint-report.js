@@ -3,7 +3,7 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-19-missing-courses-1";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -18,11 +18,12 @@ const SCHOOL_HEADER = "مدرسة الشيخ عبدالله بن عيسى آل �
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
 const STATUS = { absent: "غائب", barred: "محروم" };
+const statusText = (entry) => (entry.missing ? "غائب عن الوقفة" : STATUS[entry.status] || entry.status);
 const TREND_COLOR = { up: "#15803d", down: "#b91c1c", steady: MUTED };
 
 function cell(entry) {
   if (!entry) return "—";
-  if (entry.status) return STATUS[entry.status] || entry.status;
+  if (entry.status) return `<span style="color:#b91c1c;font-weight:700;">${esc(statusText(entry))}</span>`;
   const score = entry.maxScore ? `${entry.score} / ${entry.maxScore}` : null;
   return score ? `<span dir="ltr">${esc(score)}</span><br><span style="color:${MUTED};font-size:11px;">${pct(entry.pct)}</span>` : pct(entry.pct);
 }
@@ -46,7 +47,7 @@ export function adviceLines(comparison) {
   const absent = comparison.subjects.filter((s) => s[latest]?.status);
   const down = comparison.subjects.filter((s) => s.trend === "down");
   if (weak.length) lines.push(`تحتاج إلى متابعة ودعم في: ${weak.map((s) => s.name || s.code).join("، ")}. ننصحك بالتواصل مع معلم المقرر والاستفادة من الساعات المكتبية.`);
-  if (absent.length) lines.push(`لم تُرصد لك درجة بسبب الغياب أو الحرمان في: ${absent.map((s) => s.name || s.code).join("، ")}. راجع قسم الإرشاد الأكاديمي.`);
+  if (absent.length) lines.push(`تغيّبت عن الوقفة التقويمية في: ${absent.map((s) => s.name || s.code).join("، ")}، فلم تُرصد لك فيها درجة. راجع قسم الإرشاد الأكاديمي.`);
   if (comparison.second && down.length) lines.push(`انخفض أداؤك بين الوقفتين في: ${down.map((s) => s.name || s.code).join("، ")}.`);
   if (comparison.second && comparison.trend === "up") lines.push("أحسنت، تحسّن معدلك بين الوقفتين. استمر على هذا المستوى.");
   if (!lines.length) lines.push("أداؤك جيد في جميع المقررات. نتمنى لك دوام التوفيق والتفوق.");
@@ -60,8 +61,15 @@ export function parentMessage(comparison) {
   const latest = comparison.second ? "second" : "first";
   const avg = comparison.second ? comparison.secondAvg : comparison.firstAvg;
   const graded = comparison.subjects.filter((s) => s[latest]);
-  const failing = graded.filter((s) => s[latest].status || (s[latest].pct != null && s[latest].pct < 50));
+  const weak = graded.filter((s) => !s[latest].status && s[latest].pct != null && s[latest].pct < 50);
+  const absent = graded.filter((s) => s[latest].status);
+  const failing = [...weak, ...absent];
   const names = (list) => [...new Set(list.map((s) => s.name || s.code))].join("، ");
+  // وصف الوضع: المقررات دون 50٪ ثم المقررات اللي غاب عن وقفتها.
+  const situation = [
+    weak.length ? `جاءت درجاته دون 50٪ في: ${names(weak)}` : "",
+    absent.length ? `${weak.length ? "و" : ""}تغيّب عن الوقفة التقويمية في: ${names(absent)}` : "",
+  ].filter(Boolean).join("، ");
   const visit = "ونرجو منكم مراجعة قسم الإرشاد الأكاديمي في المدرسة";
   if (graded.length && graded.every((s) => s[latest].status || s[latest].pct === 0)) {
     return { level: "absentAll", title: "إشعار عاجل", lines: [
@@ -71,13 +79,15 @@ export function parentMessage(comparison) {
   }
   if ((avg != null && avg < 60) || failing.length >= 2) {
     return { level: "low", title: "إشعار بتدني المستوى", lines: [
-      `نود إحاطتكم بأن مستوى ابنكم الدراسي متدنٍ، إذ جاءت درجاته دون 50٪ في: ${names(failing) || "عدد من المقررات"}، وهذا يعرّضه لخطر الرسوب إذا استمر الوضع.`,
+      `نود إحاطتكم بأن مستوى ابنكم الدراسي متدنٍ، إذ ${situation || "جاءت درجاته دون 50٪ في عدد من المقررات"}، وهذا يعرّضه لخطر الرسوب إذا استمر الوضع.`,
       `${visit} في أقرب وقت لتدارك الوضع والوقوف على أسباب تدني درجاته، ومتابعته مع معلمي المقررات.`,
     ] };
   }
   if (failing.length === 1) {
     return { level: "oneWeak", title: "تنبيه", lines: [
-      `نلفت انتباهكم إلى أن درجة ابنكم في مقرر ${names(failing)} جاءت دون 50٪، رغم أن مستواه في بقية المقررات مقبول.`,
+      weak.length
+        ? `نلفت انتباهكم إلى أن درجة ابنكم في مقرر ${names(weak)} جاءت دون 50٪، رغم أن مستواه في بقية المقررات مقبول.`
+        : `نلفت انتباهكم إلى أن ابنكم تغيّب عن الوقفة التقويمية في مقرر ${names(absent)}، رغم أن مستواه في بقية المقررات مقبول.`,
       `${visit} لمعرفة سبب تدني الدرجة ومساعدته على رفعها في الوقفة القادمة.`,
     ] };
   }
@@ -87,8 +97,8 @@ export function parentMessage(comparison) {
       "نأمل استمرار دعمكم له ليحافظ على هذا المستوى المتميز.",
     ] };
   }
-  return { level: "good", title: "طمأنة", lines: [
-    "نطمئنكم بأن مستوى ابنكم جيد ولم تقل درجاته عن 50٪ في أي مقرر.",
+  return { level: "good", title: "", lines: [
+    "نود إفادتكم بأن مستوى ابنكم جيد ولم تقل درجاته عن 50٪ في أي مقرر.",
     "نأمل استمرار متابعتكم وتشجيعه على رفع مستواه أكثر في الوقفة القادمة.",
   ] };
 }
@@ -150,7 +160,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
 
   <div style="font-size:15px;font-weight:800;color:${NAVY};margin:16px 0 6px;border-right:4px solid ${GOLD};padding-right:8px;">رسالة إلى ولي الأمر</div>
   <div style="border:1px solid ${LINE};border-right:5px solid ${accent};border-radius:8px;padding:10px 14px;background:#fff;">
-    <p style="margin:2px 0 6px;font-weight:800;color:${accent};">${esc(parent.title)}</p>
+    ${parent.title ? `<p style="margin:2px 0 6px;font-weight:800;color:${accent};">${esc(parent.title)}</p>` : ""}
     <p style="margin:4px 0;">ولي أمر الطالب المحترم،</p>
     ${parent.lines.map((line) => `<p style="margin:4px 0;">${esc(line)}</p>`).join("")}
   </div>

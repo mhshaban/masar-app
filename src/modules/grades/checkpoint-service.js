@@ -216,6 +216,23 @@ export const departmentOf = (subject) => {
 const isOpenZero = (s) => s && s.score === 0 && !s.zeroConfirmed && !s.status;
 export const subjectKey = (s) => normalizeKey(s?.code || s?.name || "");
 
+// مقررات الشعبة اللي ما رُصد فيها شي للطالب (غاب عن الوقفة فيها): مقرر الشعبة
+// = مرصود لنصف طلاب الشعبة فأكثر في نفس الفصل والوقفة.
+export function missingSectionCourses(allRecords, record) {
+  if (!record?.section) return [];
+  const peers = allRecords.filter((r) => r.section === record.section && r.term === record.term && Number(r.checkpoint) === Number(record.checkpoint));
+  const own = new Set((record.subjects || []).map(subjectKey));
+  const counts = new Map();
+  for (const peer of peers) for (const s of peer.subjects || []) {
+    const key = subjectKey(s);
+    if (!key || own.has(key)) continue;
+    const entry = counts.get(key) || { code: s.code || "", name: s.name || s.code, n: 0 };
+    entry.n += 1;
+    counts.set(key, entry);
+  }
+  return [...counts.values()].filter((c) => c.n * 2 >= peers.length).map(({ code, name }) => ({ code, name }));
+}
+
 export function listZeroEntries(records, { term = null, checkpoint = null, includeConfirmed = false } = {}) {
   const out = [];
   for (const r of records) {

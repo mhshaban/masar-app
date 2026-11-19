@@ -4,14 +4,37 @@
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { COLLECTION, compareCheckpoints, getStudentCheckpoints } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
-import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-19-order-1";
+import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-19-missing-courses-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-19-missing-courses-1";
 import { buildEml } from "./checkpoint-eml.js?v=2026-11-18-eml-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
+// كل السجلات (لمعرفة مقررات الشعبة) تُحمَّل مرة وتُخزَّن دقيقتين لقائمة الإرسال.
+let allCache = null;
+function cachedAllRecords() {
+  if (!allCache || Date.now() - allCache.at > 120_000) allCache = { at: Date.now(), promise: listAll(COLLECTION) };
+  return allCache.promise;
+}
+
+// يضيف للمقارنة مقررات الشعبة اللي غاب عنها الطالب في الوقفة (بلا أي درجة مرصودة).
+async function withMissingCourses(comparison) {
+  for (const [slot, rec] of [["first", comparison.first], ["second", comparison.second]]) {
+    if (!rec) continue;
+    let missing = [];
+    try { missing = missingSectionCourses(await cachedAllRecords(), rec); } catch { missing = []; }
+    for (const m of missing) {
+      const key = (m.code || m.name);
+      let row = comparison.subjects.find((s) => (s.code || s.name) === key);
+      if (!row) { row = { code: m.code, name: m.name, first: null, second: null, delta: null, trend: null }; comparison.subjects.push(row); }
+      if (!row[slot]) row[slot] = { code: m.code, name: m.name, status: "absent", missing: true, pct: null };
+    }
+  }
+  return comparison;
+}
+
 export async function buildStudentReport(student, term, records = null) {
   const own = records || await getStudentCheckpoints(student);
-  const comparison = compareCheckpoints(own, term);
+  const comparison = await withMissingCourses(compareCheckpoints(own, term));
   let cumulative = null;
   try { cumulative = (await getStudentAcademicSummary(student)).finalCumulativeAverage; } catch { cumulative = null; }
   const html = buildAchievementReportHtml(student, comparison, { cumulative });

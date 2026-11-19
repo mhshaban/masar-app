@@ -4,7 +4,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-11-18-checkpo
 import { get, save } from "../../services/cloud-runtime.js";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { COLLECTION } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
+import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-missing-courses-1";
 import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-19-missing-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
