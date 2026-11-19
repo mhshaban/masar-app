@@ -5,7 +5,7 @@ import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-che
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
 import { COLLECTION, compareCheckpoints, getStudentCheckpoints } from "./checkpoint-service.js?v=2026-11-18-zeros-1";
-import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-19-parent-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, reportFileName } from "./checkpoint-report.js?v=2026-11-19-order-1";
 import { buildEml } from "./checkpoint-eml.js?v=2026-11-18-eml-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
