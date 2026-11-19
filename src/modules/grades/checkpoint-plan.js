@@ -1,6 +1,6 @@
 // تصنيف الطلبة حسب الوقفة التقويمية الأولى وخطة جلسات التحسين لكل فئة.
 // دوال نقية: التصنيف يستبعد الأصفار غير المؤكدة (قد تكون «لم تُرصد»).
-export const CATEGORY_LABELS = { low: "متدني", mid: "متوسط", top: "متفوق", none: "بلا درجات مرصودة" };
+export const CATEGORY_LABELS = { low: "متدني", mid: "متوسط", top: "متفوق", none: "بلا درجات مرصودة", missing: "غير مدرج في كشوف الوقفة" };
 export const GROUP_LABELS = { absentAll: "غائب عن كل المقررات", A: "المجموعة (أ): 3 مقررات فأكثر", B: "المجموعة (ب)", oneWeak: "ضعيف في مقرر واحد", "": "" };
 
 export function classifyRecord(record) {
@@ -33,6 +33,7 @@ export const PLAN_SESSIONS = {
     { id: "top-honor", title: "لقاء تكريم وتحفيز", groups: [], parent: true, attendees: "المتفوقون، ويُدعى أولياء الأمور", duration: "40 دقيقة", content: "شهادات تقدير، وبرامج التفوق والبعثات، ودعوة للتطوع في «الزميل المساند» (اختياري)", output: "قائمة المتطوعين" },
   ],
   none: [],
+  missing: [],
 };
 
 export const PLAN_GOALS = {
