@@ -68,5 +68,7 @@ test("embedded send scripts match tools/ (run scripts/build-send-scripts.mjs)", 
   assert.equal(readFileSync(new URL("../src/modules/grades/send-scripts.js", import.meta.url), "utf8"), renderSendScripts());
   const { WINDOWS_SCRIPT, MAC_SCRIPT } = await import("../src/modules/grades/send-scripts.js");
   assert.match(WINDOWS_SCRIPT, /Outlook\.Application/);
-  assert.match(MAC_SCRIPT, /Microsoft Outlook/);
+  assert.match(MAC_SCRIPT, /send-outlook-mac.applescript/);
+  const { MAC_OUTLOOK_SCRIPT } = await import("../src/modules/grades/send-scripts.js");
+  assert.match(MAC_OUTLOOK_SCRIPT, /make new outgoing message/);
 });
