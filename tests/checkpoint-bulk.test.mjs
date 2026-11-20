@@ -61,3 +61,12 @@ test("mac send script parses the manifest csv", async () => {
   const rows = parseCsv(manifestCsv([{ academicId: "7", name: 'علي "ب"', email: "a@x", subject: "تقرير، ١", htmlFile: "reports\\7.html" }]).replace(/^﻿/, ""));
   assert.deepEqual(rows, [{ academicId: "7", name: 'علي "ب"', email: "a@x", subject: "تقرير، ١", htmlFile: "reports\\7.html" }]);
 });
+
+test("embedded send scripts match tools/ (run scripts/build-send-scripts.mjs)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { renderSendScripts } = await import("../scripts/build-send-scripts.mjs");
+  assert.equal(readFileSync(new URL("../src/modules/grades/send-scripts.js", import.meta.url), "utf8"), renderSendScripts());
+  const { WINDOWS_SCRIPT, MAC_SCRIPT } = await import("../src/modules/grades/send-scripts.js");
+  assert.match(WINDOWS_SCRIPT, /Outlook\.Application/);
+  assert.match(MAC_SCRIPT, /Microsoft Outlook/);
+});

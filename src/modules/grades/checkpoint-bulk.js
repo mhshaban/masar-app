@@ -3,10 +3,11 @@
 // Outlook بعد تأكيده هو. لا يرسل مسار أي بريد بنفسه. بعد الإرسال يُرفع ملف
 // النتيجة إلى مسار فيُعلَّم الطلاب «أُرسل».
 import { get, save } from "../../services/cloud-runtime.js";
-import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-19-mac-1";
-import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-19-mac-1";
-import { COLLECTION } from "./checkpoint-service.js?v=2026-11-19-mac-1";
-import { createZip } from "./zip-writer.js?v=2026-11-19-mac-1";
+import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-20-embed-1";
+import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-20-embed-1";
+import { COLLECTION } from "./checkpoint-service.js?v=2026-11-20-embed-1";
+import { createZip } from "./zip-writer.js?v=2026-11-20-embed-1";
+import { WINDOWS_SCRIPT, MAC_SCRIPT } from "./send-scripts.js?v=2026-11-20-embed-1";
 
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
@@ -40,12 +41,6 @@ export function parseResultCsv(text) {
   if (!rows.length) return [];
   const head = rows[0].map((h) => h.trim());
   return rows.slice(1).map((r) => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? "").trim()])));
-}
-
-async function scriptText(name) {
-  const res = await fetch(new URL(`../../../tools/${name}`, import.meta.url));
-  if (!res.ok) throw new Error("تعذّر تحميل سكربت الإرسال.");
-  return (await res.text()).replace(/^\uFEFF/, "");
 }
 
 const README = `إرسال تقارير التحصيل الأكاديمي من Outlook
@@ -95,9 +90,9 @@ export async function buildBulkPackage(rows, term, onProgress = () => {}) {
   }
   if (!manifest.length) throw new Error("ما تجهّز ولا تقرير.");
   files.push({ name: "manifest.csv", bytes: manifestCsv(manifest) });
-  files.push({ name: "send-reports.ps1", bytes: "\uFEFF" + (await scriptText("send-reports.ps1")) });
+  files.push({ name: "send-reports.ps1", bytes: "\uFEFF" + WINDOWS_SCRIPT });
   files.push({ name: "SEND.bat", bytes: '@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0send-reports.ps1"\r\n' });
-  files.push({ name: "send-reports-mac.js", bytes: await scriptText("send-reports-mac.js") });
+  files.push({ name: "send-reports-mac.js", bytes: MAC_SCRIPT });
   files.push({ name: "SEND-MAC.command", bytes: MAC_LAUNCHER, mode: 0o755 });
   files.push({ name: "README.txt", bytes: "\uFEFF" + README.replace(/\n/g, "\r\n") });
   const zip = createZip(files);
