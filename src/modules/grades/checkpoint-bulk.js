@@ -3,11 +3,11 @@
 // Outlook بعد تأكيده هو. لا يرسل مسار أي بريد بنفسه. بعد الإرسال يُرفع ملف
 // النتيجة إلى مسار فيُعلَّم الطلاب «أُرسل».
 import { get, save } from "../../services/cloud-runtime.js";
-import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-20-embed-1";
-import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-20-embed-1";
-import { COLLECTION } from "./checkpoint-service.js?v=2026-11-20-embed-1";
-import { createZip } from "./zip-writer.js?v=2026-11-20-embed-1";
-import { WINDOWS_SCRIPT, MAC_SCRIPT } from "./send-scripts.js?v=2026-11-20-embed-1";
+import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-20-embed-2";
+import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-20-embed-2";
+import { COLLECTION } from "./checkpoint-service.js?v=2026-11-20-embed-2";
+import { createZip } from "./zip-writer.js?v=2026-11-20-embed-2";
+import { WINDOWS_SCRIPT, MAC_SCRIPT } from "./send-scripts.js?v=2026-11-20-embed-2";
 
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
