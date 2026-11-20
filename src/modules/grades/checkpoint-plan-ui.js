@@ -4,8 +4,8 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-11-18-checkpo
 import { get, save } from "../../services/cloud-runtime.js";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { COLLECTION, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-20-embed-2";
-import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-20-embed-2";
+import { COLLECTION, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-20-mac-2";
+import { CATEGORY_LABELS, GROUP_LABELS, PLAN_SESSIONS, PLAN_GOALS, classifyRecord, sessionsFor, withSessionLog } from "./checkpoint-plan.js?v=2026-11-20-mac-2";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FIELD = "padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;background:var(--surface);color:inherit;";

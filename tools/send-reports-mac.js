@@ -38,6 +38,7 @@ function parseCsv(text) {
   return rows.slice(1).map((r) => Object.fromEntries(head.map((h, i) => [h, (r[i] || "").trim()])));
 }
 
+const shq = (v) => "'" + String(v).replace(/'/g, "'\\''") + "'";
 const csvCell = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
 const nowIso = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 19); };
 
@@ -82,9 +83,8 @@ function run(argv) {
     console.log((i + 1) + " / " + rows.length + "  " + r.name);
     try {
       const html = readText(dir + "/" + String(r.htmlFile).replace(/\\/g, "/"));
-      const msg = outlook.make({ new: "outgoingMessage", withProperties: { subject: r.subject, content: html } });
-      outlook.make({ new: "toRecipient", at: msg, withProperties: { emailAddress: { address: r.email } } });
-      outlook.send(msg);
+      // الإرسال نفسه بـ AppleScript (قاموس Outlook موثّق فيه أكثر من JXA).
+      app.doShellScript("osascript " + [dir + "/send-outlook-mac.applescript", r.subject, html, r.email].map(shq).join(" "));
       results.push({ academicId: r.academicId, status: "sent", at: nowIso(), error: "" });
       sent++;
     } catch (e) {
@@ -93,8 +93,8 @@ function run(argv) {
       if (sent === 0) {
         writeResults(dir, results);
         say("ما قدر Outlook يرسل أول رسالة، فوقّفت الإرسال (ما انرسل شي).\n\n"
-          + "إذا كان Outlook الجديد مفعّل: من قائمة Outlook (أعلى الشاشة) اختر «Legacy Outlook» ثم شغّل السكربت مرة ثانية.\n"
-          + "وإذا طلع لك طلب سماح للتحكم في Outlook اضغط «سماح» (OK).\n\nالخطأ: " + e.message);
+          + "صوّر هذي الرسالة وأرسلها لي.\n"
+          + "إذا طلع لك طلب سماح للتحكم في Outlook اضغط «سماح» (OK) وشغّل السكربت مرة ثانية.\n\nالخطأ: " + e.message);
         return;
       }
     }
