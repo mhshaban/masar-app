@@ -4,10 +4,10 @@
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-21-all-courses-1";
-import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-21-all-courses-1";
-import { buildEml } from "./checkpoint-eml.js?v=2026-11-21-all-courses-1";
-import { scheduleCourseRows } from "./checkpoint-schedule.js?v=2026-11-21-all-courses-1";
+import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-21-cairo-local-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-21-cairo-local-1";
+import { buildEml } from "./checkpoint-eml.js?v=2026-11-21-cairo-local-1";
+import { scheduleCourseRows } from "./checkpoint-schedule.js?v=2026-11-21-cairo-local-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 // كل السجلات (لمعرفة مقررات الشعبة) تُحمَّل مرة وتُخزَّن دقيقتين لقائمة الإرسال.
