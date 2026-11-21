@@ -34,3 +34,18 @@ test("level-1 commercial: uncoded المواد التجارية covers قصد; E
   ];
   assert.deepEqual(rowsFor(codes, subjects), { عرب801: "pending", وطن801: "pending", بدن801: "continuous", بيع801: "continuous", رشد801: "continuous", محك801: "continuous" });
 });
+
+test("uncoded checkpoint subjects get their codes from the schedule", async () => {
+  const { fillMissingCodes } = await import("../src/modules/grades/checkpoint-schedule.js");
+  const subjects = [
+    { code: "", name: "الرياضيات" },
+    { code: "", name: "العلوم" },
+    { code: "انج 807", name: "اللغة الإنجليزية" },
+    { code: "", name: "مادة غير موجودة" },
+  ];
+  fillMissingCodes(["ريض807", "فيز801", "كيم801", "انج807", "بدن803"], subjects);
+  assert.equal(subjects[0].code, "ريض807");
+  assert.equal(subjects[1].code, "فيز801 / كيم801");
+  assert.equal(subjects[2].code, "انج807");
+  assert.equal(subjects[3].code, "");
+});

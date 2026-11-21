@@ -3,8 +3,8 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-21-cairo-local-1";
-import { NOTE_LABELS } from "./checkpoint-schedule.js?v=2026-11-21-cairo-local-1";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-21-course-codes-1";
+import { NOTE_LABELS } from "./checkpoint-schedule.js?v=2026-11-21-course-codes-1";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
