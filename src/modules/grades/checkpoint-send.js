@@ -4,9 +4,10 @@
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-20-mac-2";
-import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-20-mac-2";
-import { buildEml } from "./checkpoint-eml.js?v=2026-11-20-mac-2";
+import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-21-all-courses-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-21-all-courses-1";
+import { buildEml } from "./checkpoint-eml.js?v=2026-11-21-all-courses-1";
+import { scheduleCourseRows } from "./checkpoint-schedule.js?v=2026-11-21-all-courses-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 // كل السجلات (لمعرفة مقررات الشعبة) تُحمَّل مرة وتُخزَّن دقيقتين لقائمة الإرسال.
@@ -32,9 +33,29 @@ async function withMissingCourses(comparison) {
   return comparison;
 }
 
+// جدول الحصص (كل الشعب) يُحمَّل مرة ويُخزَّن دقيقتين.
+let scheduleCache = null;
+function cachedSchedules() {
+  if (!scheduleCache || Date.now() - scheduleCache.at > 120_000) scheduleCache = { at: Date.now(), promise: listAll("classSchedules") };
+  return scheduleCache.promise;
+}
+
+// يضيف كل مقررات جدول شعبة الطالب اللي ما لها درجة: «لم تُرصد بعد» أو «تقويم مستمر».
+async function withScheduleCourses(comparison, student) {
+  const section = student.section || comparison.first?.section || comparison.second?.section;
+  if (!section) return comparison;
+  let codes = [];
+  try { codes = (await cachedSchedules()).filter((r) => r.section === section).map((r) => r.subjectCode); } catch { codes = []; }
+  for (const row of scheduleCourseRows(codes, comparison.subjects)) {
+    const entry = { code: row.code, name: row.name, note: row.note, pct: null };
+    comparison.subjects.push({ code: row.code, name: row.name, first: comparison.first ? entry : null, second: comparison.second ? entry : null, delta: null, trend: null, note: row.note });
+  }
+  return comparison;
+}
+
 export async function buildStudentReport(student, term, records = null) {
   const own = records || await getStudentCheckpoints(student);
-  const comparison = await withMissingCourses(compareCheckpoints(own, term));
+  const comparison = await withScheduleCourses(await withMissingCourses(compareCheckpoints(own, term)), student);
   let cumulative = null;
   try { cumulative = (await getStudentAcademicSummary(student)).finalCumulativeAverage; } catch { cumulative = null; }
   const html = buildAchievementReportHtml(student, comparison, { cumulative });

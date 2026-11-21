@@ -3,7 +3,8 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-20-mac-2";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-21-all-courses-1";
+import { NOTE_LABELS } from "./checkpoint-schedule.js?v=2026-11-21-all-courses-1";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -23,6 +24,7 @@ const TREND_COLOR = { up: "#15803d", down: "#b91c1c", steady: MUTED };
 
 function cell(entry) {
   if (!entry) return "—";
+  if (entry.note) return `<span style="color:${MUTED};font-weight:700;">${esc(NOTE_LABELS[entry.note] || entry.note)}</span>`;
   if (entry.status) return `<span style="color:#b91c1c;font-weight:700;">${esc(statusText(entry))}</span>`;
   const score = entry.maxScore ? `${entry.score} / ${entry.maxScore}` : null;
   return score ? `<span dir="ltr">${esc(score)}</span><br><span style="color:${MUTED};font-size:11px;">${pct(entry.pct)}</span>` : pct(entry.pct);
@@ -60,7 +62,8 @@ export function adviceLines(comparison) {
 export function parentMessage(comparison) {
   const latest = comparison.second ? "second" : "first";
   const avg = comparison.second ? comparison.secondAvg : comparison.firstAvg;
-  const graded = comparison.subjects.filter((s) => s[latest]);
+  // مقررات التقويم المستمر واللي لم تُرصد بعد لا تدخل في الحكم على الوضع.
+  const graded = comparison.subjects.filter((s) => s[latest] && !s[latest].note);
   const weak = graded.filter((s) => !s[latest].status && s[latest].pct != null && s[latest].pct < 50);
   const absent = graded.filter((s) => s[latest].status);
   const failing = [...weak, ...absent];
