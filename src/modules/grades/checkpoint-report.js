@@ -3,8 +3,8 @@
 // نفسه عند: العرض داخل مسار، التحويل إلى PDF، والطباعة. ألوان القسم:
 // كحلي + ذهبي. لا تُذكر أسماء المرشدين — الصفة فقط.
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-21-all-courses-1";
-import { NOTE_LABELS } from "./checkpoint-schedule.js?v=2026-11-21-all-courses-1";
+import { CHECKPOINT_LABELS, TREND_LABELS } from "./checkpoint-service.js?v=2026-11-21-cairo-local-1";
+import { NOTE_LABELS } from "./checkpoint-schedule.js?v=2026-11-21-cairo-local-1";
 
 const NAVY = "#1b2a4a";
 const GOLD = "#b8913a";
@@ -123,7 +123,7 @@ export function buildAchievementReportHtml(student, comparison, { cumulative = n
   const parent = parentMessage(comparison);
   const accent = PARENT_ACCENT[parent.level];
   const th = `style="border:1px solid ${NAVY};background:${NAVY};color:#fff;padding:8px 6px;font-weight:700;font-size:12.5px;"`;
-  return `<div dir="rtl" lang="ar" style="font-family:Cairo,'Segoe UI',Tahoma,Arial,sans-serif;color:${INK};background:#fff;width:100%;max-width:720px;margin:0 auto;font-size:13px;line-height:1.6;">
+  return `<div dir="rtl" lang="ar" style="font-family:CairoWeb,Cairo,'Cairo Regular','Segoe UI',Tahoma,Arial,sans-serif;color:${INK};background:#fff;width:100%;max-width:720px;margin:0 auto;font-size:13px;line-height:1.6;">
   <table role="presentation" style="width:100%;border-collapse:collapse;background:${NAVY};">
     <tr><td style="padding:18px 20px;color:#fff;">
       <div style="font-size:12px;color:#d6c08a;">${SCHOOL_HEADER}</div>
@@ -192,6 +192,16 @@ export function emailBody(student, comparison = null) {
   ].join("\n");
 }
 
+// خط Cairo في البريد باسم مستقل «CairoWeb»: إذا منع البرنامج تحميل الخطوط من
+// النت (مثل Outlook في الآيفون) يرجع لخط Cairo المثبّت على الجهاز. لو سمّيناه
+// «Cairo» نفسه، فشل التحميل يغطي على الخط المثبّت ويطلع خط النظام.
+const CAIRO_URL = "https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0h";
+const CAIRO_WEIGHTS = { 400: "OA-a1", 700: "Ac5a1", 800: "GA5a1" };
+const AR_RANGE = "U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+FB50-FDFF,U+FE70-FEFC";
+const CAIRO_FACES = Object.entries(CAIRO_WEIGHTS).map(([w, k]) =>
+  `@font-face{font-family:CairoWeb;font-weight:${w};font-style:normal;src:url(${CAIRO_URL}${k}biKi2CikEEnMH9.woff) format('woff');unicode-range:${AR_RANGE};}`
+  + `@font-face{font-family:CairoWeb;font-weight:${w};font-style:normal;src:url(${CAIRO_URL}${k}PiKi2CikEEnA.woff) format('woff');unicode-range:U+0000-00FF,U+2000-206F;}`).join("");
+
 function injectAt(reportHtml, marker, html, fallbackFirst) {
   if (reportHtml.includes(marker)) return reportHtml.replace(marker, html);
   return fallbackFirst ? html + reportHtml : reportHtml + html;
@@ -210,8 +220,7 @@ export function emailHtml(student, comparison, reportHtml) {
   body = injectAt(body, "<!--email-closing-->", box(p(closing), "18px 0 0"), false);
   return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
-<style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');:root{color-scheme:light only;supported-color-schemes:light only;}</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
+<style>${CAIRO_FACES}:root{color-scheme:light only;supported-color-schemes:light only;}</style></head><body dir="rtl" style="margin:0;padding:12px;background:#ffffff;">
   ${body}
 </body></html>`;
 }

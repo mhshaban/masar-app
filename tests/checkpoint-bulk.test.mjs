@@ -37,7 +37,7 @@ test("email html embeds the report without the greeting line, eml carries it", (
   assert.ok(!/عزيزي الطالب طالب/.test(html));
   assert.match(html, /فيما يلي تقرير/);
   assert.match(html, /REPORT/);
-  assert.match(html, /family=Cairo/);
+  assert.match(html, /font-family:CairoWeb;/);
   assert.ok(!/قسم الإرشاد الأكاديمي والتوجيه المهني<\/div>/.test(html));
   const eml = buildEml({ to: "a@x", subject: "س", text: "نص", html });
   assert.ok(!/Content-Disposition: attachment/.test(eml));

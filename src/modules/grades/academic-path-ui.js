@@ -3,7 +3,7 @@ import { getStudentTermTimeline, getStudentAcademicSummary, officialAverage } fr
 import { findStudentCertificates, readStudentCertificate } from "./student-certificate-local.js?v=2026-09-07-academic-fix-1";
 import { listWhere } from "../../services/cloud-runtime.js";
 import { formatPct } from "../shared/format-pct.js?v=2026-10-01-avg-decimals-1";
-import { renderStudentCheckpointsCard } from "./checkpoints-ui.js?v=2026-11-21-all-courses-1";
+import { renderStudentCheckpointsCard } from "./checkpoints-ui.js?v=2026-11-21-cairo-local-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const statusLabels = { absent: "غائب", barred: "محروم" };
