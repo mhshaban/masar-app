@@ -66,3 +66,21 @@ export function scheduleCourseRows(scheduleCodes, subjects) {
   // «لم تُرصد بعد» أولًا ثم «تقويم مستمر».
   return rows.sort((a, b) => (a.note === b.note ? 0 : a.note === "pending" ? -1 : 1));
 }
+
+// مقررات الوقفة المرصودة بالاسم فقط (العربي، الرياضيات، العلوم، الرسم…):
+// نكمل رمزها من جدول الشعبة عشان كل المقررات في التقرير تطلع برموزها.
+// إذا غطى الاسم أكثر من مقرر في الجدول (مثل العلوم) تنكتب الرموز كلها.
+export function fillMissingCodes(scheduleCodes, subjects) {
+  const codes = [...new Set((scheduleCodes || []).map(normalizeCode).filter(Boolean))];
+  for (const s of subjects || []) {
+    // نفس الشكل لكل الرموز («انج 801» تصير «انج801» مثل «وطن801»).
+    if (normalizeCode(s.code)) { s.code = normalizeCode(s.code); continue; }
+    if (!s.name) continue;
+    const match = codes.filter((c) => {
+      const family = NAME_FAMILIES[prefixOf(c)];
+      return family && String(s.name).startsWith(family);
+    });
+    if (match.length) s.code = match.join(" / ");
+  }
+  return subjects;
+}

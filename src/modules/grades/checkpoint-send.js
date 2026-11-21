@@ -4,10 +4,10 @@
 import { ensureHtml2Pdf } from "../../services/vendor-loader.js?v=2026-11-18-checkpoints-1";
 import { get, save, list as listAll } from "../../services/cloud-runtime.js";
 import { getStudentAcademicSummary } from "./term-progress-service.js?v=2026-09-24-no-synthetic-terms-1";
-import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-21-cairo-local-1";
-import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-21-cairo-local-1";
-import { buildEml } from "./checkpoint-eml.js?v=2026-11-21-cairo-local-1";
-import { scheduleCourseRows } from "./checkpoint-schedule.js?v=2026-11-21-cairo-local-1";
+import { COLLECTION, compareCheckpoints, getStudentCheckpoints, missingSectionCourses } from "./checkpoint-service.js?v=2026-11-21-course-codes-1";
+import { buildAchievementReportHtml, emailSubject, emailBody, emailHtml, reportFileName } from "./checkpoint-report.js?v=2026-11-21-course-codes-1";
+import { buildEml } from "./checkpoint-eml.js?v=2026-11-21-course-codes-1";
+import { scheduleCourseRows, fillMissingCodes } from "./checkpoint-schedule.js?v=2026-11-21-course-codes-1";
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 
 // كل السجلات (لمعرفة مقررات الشعبة) تُحمَّل مرة وتُخزَّن دقيقتين لقائمة الإرسال.
@@ -46,7 +46,9 @@ async function withScheduleCourses(comparison, student) {
   if (!section) return comparison;
   let codes = [];
   try { codes = (await cachedSchedules()).filter((r) => r.section === section).map((r) => r.subjectCode); } catch { codes = []; }
-  for (const row of scheduleCourseRows(codes, comparison.subjects)) {
+  const extra = scheduleCourseRows(codes, comparison.subjects);
+  fillMissingCodes(codes, comparison.subjects);
+  for (const row of extra) {
     const entry = { code: row.code, name: row.name, note: row.note, pct: null };
     comparison.subjects.push({ code: row.code, name: row.name, first: comparison.first ? entry : null, second: comparison.second ? entry : null, delta: null, trend: null, note: row.note });
   }
