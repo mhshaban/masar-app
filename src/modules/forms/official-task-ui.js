@@ -61,12 +61,12 @@ export const PRINT_CSS = `
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: #fff; color: #000; }
-  body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Sakkal Majalla", "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ot-page { width: 210mm; height: 296mm; overflow: hidden; padding: 16mm 18mm 10mm; display: flex; flex-direction: column; margin: 0 auto; }
   .ot-head { text-align: center; }
   .ot-head img { height: 15mm; max-width: 100%; }
-  .ot-title { text-align: center; font-size: 17pt; font-weight: 700; margin: 12mm 0 8mm; }
-  .ot-table { width: 100%; border-collapse: collapse; font-size: 13pt; table-layout: fixed; }
+  .ot-title { text-align: center; font-size: 22pt; font-weight: 700; margin: 12mm 0 8mm; }
+  .ot-table { width: 100%; border-collapse: collapse; font-size: 17pt; table-layout: fixed; }
   .ot-table td { border: .35mm solid #000; padding: 3mm 3.5mm; vertical-align: top; height: 17mm; }
   .ot-table b { font-weight: 700; }
   .ot-task .ot-line { border-bottom: .35mm dotted #000; min-height: 11mm; padding: 3mm 1mm 0; line-height: 1.5; }
@@ -90,6 +90,7 @@ export async function printOfficialTask(data) {
     popup.document.close();
     const logo = popup.document.querySelector(".ot-head img");
     const logoReady = logo.complete ? Promise.resolve() : new Promise((resolve) => { logo.onload = logo.onerror = resolve; });
+    // الخط الأساسي Sakkal Majalla من خطوط الجهاز (موجود مع ويندوز)، وCairo احتياطي لو ما كان مثبّتًا.
     const fontsReady = Promise.all([400, 700].map((w) => popup.document.fonts.load(`${w} 12px "Cairo"`, "استمارة"))).catch(() => {});
     await Promise.race([Promise.all([logoReady, fontsReady]), new Promise((resolve) => setTimeout(resolve, 4000))]);
     await popup.document.fonts.ready;
