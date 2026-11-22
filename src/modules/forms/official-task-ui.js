@@ -1,6 +1,6 @@
 // استمارة المهام الرسمية — نسخة مطابقة لنموذج الوزارة الورقي (شعار الوزارة،
 // جدول البيانات، أسطر المهمة، مرفق/لا مرفق، توقيعا الموظف ومدير المدرسة،
-// وسطر إدارة العمليات المدرسية – المنطقة الرابعة أسفل الصفحة).
+// والتذييل الإنجليزي لإدارة العمليات المدرسية – المنطقة الرابعة).
 // تُعبّأ وتُطبع فقط (لا تُحفظ بقاعدة البيانات)؛ اسم الموظف ورقمه الشخصي
 // ووظيفته تُعبّأ من بيانات المعلمين عند اختيار الاسم.
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
@@ -11,7 +11,6 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const FORM_TITLE = "استمارة المهام الرسمية";
 const TASK_LINES = 5;
 const LOGO_URL = new URL("../../../assets/moe-logo.png", import.meta.url).href;
-const FOOTER_AR = "إدارة العمليات التعليمية المنطقة الرابعة، هاتف: <bdi dir=\"ltr\">+97317680096</bdi>، ص.ب: 43 المنامة، مملكة البحرين";
 const FOOTER_EN = "School Operations Region (4) Directorate, T: +973 17680096 – 17680158, P.O.BOX: 43, Manama, kingdom of Bahrain";
 const FOOTER_MAIL = "dir.schop4@moe.gov.bh";
 
@@ -58,7 +57,6 @@ export function officialTaskMarkup(d = {}) {
       <tr class="ot-sign"><td><b>توقيع الموظف:</b></td><td><b>توقيع مدير المدرسة:</b></td></tr>
     </table>
     <footer class="ot-foot">
-      <div class="ot-foot-ar">${FOOTER_AR}</div>
       <div dir="ltr">${FOOTER_EN}</div>
       <div dir="ltr">${FOOTER_MAIL}</div>
     </footer>
