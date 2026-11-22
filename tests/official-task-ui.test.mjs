@@ -16,11 +16,12 @@ test("نص المهمة يتوزع على خمسة أسطر والزائد يُ�
   assert.deepEqual(taskLines("1\n2\n3\n4\n5\n6"), ["1", "2", "3", "4", "5 6"]);
 });
 
-test("الاستمارة الفارغة فيها كل البنود والتذييل وتُهرّب المدخلات", () => {
+test("الاستمارة الفارغة فيها كل البنود وتُهرّب المدخلات", () => {
   const blank = officialTaskMarkup({});
-  for (const label of ["اسم الموظف", "الرقم الشخصي", "الوظيفة", "اليوم", "التاريخ", "وقت المغادرة", "الوقت المتوقع للعودة", "المهمة الرسمية", "يوجد مرفق", "لا يوجد مرفق", "توقيع الموظف", "توقيع مدير المدرسة", "dir.schop4@moe.gov.bh"]) {
+  for (const label of ["اسم الموظف", "الرقم الشخصي", "الوظيفة", "اليوم", "التاريخ", "وقت المغادرة", "الوقت المتوقع للعودة", "المهمة الرسمية", "يوجد مرفق", "لا يوجد مرفق", "توقيع الموظف", "توقيع مدير المدرسة"]) {
     assert.ok(blank.includes(label), label);
   }
+  assert.ok(!blank.includes("ot-foot"));
   assert.ok(officialTaskMarkup({ name: "<b>x</b>" }).includes("&lt;b&gt;x&lt;/b&gt;"));
   assert.ok(officialTaskMarkup({ attachment: "yes" }).includes("✓"));
 });

@@ -1,6 +1,6 @@
 // استمارة المهام الرسمية — نسخة مطابقة لنموذج الوزارة الورقي (شعار الوزارة،
 // جدول البيانات، أسطر المهمة، مرفق/لا مرفق، توقيعا الموظف ومدير المدرسة،
-// والتذييل الإنجليزي لإدارة العمليات المدرسية – المنطقة الرابعة).
+// بدون تذييل).
 // تُعبّأ وتُطبع فقط (لا تُحفظ بقاعدة البيانات)؛ اسم الموظف ورقمه الشخصي
 // ووظيفته تُعبّأ من بيانات المعلمين عند اختيار الاسم.
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
@@ -11,8 +11,6 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const FORM_TITLE = "استمارة المهام الرسمية";
 const TASK_LINES = 5;
 const LOGO_URL = new URL("../../../assets/moe-logo.png", import.meta.url).href;
-const FOOTER_EN = "School Operations Region (4) Directorate, T: +973 17680096 – 17680158, P.O.BOX: 43, Manama, kingdom of Bahrain";
-const FOOTER_MAIL = "dir.schop4@moe.gov.bh";
 
 export function dayName(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return "";
@@ -56,10 +54,6 @@ export function officialTaskMarkup(d = {}) {
       <tr><td colspan="2" class="ot-attach"><span>${box(d.attachment === "yes")} يوجد مرفق</span><span>${box(d.attachment === "no")} لا يوجد مرفق</span></td></tr>
       <tr class="ot-sign"><td><b>توقيع الموظف:</b></td><td><b>توقيع مدير المدرسة:</b></td></tr>
     </table>
-    <footer class="ot-foot">
-      <div dir="ltr">${FOOTER_EN}</div>
-      <div dir="ltr">${FOOTER_MAIL}</div>
-    </footer>
   </div>`;
 }
 
@@ -81,7 +75,6 @@ export const PRINT_CSS = `
   .ot-attach > span { display: inline-flex; align-items: center; gap: 2mm; margin-left: 45mm; }
   .ot-box { display: inline-flex; width: 4.5mm; height: 4.5mm; border: .5mm solid #000; align-items: center; justify-content: center; font-size: 10pt; line-height: 1; }
   .ot-sign td { height: 36mm; }
-  .ot-foot { margin-top: auto; border-top: .3mm solid #000; padding-top: 1.5mm; text-align: center; font-size: 8pt; line-height: 1.45; }
   @media screen { body { background: #e9ecf1; padding: 8mm 0; } .ot-page { background: #fff; box-shadow: 0 1mm 4mm rgba(0,0,0,.15); } }
 `;
 
