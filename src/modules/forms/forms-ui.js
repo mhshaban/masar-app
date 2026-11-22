@@ -18,6 +18,7 @@ import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
 import { renderEventFiles } from "./event-file-ui.js?v=2026-10-14-event-file-1";
 import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-print-spacing-1";
+import { renderOfficialTask } from "./official-task-ui.js?v=2026-11-22-official-task-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
@@ -879,7 +880,7 @@ export async function mountTeachersView(container) {
 
 export async function mountFormsView(container, options = {}) {
   const onGoto = options.onGoto;
-  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="events">ملفات الفعاليات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button></div><div id="forms-content"></div>`;
+  container.innerHTML = `<div class="topbar"><div><h1>الاستمارات والسجلات</h1><div class="sub">إحالات القسم، طلبات تغيير الشعب، موافقات أولياء الأمور، كشوف الفعاليات واستمارات اعتمادها، واستمارة المهام الرسمية</div></div></div><div class="tabs" role="tablist"><button class="tab active" data-tab="new">استمارة جديدة</button><button class="tab" data-tab="log">سجل الاستمارات</button><button class="tab" data-tab="events">ملفات الفعاليات</button><button class="tab" data-tab="attendance">كشف حضور فعالية</button><button class="tab" data-tab="candidates">كشف طلاب مرشحين لفعالية</button><button class="tab" data-tab="approval">استمارة اعتماد فعالية</button><button class="tab" data-tab="officialTask">استمارة المهام الرسمية</button></div><div id="forms-content"></div>`;
   const content = container.querySelector("#forms-content");
   async function show(tab) {
     container.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
@@ -895,6 +896,7 @@ export async function mountFormsView(container, options = {}) {
       else if (tab === "events") await renderEventFiles(content, { renderEditor: renderAttendanceEditor, printSheet: printAttendanceSheetDirect });
       else if (tab === "attendance") await renderAttendanceSheet(content, "attendance");
       else if (tab === "candidates") await renderAttendanceSheet(content, "candidates");
+      else if (tab === "officialTask") await renderOfficialTask(content);
       else await renderEventApprovals(content);
     } catch (error) {
       console.error("تعذر تحميل قسم الاستمارات", error);
