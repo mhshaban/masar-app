@@ -10,7 +10,7 @@ import { getCurrentProfile } from "../../services/auth-service.js";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const FORM_TITLE = "استمارة المهام الرسمية";
 const TASK_LINES = 5;
-const LOGO_URL = new URL("../../../assets/moe-logo.png", import.meta.url).href;
+const LOGO_URL = new URL("../../../icons/moe-logo.png", import.meta.url).href;
 
 export function dayName(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return "";
