@@ -102,7 +102,10 @@ export async function printOfficialTask(data) {
 const input = (label, name, value = "", { type = "text", wide = false, list = "", dir = "" } = {}) =>
   `<label class="forms-field${wide ? " forms-wide" : ""}"><span>${label}</span><input name="${name}" type="${type}" value="${esc(value)}"${list ? ` list="${list}" autocomplete="off"` : ""}${dir ? ` dir="${dir}"` : ""}></label>`;
 
-export async function renderOfficialTask(root) {
+export const OFFICIAL_TASK_TYPE = "official_task";
+
+// embedded: داخل بطاقة "استمارة جديدة" (بعد اختيار النوع من القائمة) فتُرسم الحقول فقط.
+export async function renderOfficialTask(root, { embedded = false } = {}) {
   const teachers = await listTeachers().catch(() => []);
   const byName = new Map(teachers.filter((t) => t.name).map((t) => [t.name.trim(), t]));
   let profileName = "";
@@ -110,9 +113,10 @@ export async function renderOfficialTask(root) {
   const me = byName.get(profileName);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bahrain" });
 
-  root.innerHTML = `<div class="card forms-card">
-    <div class="card-head"><h2>${FORM_TITLE}</h2></div>
-    <p class="hint">تُطبع على نموذج الوزارة نفسه. الخانات الفارغة تُطبع فارغة لتعبئتها يدويًا، واليوم يُكتب تلقائيًا من التاريخ.</p>
+  const head = embedded ? "" : `<div class="card-head"><h2>${FORM_TITLE}</h2></div>
+    <p class="hint">تُطبع على نموذج الوزارة نفسه. الخانات الفارغة تُطبع فارغة لتعبئتها يدويًا، واليوم يُكتب تلقائيًا من التاريخ.</p>`;
+  root.innerHTML = `<div${embedded ? "" : ' class="card forms-card"'}>
+    ${head}
     <form id="official-task-form" class="forms-grid">
       ${input("اسم الموظف", "name", profileName, { list: "official-task-teachers" })}
       ${input("الرقم الشخصي", "personalNo", me?.personalNo || "", { dir: "ltr" })}
