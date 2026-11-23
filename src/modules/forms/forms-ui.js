@@ -19,7 +19,7 @@ import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval
 import { renderEventFiles } from "./event-file-ui.js?v=2026-10-14-event-file-1";
 import { renderEventApprovals } from "./event-approval-ui.js?v=2026-10-12-print-spacing-1";
 import { renderOfficialTask, OFFICIAL_TASK_TYPE } from "./official-task-ui.js?v=2026-11-22-official-task-3";
-import { renderCertificates } from "./certificates-ui.js?v=2026-11-23-certificates-1";
+import { renderCertificates } from "./certificates-ui.js?v=2026-11-23-certificates-paper-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
