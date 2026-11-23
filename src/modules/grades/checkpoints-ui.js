@@ -12,7 +12,7 @@ import { CHECKPOINT_LABELS, TREND_LABELS, DEFAULT_TERM, parseCheckpointRows, bui
 import { mountPlanCard } from "./checkpoint-plan-ui.js?v=2026-11-21-course-codes-1";
 import { mountZeroReview } from "./checkpoint-zeros-ui.js?v=2026-11-21-course-codes-1";
 import { buildStudentReport, sendStudentReport, downloadStudentReport, allCheckpointRecords } from "./checkpoint-send.js?v=2026-11-21-course-codes-1";
-import { buildBulkPackage, applyBulkResult } from "./checkpoint-bulk.js?v=2026-11-21-course-codes-1";
+import { buildBulkPackage, applyBulkResult } from "./checkpoint-bulk.js?v=2026-11-23-bulk-result-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pct = (v) => (v == null ? "—" : `${formatPct(v)}٪`);
@@ -227,6 +227,7 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
         <div class="forms-actions" style="margin-bottom:10px;">
           <button class="btn btn-primary" id="cp-queue" ${selected.size ? "" : "disabled"}>تجهيز الإرسال (${selected.size})</button>
           ${selected.size ? '<button class="btn btn-ghost" id="cp-clear">إلغاء التحديد</button>' : ""}
+          <label class="btn btn-ghost" style="cursor:pointer;" id="cp-bulk-result-label">رفع نتيجة الإرسال (result.csv)<input type="file" id="cp-bulk-result" accept=".csv,text/csv" hidden></label>
         </div>
         <div id="cp-queue-panel"></div>
         <div class="tablewrap"><table>
@@ -259,6 +260,25 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
     on("#cp-clear", "click", () => { selected.clear(); render(); });
     root.querySelectorAll("[data-pick]").forEach((box) => box.addEventListener("change", () => { if (box.checked) selected.add(box.dataset.pick); else selected.delete(box.dataset.pick); render(); }));
     root.querySelectorAll("[data-goto-student]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); onGoto && onGoto("students", { studentId: a.dataset.gotoStudent }); }));
+    on("#cp-bulk-result", "change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const label = root.querySelector("#cp-bulk-result-label");
+      const setLabel = (t) => { if (label?.firstChild) label.firstChild.textContent = t; };
+      setLabel("جارٍ قراءة الملف…");
+      try {
+        const { sent, failed, marked, already, notFound } = await applyBulkResult(await file.text(), data.records, term, (i, n) => setLabel(`جارٍ التأشير ${i} من ${n}…`));
+        notify(`تم: ${sent} أُرسل${failed ? `، و${failed} ما انرسل` : ""}. تأشّر على ${marked} سجل${already ? `، و${already} كانت متأشّرة من قبل` : ""}${notFound ? `، و${notFound} رقم ما له سجل في هذا الفصل` : ""}.`);
+        await logAuditEvent("checkpoint_report_bulk_result", { tableName: COLLECTION, count: sent });
+        data = await load();
+        queue = []; selected.clear();
+        render();
+      } catch (err) {
+        notify(`${err.message || "تعذّر قراءة الملف"} — اللي تأشّر محفوظ، ارفع الملف مرة ثانية يكمّل الباقي.`);
+        data = await load();
+        render();
+      }
+    });
     on("#cp-queue", "click", () => {
       queue = rows.filter((r) => selected.has(r.student.id)).map((r) => ({ row: r, done: false }));
       drawQueue();
@@ -274,10 +294,9 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
         <div class="card-head"><h3 style="margin:0;font-size:14px;">قائمة الإرسال: ${doneCount} من ${queue.length}</h3><button class="link-btn" id="cp-queue-close">إغلاق</button></div>
         <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
           <strong>الإرسال الجماعي من Outlook</strong>
-          <p class="hint" style="margin:4px 0 8px;">نزّل حزمة الإرسال، فك ضغطها على جهازك، واضغط SEND.bat (ويندوز) أو SEND-MAC.command (ماك). يطلب منك تأكيدًا واحدًا ثم يرسل لكل طالب تقريره داخل الرسالة من بريدك. بعدها ارفع ملف result.csv هنا ليُعلَّم الطلاب «أُرسل».</p>
+          <p class="hint" style="margin:4px 0 8px;">نزّل حزمة الإرسال، فك ضغطها على جهازك، واضغط SEND.bat (ويندوز) أو SEND-MAC.command (ماك). يطلب منك تأكيدًا واحدًا ثم يرسل لكل طالب تقريره داخل الرسالة من بريدك. بعدها ارفع ملف result.csv من زر «رفع نتيجة الإرسال» فوق ليُعلَّم الطلاب «أُرسل».</p>
           <div class="forms-actions">
             ${next ? `<button class="btn btn-primary" id="cp-bulk">تجهيز الإرسال الجماعي (${queue.length - doneCount})</button>` : ""}
-            <label class="btn btn-ghost" style="cursor:pointer;">رفع نتيجة الإرسال (result.csv)<input type="file" id="cp-bulk-result" accept=".csv,text/csv" hidden></label>
           </div>
         </div>
         <p class="hint">أو واحد واحد: كل ضغطة تنزّل رسالة بريد جاهزة (.eml) فيها التقرير، افتحها في Outlook واضغط إرسال.</p>
@@ -302,18 +321,6 @@ export async function mountCheckpointsTab(root, { onGoto } = {}) {
         const { count, failed } = await buildBulkPackage(pending.map((q) => q.row), term, (i, n) => { btn.textContent = `جارٍ التجهيز ${i} من ${n}…`; });
         notify(`نزلت حزمة الإرسال (${count} طالب)${failed.length ? `، وما تجهّز ${failed.length}: ${failed.slice(0, 3).map((f) => f.name).join("، ")}` : ""}. فك ضغطها واضغط SEND.bat (ويندوز) أو SEND-MAC.command (ماك).`);
       }); });
-      panel.querySelector("#cp-bulk-result")?.addEventListener("change", async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        try {
-          const { sent, failed, marked } = await applyBulkResult(await file.text(), data.records, term);
-          notify(`تم: ${sent} أُرسل${failed ? `، و${failed} ما انرسل` : ""}. تأشّر على ${marked} سجل.`);
-          await logAuditEvent("checkpoint_report_bulk_result", { tableName: COLLECTION, count: sent });
-          data = await load();
-          queue = []; selected.clear();
-          render();
-        } catch (err) { notify(err.message || "تعذّر قراءة الملف"); }
-      });
       panel.querySelector("#cp-queue-next")?.addEventListener("click", (e) => withBusy(e.currentTarget, "جارٍ التجهيز…", async () => {
         await sendStudentReport(next.row.student, term, { records: next.row.records });
         next.done = true;

@@ -72,3 +72,25 @@ test("embedded send scripts match tools/ (run scripts/build-send-scripts.mjs)", 
   const { MAC_OUTLOOK_SCRIPT } = await import("../src/modules/grades/send-scripts.js");
   assert.match(MAC_OUTLOOK_SCRIPT, /make new outgoing message/);
 });
+
+test("bulk result marks all sent students in batches and is safe to re-upload", async () => {
+  const { applyBulkResult } = await import("../src/modules/grades/checkpoint-bulk.js");
+  const saved = new Map();
+  let calls = 0;
+  globalThis.__MASAR_TEST_BACKEND__ = { bulkPut: async (_c, recs) => { calls++; for (const r of recs) saved.set(r.id, r); } };
+  try {
+    const term = "الفصل الأول";
+    const records = Array.from({ length: 450 }, (_, i) => ({ id: `r${i}`, studentId: String(1000 + i), term, checkpoint: 1 }));
+    records.push({ id: "other", studentId: "1000", term: "فصل آخر", checkpoint: 1 });
+    const lines = ['"academicId","status","at","error"', ...records.slice(0, 450).map((r) => `"${r.studentId}","sent","2026-11-23T11:21:53",""`), '"9999","sent","2026-11-23T11:30:00",""', '"1001","failed","2026-11-23T11:30:00","x"'];
+    const res = await applyBulkResult("﻿" + lines.join("\r\n"), records, term);
+    assert.equal(res.marked, 450);
+    assert.equal(res.notFound, 1);
+    assert.equal(calls, 3);
+    assert.ok(!saved.has("other"));
+    assert.equal(saved.get("r5").reportSentVia, "outlook-bulk");
+    const again = await applyBulkResult(lines.join("\n"), [...saved.values()], term);
+    assert.equal(again.marked, 0);
+    assert.equal(again.already, 450);
+  } finally { delete globalThis.__MASAR_TEST_BACKEND__; }
+});

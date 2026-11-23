@@ -2,7 +2,7 @@
 // يُدمج في نص البريد + قائمة الإيميلات + سكربت PowerShell للويندوز وسكربت للماك)، والسكربت على جهاز المرشد يرسلها كلها من
 // Outlook بعد تأكيده هو. لا يرسل مسار أي بريد بنفسه. بعد الإرسال يُرفع ملف
 // النتيجة إلى مسار فيُعلَّم الطلاب «أُرسل».
-import { get, save } from "../../services/cloud-runtime.js";
+import { bulkPut } from "../../services/cloud-runtime.js";
 import { buildStudentReport, downloadBlob } from "./checkpoint-send.js?v=2026-11-21-course-codes-1";
 import { emailSubject, emailHtml } from "./checkpoint-report.js?v=2026-11-21-course-codes-1";
 import { COLLECTION } from "./checkpoint-service.js?v=2026-11-21-course-codes-1";
@@ -102,20 +102,35 @@ export async function buildBulkPackage(rows, term, onProgress = () => {}) {
   return { count: manifest.length, failed };
 }
 
-// يعلّم الطلاب المرسَلين حسب ملف النتيجة. records: كل سجلات الوقفات.
-export async function applyBulkResult(text, records, term) {
+// يعلّم الطلاب المرسَلين حسب ملف النتيجة. records: كل سجلات الوقفات (محمّلة للتو).
+// يحفظ على دفعات (bulkPut) بدل طلبين لكل سجل، فما يوقف في النص مع ملف فيه 1,000+ طالب،
+// ويتخطى السجلات المعلَّمة من قبل بنفس الوقت، فإعادة رفع نفس الملف آمنة.
+export async function applyBulkResult(text, records, term, onProgress) {
   const rows = parseResultCsv(text);
   if (!rows.length || !("academicId" in rows[0])) throw new Error("هذا مو ملف نتيجة الإرسال (result.csv).");
   const sent = rows.filter((r) => r.status === "sent");
-  let marked = 0;
+  const byStudent = new Map();
+  for (const rec of records) {
+    if (rec.term !== term) continue;
+    const key = String(rec.studentId);
+    if (!byStudent.has(key)) byStudent.set(key, []);
+    byStudent.get(key).push(rec);
+  }
+  const updates = [];
+  let already = 0, notFound = 0;
   for (const r of sent) {
-    const at = r.at ? new Date(r.at).toISOString() : new Date().toISOString();
-    for (const rec of records.filter((x) => String(x.studentId) === r.academicId && x.term === term)) {
-      const current = await get(COLLECTION, rec.id);
-      if (!current) continue;
-      await save(COLLECTION, { ...current, reportSentAt: at, reportSentVia: "outlook-bulk" });
-      marked++;
+    const at = r.at && !Number.isNaN(new Date(r.at).getTime()) ? new Date(r.at).toISOString() : new Date().toISOString();
+    const recs = byStudent.get(String(r.academicId).trim()) || [];
+    if (!recs.length) { notFound++; continue; }
+    for (const rec of recs) {
+      if (rec.reportSentAt === at) { already++; continue; }
+      updates.push({ ...rec, reportSentAt: at, reportSentVia: "outlook-bulk" });
     }
   }
-  return { sent: sent.length, failed: rows.length - sent.length, marked };
+  const BATCH = 200;
+  for (let i = 0; i < updates.length; i += BATCH) {
+    await bulkPut(COLLECTION, updates.slice(i, i + BATCH));
+    if (onProgress) onProgress(Math.min(i + BATCH, updates.length), updates.length);
+  }
+  return { sent: sent.length, failed: rows.length - sent.length, marked: updates.length, already, notFound };
 }
