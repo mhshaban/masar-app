@@ -4,10 +4,11 @@
 // مسبقًا (نص + المخطوطة فقط)، وشهادة الإيميل بخلفيتها الكاملة للإرسال الرقمي.
 // تُعبّأ وتُطبع فقط (لا تُحفظ بقاعدة البيانات)؛ أسماء المستلمين من الطلاب
 // والمعلمين والأقسام المسجّلة في مسار، أو تُكتب يدويًا. صفحة A4 أفقية لكل مستلم.
-import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
+import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountStudentPicker } from "../shared/student-picker.js?v=2026-10-01-avg-decimals-1";
 import { getFilterOptions } from "../students/students-service.js";
 import { listTeachers } from "./forms-service.js?v=2026-09-08-form-fields-1";
+import { normalizeCertificateRecord, listCertificates, getCertificate, saveCertificate, removeCertificate } from "./certificate-service.js?v=2026-11-23-certificates-log-1";
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const asset = (name) => {
@@ -269,18 +270,74 @@ function clearSaved(key) {
   try { localStorage.removeItem(STORE_KEY(key)); } catch { /* تخزين المتصفح غير متاح */ }
 }
 
+// تبويب الشهادات: السجل أولًا (مثل كشوف الحضور) ومنه «+ شهادات جديدة» أو تعديل سجل.
 export async function renderCertificates(root) {
+  const showLog = () => renderCertificatesLog(root, () => showEditor(null), (id) => showEditor(id));
+  const showEditor = async (id) => {
+    root.innerHTML = '<div class="empty" role="status">جارٍ تحميل البيانات…</div>';
+    const record = id ? await getCertificate(id) : null;
+    if (id && !record) { notify("سجل الشهادات غير موجود"); return showLog(); }
+    await renderCertificateEditor(root, { record, onDone: showLog });
+  };
+  await showLog();
+}
+
+const recipientsSummary = (list = []) => {
+  const names = list.map((r) => r.name).filter(Boolean);
+  return names.length <= 3 ? names.join("، ") : `${names.slice(0, 3).join("، ")} و${names.length - 3} آخرين`;
+};
+
+async function renderCertificatesLog(root, onNew, onEdit) {
+  const rows = await listCertificates();
+  root.innerHTML = `<div class="card">
+    <div class="card-head"><h2>سجل الشهادات (${rows.length})</h2><button class="btn btn-primary" id="cert-new" type="button">+ شهادات جديدة</button></div>
+    ${rows.length ? `<div class="forms-toolbar"><div class="search"><input id="cert-search" type="search" placeholder="بحث بالعنوان أو القالب أو اسم المستلم..."></div>
+      <div class="forms-actions"><select id="cert-filter"><option value="">كل القوالب</option>${Object.entries(CERTIFICATE_TEMPLATES).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join("")}</select></div></div>
+      <div id="cert-table"></div>` : '<div class="empty">لا توجد شهادات محفوظة بعد. اضغط «+ شهادات جديدة» واحفظها لتظهر هنا.</div>'}
+  </div>`;
+  root.querySelector("#cert-new").addEventListener("click", onNew);
+  if (!rows.length) return;
+  const table = root.querySelector("#cert-table");
+  const draw = () => {
+    const q = root.querySelector("#cert-search").value.trim().toLowerCase();
+    const f = root.querySelector("#cert-filter").value;
+    const list = rows.filter((r) => (!f || r.templateKey === f) && (!q || `${r.title} ${r.templateLabel} ${(r.recipients || []).map((x) => x.name).join(" ")}`.toLowerCase().includes(q)));
+    table.innerHTML = list.length ? `<div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>العنوان</th><th>القالب</th><th>المستلمون</th><th></th></tr></thead><tbody>
+      ${list.map((r) => `<tr><td class="num">${esc(r.date) || "—"}</td><td><strong>${esc(r.title)}</strong>${r.createdByName ? `<div class="hint">${esc(r.createdByName)}</div>` : ""}</td><td>${esc(CERTIFICATE_TEMPLATES[r.templateKey]?.label || r.templateLabel)}</td>
+        <td><span class="num">${(r.recipients || []).length}</span><div class="hint">${esc(recipientsSummary(r.recipients))}</div></td>
+        <td><div class="forms-actions"><button class="btn btn-ghost" type="button" data-edit="${esc(r.id)}">تعديل</button><button class="btn btn-ghost" type="button" data-print="${esc(r.id)}">طباعة</button><button class="btn btn-ghost forms-danger" type="button" data-remove="${esc(r.id)}">حذف</button></div></td></tr>`).join("")}
+      </tbody></table></div>` : '<div class="empty">لا نتائج مطابقة</div>';
+    table.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => onEdit(b.dataset.edit)));
+    table.querySelectorAll("[data-print]").forEach((b) => b.addEventListener("click", () => {
+      const r = rows.find((x) => x.id === b.dataset.print);
+      if (r && CERTIFICATE_TEMPLATES[r.templateKey]) printCertificates(r.templateKey, r.recipients || [], { ...(r.settings || {}), date: r.date });
+    }));
+    table.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", async () => {
+      if (!await confirmDialog("حذف سجل الشهادات هذا نهائيًا؟")) return;
+      try { await removeCertificate(b.dataset.remove); notify("تم حذف السجل"); await renderCertificatesLog(root, onNew, onEdit); }
+      catch (error) { notify(error.message || "تعذّر الحذف"); }
+    }));
+  };
+  root.querySelector("#cert-search").addEventListener("input", draw);
+  root.querySelector("#cert-filter").addEventListener("change", draw);
+  draw();
+}
+
+async function renderCertificateEditor(root, { record = null, onDone } = {}) {
   const [teachers, options] = await Promise.all([listTeachers().catch(() => []), getFilterOptions().catch(() => ({ departments: [] }))]);
   const teacherByName = new Map(teachers.filter((t) => t.name).map((t) => [t.name.trim(), t]));
-  let key = "departments";
-  let recipients = [];
+  let key = record && CERTIFICATE_TEMPLATES[record.templateKey] ? record.templateKey : "departments";
+  let recipients = (record?.recipients || []).map((r) => ({ ...r }));
+  // نص السجل المحفوظ يُستخدم مرة واحدة عند فتحه؛ تغيير القالب يرجع للنص المعتاد.
+  let recordSettings = record ? { ...(record.settings || {}) } : null;
 
   root.innerHTML = `<div class="card forms-card">
-    <div class="card-head"><h2>الشهادات</h2></div>
+    <div class="card-head"><h2>${record ? "تعديل سجل شهادات" : "شهادات جديدة"}</h2><button class="btn btn-ghost" type="button" id="cert-back">رجوع للسجل</button></div>
     <p class="hint">اختر القالب، أضف المستلمين من الطلاب أو المعلمين أو الأقسام، وعدّل النص إن احتجت. تُطبع شهادة لكل مستلم على صفحة A4 أفقية — القوالب الأربعة الأولى للطباعة على ورق الشهادات المطبوع، وشهادة الإيميل بخلفيتها الكاملة (احفظها PDF من نافذة الطباعة).</p>
     <div class="forms-grid">
-      <label class="forms-field"><span>القالب</span><select id="cert-template">${Object.entries(CERTIFICATE_TEMPLATES).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join("")}</select></label>
-      <label class="forms-field"><span>تاريخ التحرير</span><input id="cert-date" type="date" value="${todayBahrain()}"></label>
+      <label class="forms-field"><span>القالب</span><select id="cert-template">${Object.entries(CERTIFICATE_TEMPLATES).map(([k, t]) => `<option value="${k}"${k === key ? " selected" : ""}>${esc(t.label)}</option>`).join("")}</select></label>
+      <label class="forms-field"><span>تاريخ التحرير</span><input id="cert-date" type="date" value="${esc(record?.date || todayBahrain())}"></label>
+      <label class="forms-field forms-wide"><span>عنوان السجل (المناسبة)</span><input id="cert-title" value="${esc(record?.title || "")}" placeholder="مثال: تكريم المتفوقين - الفصل الأول"></label>
     </div>
     <h3 style="margin:18px 0 8px;">المستلمون</h3>
     <div class="tabs" role="tablist" id="cert-sources"></div>
@@ -289,7 +346,9 @@ export async function renderCertificates(root) {
     <h3 style="margin:18px 0 8px;">نص الشهادة</h3>
     <form id="cert-text" class="forms-grid"></form>
     <div class="forms-actions" style="margin-top:14px;flex-wrap:wrap;">
-      <button class="btn btn-primary" type="button" id="cert-print">طباعة الشهادات</button>
+      <button class="btn btn-primary" type="button" id="cert-save-print">حفظ وطباعة</button>
+      <button class="btn btn-ghost" type="button" id="cert-save">حفظ في السجل</button>
+      <button class="btn btn-ghost" type="button" id="cert-print">طباعة بدون حفظ</button>
       <button class="btn btn-ghost" type="button" id="cert-reset">استعادة النص الأصلي للقالب</button>
     </div>
     <h3 style="margin:18px 0 8px;">معاينة</h3>
@@ -335,7 +394,7 @@ export async function renderCertificates(root) {
 
   const drawText = (useDefaults = false) => {
     const defaults = templateDefaults(key, dateInput.value);
-    const saved = useDefaults ? null : loadSaved(key);
+    const saved = useDefaults ? null : (recordSettings || loadSaved(key));
     const s = { ...defaults, ...(saved || {}) };
     const t = CERTIFICATE_TEMPLATES[key];
     const signers = defaults.signers.map((d, i) => s.signers?.[i] || d);
@@ -432,11 +491,34 @@ export async function renderCertificates(root) {
     drawRecipients();
   };
 
-  select.addEventListener("change", () => { key = select.value; recipients = []; drawTemplate(); });
-  root.querySelector("#cert-reset").addEventListener("click", () => { clearSaved(key); drawText(true); });
+  select.addEventListener("change", () => { key = select.value; recipients = []; recordSettings = null; drawTemplate(); });
+  root.querySelector("#cert-reset").addEventListener("click", () => { clearSaved(key); recordSettings = null; drawText(true); });
+  root.querySelector("#cert-back").addEventListener("click", () => onDone?.());
   root.querySelector("#cert-print").addEventListener("click", () => {
     if (!recipients.length) return notify("أضف مستلمًا واحدًا على الأقل");
     printCertificates(key, recipients, settingsFromForm());
   });
+  let savedId = record?.id || null;
+  let saving = false;
+  const saveRecord = async (thenPrint) => {
+    if (saving) return;
+    let data;
+    try {
+      data = normalizeCertificateRecord({ templateKey: key, title: root.querySelector("#cert-title").value, date: dateInput.value, settings: settingsFromForm(), recipients }, CERTIFICATE_TEMPLATES);
+    } catch (error) { notify(error.message); return; }
+    // نافذة الطباعة تُفتح قبل انتظار الحفظ حتى لا يمنعها المتصفح.
+    const printing = thenPrint ? printCertificates(key, data.recipients, { ...data.settings, date: data.date }) : null;
+    saving = true;
+    try {
+      const saved = await saveCertificate(savedId, data);
+      savedId = saved?.id || savedId;
+      notify(thenPrint ? "تم الحفظ في سجل الشهادات" : "تم حفظ الشهادات في السجل");
+      if (!thenPrint) onDone?.();
+    } catch (error) { notify(error.message || "تعذّر الحفظ"); }
+    finally { saving = false; }
+    await printing;
+  };
+  root.querySelector("#cert-save").addEventListener("click", () => saveRecord(false));
+  root.querySelector("#cert-save-print").addEventListener("click", () => saveRecord(true));
   drawTemplate();
 }
