@@ -81,9 +81,9 @@ export function templateDefaults(key, date = todayBahrain()) {
 // layout: side = المخطوطة يسار والنص بالوسط وتوقيع المدير يسار أسفل؛
 // top = المخطوطة أعلى الوسط وتوقيعان؛ email = خلفية كاملة ووسام «شكر وتقدير».
 export const CERTIFICATE_TEMPLATES = {
-  departments: { label: "شكر الأقسام", layout: "side", art: "thanks.png", font: "somar", sources: ["department", "manual"], prefix: false, textCenter: 150, artBox: [19, 84, 41, 19.4], signCenter: 32 },
-  top: { label: "تهنئة المتفوقين", layout: "side", art: "congrats.png", font: "somar", sources: ["student", "manual"], prefix: false, average: true, textCenter: 138, artBox: [13, 79, 28.3, 25.4], signCenter: 26 },
-  staff: { label: "شكر المعلمين والطلاب", layout: "side", art: "thanks.png", font: "somar", sources: ["teacher", "student", "manual"], prefix: true, textCenter: 138, artBox: [11.4, 84, 41, 19.4], signCenter: 26, big: true },
+  departments: { label: "شكر الأقسام", layout: "side", art: "thanks.png", font: "somar", sources: ["department", "manual"], prefix: false, textCenter: 149, artBox: [19, 84, 41, 19.4], signCenter: 47.5 },
+  top: { label: "تهنئة المتفوقين", layout: "side", art: "congrats.png", font: "somar", sources: ["student", "manual"], prefix: false, average: true, textCenter: 149, artBox: [13, 79, 28.3, 25.4], signCenter: 47.5 },
+  staff: { label: "شكر المعلمين والطلاب", layout: "side", art: "thanks.png", font: "somar", sources: ["teacher", "student", "manual"], prefix: true, textCenter: 149, artBox: [11.4, 84, 41, 19.4], signCenter: 47.5, big: true },
   email: { label: "شهادة الإيميل (بخلفية كاملة)", layout: "email", art: "email-background.jpg", font: "thesans", sources: ["teacher", "student", "manual"], prefix: true },
   general: { label: "شهادة عامة (توقيعان)", layout: "top", art: "thanks-wide.png", font: "frutiger", sources: ["student", "teacher", "manual"], prefix: true },
 };
@@ -170,7 +170,8 @@ export function certificateMarkup(key, recipient = {}, settings = {}) {
   const s = { ...templateDefaults(key, settings.date || todayBahrain()), ...settings };
   const signers = s.signers || [];
   const L = settings.layout || {};
-  const paper = settings.paperImage ? `<img class="c-paper" src="${esc(settings.paperImage)}" alt="">` : "";
+  // خلفية ورق الشهادة: تظهر في المعاينة دائمًا، وتُطبع فقط عند اختيار «طباعة الخلفية».
+  const paper = settings.paperImage && template.layout !== "email" ? `<img class="c-paper" src="${esc(settings.paperImage)}" alt="">` : "";
   const text = `<div class="c-text"${elementStyle(L, "text")}>
       ${para(s.intro)}
       ${nameLine(template, recipient)}
@@ -234,29 +235,29 @@ export const CERTIFICATE_CSS = `
   .c-body { margin-top: 2mm; }
   .c-average { font-size: 1.15em; }
   .c-art { position: absolute; object-fit: contain; }
-  .c-paper { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; opacity: .5; pointer-events: none; }
+  .c-paper { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
   .c-editing [data-el] { cursor: move; outline: 1px dashed rgba(200, 140, 40, .55); outline-offset: 1mm; }
   .c-editing [data-el].c-selected { outline: 1.5px solid #c88c28; }
   .c-sign { position: absolute; width: 56mm; text-align: center; line-height: 1.35; }
   .c-date { position: absolute; width: 60mm; text-align: center; }
 
   /* شكر الأقسام / المتفوقين / المعلمين والطلاب */
-  .c-side .c-text { width: 158mm; left: calc(var(--tc) - 79mm); top: 47mm; height: 122mm; font-size: calc(21pt * var(--fs, 1)); }
+  .c-side .c-text { width: 158mm; left: calc(var(--tc) - 79mm); top: 66mm; height: 104mm; font-size: calc(21pt * var(--fs, 1)); }
   .c-side.c-big .c-text { font-size: calc(22pt * var(--fs, 1)); }
   .c-side.c-big .c-name { font-size: 1em; }
   .c-side .c-art { left: var(--ax); top: var(--ay); width: var(--aw); height: var(--ah); }
-  .c-side .c-sign { left: max(3mm, calc(var(--sc) - 28mm)); top: 178mm; font-size: calc(15.5pt * var(--fs, 1)); }
+  .c-side .c-sign { left: max(3mm, calc(var(--sc) - 28mm)); bottom: 31.5mm; font-size: calc(15.5pt * var(--fs, 1)); }
   .c-side .c-date { left: calc(var(--tc) - 30mm); top: 184mm; font-size: calc(13.5pt * var(--fs, 1)); }
 
   /* شهادة عامة */
   .c-top .c-art { left: calc(148.5mm - 26mm); top: 20mm; width: 52.6mm; height: 22mm; }
-  .c-top .c-text { width: 170mm; left: 63.5mm; top: 52mm; height: 112mm; font-size: calc(16pt * var(--fs, 1)); }
+  .c-top .c-text { width: 170mm; left: 63.5mm; top: 66mm; height: 98mm; font-size: calc(16pt * var(--fs, 1)); }
   .c-top .c-name { font-size: 1.125em; }
   .c-top .c-title { font-size: 1em; }
   .c-top .c-sub { font-size: .56em; }
-  .c-top .c-sign { top: 170mm; font-size: calc(12pt * var(--fs, 1)); width: 44mm; }
+  .c-top .c-sign { bottom: 31.5mm; font-size: calc(12pt * var(--fs, 1)); width: 44mm; }
   .c-top .c-sign-right { left: calc(210mm - 22mm); }
-  .c-top .c-sign-left { left: calc(50mm - 22mm); }
+  .c-top .c-sign-left { left: calc(47.5mm - 22mm); }
   .c-top .c-date { left: calc(148.5mm - 30mm); top: 184mm; font-size: calc(14pt * var(--fs, 1)); }
 
   /* شهادة الإيميل */
@@ -298,7 +299,7 @@ export async function printCertificates(key, recipients, settings) {
     if (popup.document.body) popup.document.body.textContent = "جارٍ تجهيز الشهادات للطباعة…";
     // ضبط الأماكن المحفوظ للقالب يُطبَّق دائمًا (من السجل أو المحرر)؛ صورة الورق للمعاينة فقط.
     const layout = settings.layout ?? await getCertificateLayout(key).catch(() => ({}));
-    const printSettings = { ...settings, layout, paperImage: "" };
+    const printSettings = { ...settings, layout, paperImage: settings.printBackground ? PAPER_BACKGROUND : "" };
     popup.document.open();
     popup.document.write(certificatesDocument(title, recipients.map((r) => certificateMarkup(key, r, printSettings))));
     popup.document.close();
@@ -317,6 +318,7 @@ function saveSettings(key, settings) {
   try { const { date, ...rest } = settings; localStorage.setItem(STORE_KEY(key), JSON.stringify(rest)); } catch { /* تخزين المتصفح غير متاح */ }
 }
 // صورة الورق المطبوع للمعاينة فقط (تُصغَّر وتُحفظ في متصفح هذا الجهاز).
+export const PAPER_BACKGROUND = asset("paper-background.jpg");
 const PAPER_KEY = (key) => `masar.certificates.paper.${key}.v1`;
 function loadPaper(key) {
   try { return localStorage.getItem(PAPER_KEY(key)) || ""; } catch { return ""; }
@@ -422,6 +424,7 @@ async function renderCertificateEditor(root, { record = null, onDone } = {}) {
       <button class="btn btn-ghost" type="button" id="cert-save">حفظ في السجل</button>
       <button class="btn btn-ghost" type="button" id="cert-print">طباعة بدون حفظ</button>
       <button class="btn btn-ghost" type="button" id="cert-reset">استعادة النص الأصلي للقالب</button>
+      <label id="cert-print-bg-wrap" style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" id="cert-print-bg"${record?.settings?.printBackground ? " checked" : ""}> طباعة الخلفية (لورق عادي أو حفظ PDF)</label>
     </div>
     <h3 style="margin:18px 0 8px;">معاينة وضبط الأماكن</h3>
     <p class="hint">اسحب أي عنصر في المعاينة بالماوس، أو اختره من القائمة وحرّكه بالأسهم (كل ضغطة 1 مم). الضبط يُحفظ لهذا القالب ويُطبَّق على كل الشهادات وعلى كل الأجهزة. «كل العناصر معًا» تزيح الشهادة كلها إذا كانت الطابعة مزحزحة.</p>
@@ -441,8 +444,8 @@ async function renderCertificateEditor(root, { record = null, onDone } = {}) {
         <button class="btn btn-ghost" type="button" id="cert-layout-reset-el">إرجاع العنصر</button>
         <button class="btn btn-ghost" type="button" id="cert-layout-reset">إرجاع الكل للأصل</button>
       </div>
-      <label class="forms-field forms-wide"><span>صورة ورق الشهادة المطبوع (اختياري، تظهر في المعاينة فقط ولا تُطبع)</span>
-        <span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input id="cert-paper" type="file" accept="image/*"><button class="btn btn-ghost" type="button" id="cert-paper-clear">إزالة الصورة</button><span class="hint" id="cert-layout-state"></span></span></label>
+      <label class="forms-field forms-wide"><span>صورة ورق مختلف للمعاينة (اختياري؛ ورق الشهادة المعتمد يظهر تلقائيًا، وهذه الصورة لا تُطبع)</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input id="cert-paper" type="file" accept="image/*"><button class="btn btn-ghost" type="button" id="cert-paper-clear">رجوع لورق الشهادة المعتمد</button><span class="hint" id="cert-layout-state"></span></span></label>
     </div>
     <div id="cert-preview-wrap" style="position:relative;width:100%;max-width:900px;aspect-ratio:297/210;overflow:hidden;border:1px solid var(--line, #dde3ea);border-radius:8px;background:#fff;margin-top:10px;">
       <iframe id="cert-preview" title="معاينة الشهادة" style="position:absolute;top:0;left:0;width:1123px;height:794px;border:0;transform-origin:0 0;"></iframe>
@@ -461,7 +464,7 @@ async function renderCertificateEditor(root, { record = null, onDone } = {}) {
   const settingsFromForm = () => {
     const f = textForm.elements;
     const signers = [0, 1].map((i) => ({ name: f[`signer${i}Name`]?.value.trim() || "", title: f[`signer${i}Title`]?.value.trim() || "" })).filter((_, i) => f[`signer${i}Name`]);
-    const out = { intro: f.intro.value, body: f.body.value, closing: f.closing.value, signers, date: dateInput.value };
+    const out = { intro: f.intro.value, body: f.body.value, closing: f.closing.value, signers, date: dateInput.value, printBackground: CERTIFICATE_TEMPLATES[key].layout !== "email" && root.querySelector("#cert-print-bg").checked };
     if (f.averageLabel) out.averageLabel = f.averageLabel.value;
     if (f.badge) out.badge = f.badge.value;
     return out;
@@ -476,7 +479,7 @@ async function renderCertificateEditor(root, { record = null, onDone } = {}) {
   const yInput = root.querySelector("#cert-y");
   const sizeInput = root.querySelector("#cert-size");
   const layoutState = root.querySelector("#cert-layout-state");
-  const withLayout = () => ({ ...settingsFromForm(), layout, paperImage: loadPaper(key) });
+  const withLayout = () => ({ ...settingsFromForm(), layout, paperImage: loadPaper(key) || PAPER_BACKGROUND });
   const setDirty = (dirty) => { layoutDirty = dirty; layoutState.textContent = dirty ? "تغييرات أماكن غير محفوظة" : ""; };
   const syncLayoutInputs = () => {
     const v = layout[selectedEl] || {};
@@ -680,8 +683,10 @@ async function renderCertificateEditor(root, { record = null, onDone } = {}) {
     });
   };
 
+  root.querySelector("#cert-print-bg").addEventListener("change", updatePreview);
   const drawTemplate = () => {
     const t = CERTIFICATE_TEMPLATES[key];
+    root.querySelector("#cert-print-bg-wrap").style.display = t.layout === "email" ? "none" : "inline-flex";
     sourcesRoot.innerHTML = t.sources.map((src) => `<button class="tab" type="button" data-source="${src}">${SOURCE_LABELS[src]}</button>`).join("");
     sourcesRoot.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => drawSource(b.dataset.source)));
     drawSource(t.sources[0]);
