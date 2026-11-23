@@ -42,3 +42,20 @@ export async function saveCertificate(id, record) {
 }
 
 export const removeCertificate = (id) => removeAttendanceSheet(id);
+
+// أماكن العناصر لكل قالب (مشتركة بين كل الأجهزة): سجل ثابت المعرّف بنفس
+// الجدول بـkind مختلف، فلا يظهر في سجل الشهادات.
+export const LAYOUT_KIND = "certificate_layout";
+const layoutId = (key) => `certificate-layout-${key}`;
+
+export async function getCertificateLayout(key) {
+  const row = await getAttendanceSheet(layoutId(key));
+  return row?.kind === LAYOUT_KIND && row.layout && typeof row.layout === "object" ? row.layout : {};
+}
+
+export async function saveCertificateLayout(key, layout = {}) {
+  const id = layoutId(key);
+  const data = { kind: LAYOUT_KIND, title: `أماكن قالب الشهادة: ${key}`, templateKey: key, layout };
+  const current = await getAttendanceSheet(id);
+  return current ? updateAttendanceSheet(id, data) : createAttendanceSheet({ id, ...data });
+}

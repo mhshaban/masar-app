@@ -50,3 +50,13 @@ test("حفظ وتعديل وحذف سجل الشهادات، والسجل لا �
   list = await listCertificates();
   assert.equal(list.length, 0);
 });
+
+test("أماكن القالب تُحفظ وتُقرأ ولا تظهر في سجل الشهادات", async () => {
+  const { getCertificateLayout, saveCertificateLayout } = await import("../src/modules/forms/certificate-service.js");
+  assert.deepEqual(await getCertificateLayout("top"), {});
+  await saveCertificateLayout("top", { text: { x: 3, y: -2, size: 95 } });
+  await saveCertificateLayout("top", { text: { x: 4 } });
+  assert.deepEqual(await getCertificateLayout("top"), { text: { x: 4 } });
+  assert.deepEqual(await getCertificateLayout("email"), {});
+  assert.equal((await listCertificates()).length, 0);
+});

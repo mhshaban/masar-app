@@ -50,3 +50,16 @@ test("تجهيز المستلمين من الطلاب والمعلمين وال�
   assert.equal(departmentRecipient("الديزل").name, "قسم الديزل");
   assert.equal(departmentRecipient("قسم الكهرباء").name, "قسم الكهرباء");
 });
+
+test("ضبط الأماكن: إزاحة بالملليمتر وحجم الخط، و«كل العناصر» تُضاف لكل عنصر", async () => {
+  const { elementStyle, layoutElementsFor } = await import("../src/modules/forms/certificates-ui.js");
+  assert.equal(elementStyle({}, "text"), ' data-el="text"');
+  assert.equal(elementStyle({ text: { x: 2, y: -3, size: 110 } }, "text"), ' data-el="text" style="transform:translate(2mm, -3mm);--fs:1.1"');
+  assert.equal(elementStyle({ all: { x: 1, y: 1 }, date: { x: 1 } }, "date"), ' data-el="date" style="transform:translate(2mm, 1mm)"');
+  assert.equal(elementStyle({ art: { size: 120 } }, "art"), ' data-el="art" style="transform:scale(1.2)"');
+  assert.deepEqual(layoutElementsFor("general"), ["all", "text", "art", "sign0", "sign1", "date"]);
+  assert.deepEqual(layoutElementsFor("email"), ["all", "text", "badge", "sign0", "date"]);
+  const html = certificateMarkup("general", { name: "س" }, { layout: { sign1: { y: 5 } }, paperImage: "data:image/jpeg;base64,AA" });
+  assert.ok(html.includes('data-el="sign1" style="transform:translate(0mm, 5mm)"'));
+  assert.ok(html.includes('class="c-paper"'));
+});
