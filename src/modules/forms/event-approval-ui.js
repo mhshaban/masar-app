@@ -81,9 +81,9 @@ export const PRINT_CSS = `
   * { box-sizing: border-box; }
   html, body { margin: 0; background: #fff; color: #000; }
   body { font-family: "Sakkal Majalla", "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .ea-page { width: 210mm; min-height: 296mm; padding: 9mm 12mm 6mm; margin: 0 auto; }
+  .ea-page { width: 210mm; min-height: 296mm; padding: 8mm 12mm 5mm; margin: 0 auto; }
   .ea-head { display: flex; justify-content: center; }
-  .ea-head img { display: block; height: 13mm; max-width: 100%; margin: 0 auto; }
+  .ea-head img { display: block; height: 21mm; max-width: 100%; margin: 0 auto; }
   .ea-title { text-align: center; font-size: 18pt; font-weight: 700; margin: 3mm 0 2.5mm; }
   .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12pt; margin-top: -.3mm; }
   .ea-info { margin-top: 0; }
