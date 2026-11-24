@@ -85,7 +85,7 @@ export const PRINT_CSS = `
   .ea-head { display: flex; justify-content: center; }
   .ea-head img { display: block; height: 13mm; max-width: 100%; margin: 0 auto; }
   .ea-title { text-align: center; font-size: 18pt; font-weight: 700; margin: 3mm 0 2.5mm; }
-  .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12pt; margin-top: 1.6mm; }
+  .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12pt; margin-top: -.3mm; }
   .ea-info { margin-top: 0; }
   .ea-grid th, .ea-grid td { border: .3mm solid #000; padding: .4mm 1.6mm; height: 7.2mm; vertical-align: middle; line-height: 1.05; overflow-wrap: anywhere; }
   .ea-grid th { background: #bfbfbf; font-weight: 400; text-align: right; }
@@ -93,7 +93,7 @@ export const PRINT_CSS = `
   .ea-cols tr > th:first-child[rowspan] { text-align: right; }
   .ea-grid td.ea-center { text-align: center; }
   .ea-grid td.ea-start { text-align: right; }
-  .ea-grid tr.ea-tall > * { height: 14mm; }
+  .ea-grid tr.ea-tall > * { height: 15mm; }
   .ea-grid tr.ea-val > td { height: 8mm; }
   .ea-grid tr.ea-gap > td { height: 6mm; }
   .ea-grid tr.ea-opinion > td { height: 8mm; }
@@ -101,7 +101,7 @@ export const PRINT_CSS = `
   .ea-info th { white-space: nowrap; }
   .ea-info tr > th:first-child { white-space: normal; }
   .ea-multi { white-space: pre-wrap; text-align: right; }
-  .ea-approved { width: 33%; margin-inline-start: 0; margin-top: 1.6mm; }
+  .ea-approved { width: 33%; margin-inline-start: 0; margin-top: -.3mm; }
   @media screen { body { background: #e9ecf1; padding: 8mm 0; } .ea-page { background: #fff; box-shadow: 0 1mm 4mm rgba(0,0,0,.15); } }
 `;
 
