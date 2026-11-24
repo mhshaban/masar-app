@@ -1,6 +1,7 @@
 import { notify, confirmDialog } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { listTeachers } from "./forms-service.js?v=2026-09-08-form-fields-1";
 import { dayName, formatDate, formatTime } from "./official-task-ui.js?v=2026-11-22-official-task-3";
+import { printMarkupInPopup } from "./print-popup.js?v=2026-10-12-event-approval-1";
 import {
   SCHOOL_NAME, DEPARTMENT_NAME, EVENT_TYPES, BENEFICIARY_GROUPS, OTHER_SCHOOL_GROUPS,
   durationLabel, normalizeEventApproval, listEventApprovals, getEventApproval, saveEventApproval, removeEventApproval,
@@ -9,6 +10,9 @@ import {
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const today = () => new Date().toISOString().slice(0, 10);
 const FORM_TITLE = "استمارة طلب إعتماد فعالية مدرسية";
+const CARDS_TITLE = "استمارة طلب اعتماد فعالية مدرسية";
+// قالبا الطباعة: النموذج الرسمي للوزارة، أو قالب القسم بالبطاقات.
+export const PRINT_TEMPLATES = [{ key: "official", label: "النموذج الرسمي" }, { key: "cards", label: "قالب القسم" }];
 
 const input = (label, name, value = "", { type = "text", required = false, wide = false, list = "", dir = "" } = {}) =>
   `<label class="forms-field${wide ? " forms-wide" : ""}"><span>${label}${required ? " *" : ""}</span><input name="${name}" type="${type}" value="${esc(value)}"${required ? " required" : ""}${list ? ` list="${list}" autocomplete="off"` : ""}${dir ? ` dir="${dir}"` : ""}></label>`;
@@ -17,6 +21,72 @@ const textarea = (label, name, value = "") =>
 const section = (title) => `<h3 class="forms-wide event-approval-section">${title}</h3>`;
 const countInputs = (prefix, groups, values = {}) => groups.map(({ key, label }) =>
   `<label class="forms-field"><span>${label}</span><input name="${prefix}_${key}" type="number" min="0" step="1" inputmode="numeric" value="${esc(values[key] ?? "")}"></label>`).join("");
+
+function cardDate(date) {
+  if (!date) return "";
+  const parsed = new Date(date);
+  const day = Number.isNaN(parsed.getTime()) ? "" : new Intl.DateTimeFormat("ar-BH", { timeZone: "Asia/Bahrain", weekday: "long" }).format(parsed);
+  return `${esc(day)} <span dir="ltr">${esc(date)}</span>`;
+}
+
+// قالب القسم (البطاقات): سطر القسم + العنوان + بطاقات البيانات، بنفس نمط
+// طباعة الاستمارات الأخرى. بديل اختياري عن النموذج الرسمي.
+export function eventApprovalCardsMarkup(raw) {
+  const d = normalizeEventApproval(raw);
+  const v = (value) => (value ? esc(value) : "—");
+  const multi = (value) => (value ? `<div class="ea-multiline">${esc(value)}</div>` : "—");
+  const time = (t) => v(formatTime(t));
+  return `<table class="forms-print event-approval-print">
+    <thead><tr><td>
+      <div class="print-dept-line">${esc(DEPARTMENT_NAME)}</div>
+      <div class="topbar"><div><h1>${CARDS_TITLE}</h1></div></div>
+    </td></tr></thead>
+    <tbody><tr><td>
+      <div class="card"><h2>بيانات الفعالية</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>اسم الفعالية</th><td colspan="3"><strong>${v(d.title)}</strong></td></tr>
+          <tr><th>اسم المدرسة</th><td>${v(d.schoolName)}</td><th>تاريخ الطلب</th><td>${v(d.requestDate)}</td></tr>
+          <tr><th>نوع الفعالية / النشاط المطلوب</th><td>${v(d.eventType)}</td><th>الجهة المعنية</th><td>${v(d.concernedParty)}</td></tr>
+          <tr><th>وصف الفعالية / النشاط</th><td colspan="3">${multi(d.description)}</td></tr>
+          <tr><th>مبررات تنفيذ الفعالية / أهداف الفعالية</th><td colspan="3">${multi(d.objectives)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>موعد التنفيذ والتمويل</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>تاريخ التنفيذ</th><td>${cardDate(d.date) || "—"}</td><th>المدة الزمنية</th><td>${v(d.duration)}</td></tr>
+          <tr><th>من الساعة</th><td>${time(d.startTime)}</td><th>إلى الساعة</th><td>${time(d.endTime)}</td></tr>
+          <tr><th>اسم الراعي</th><td>${v(d.sponsor)}</td><th>الميزانية المخصصة</th><td>${v(d.budget)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>الجهة المنظمة والمشرف على التنظيم</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th></th><th>الاسم</th><th>المسمى الوظيفي</th><th>جهة العمل</th></tr></thead>
+          <tbody>
+            <tr><th>الجهة المنظمة</th><td>${v(d.organizerName)}</td><td>${v(d.organizerTitle)}</td><td>${v(d.organizerWorkplace)}</td></tr>
+            <tr><th>المشرف على التنظيم</th><td>${v(d.supervisorName)}</td><td>${v(d.supervisorTitle)}</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>المحاضر والجهات المتعاونة</h2>
+        <div class="tablewrap"><table class="ea-pairs">
+          <tr><th>اسم المحاضر / منفذ الورشة أو الندوة</th><td>${v(d.presenterName)}</td><th>جهة العمل</th><td>${v(d.presenterWorkplace)}</td></tr>
+          <tr><th>الجهات الأخرى المتعاونة</th><td colspan="3">${v(d.partners)}</td></tr>
+        </table></div>
+      </div>
+      <div class="card"><h2>عدد المنتفعين</h2>
+        <div class="tablewrap"><table class="ea-counts">
+          <thead><tr><th></th>${BENEFICIARY_GROUPS.map((g) => `<th>${g.label}</th>`).join("")}</tr></thead>
+          <tbody>
+            <tr><th>من المدرسة</th>${BENEFICIARY_GROUPS.map((g) => `<td>${v(d.beneficiaries[g.key])}</td>`).join("")}</tr>
+            <tr><th>من مدارس أخرى</th>${BENEFICIARY_GROUPS.map((g) => `<td>${g.key in d.otherSchoolBeneficiaries ? v(d.otherSchoolBeneficiaries[g.key]) : "—"}</td>`).join("")}</tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>أهم الملاحظات</h2>${multi(d.notes)}</div>
+      <div class="print-approval form-workflow"><strong>اعتماد مدير المدرسة</strong><div class="workflow-signatures"><span>الاسم: ................................</span><span>التوقيع: ................................</span><span>ختم المدرسة:</span></div></div>
+    </td></tr></tbody>
+  </table>`;
+}
 
 const LOGO_URL = new URL("../../../icons/moe-logo.png", import.meta.url).href;
 
@@ -105,7 +175,8 @@ export const PRINT_CSS = `
   @media screen { body { background: #e9ecf1; padding: 8mm 0; } .ea-page { background: #fff; box-shadow: 0 1mm 4mm rgba(0,0,0,.15); } }
 `;
 
-async function printApproval(data = {}) {
+async function printApproval(data = {}, template = "official") {
+  if (template === "cards") { await printMarkupInPopup(data.title || CARDS_TITLE, eventApprovalCardsMarkup(data)); return; }
   const popup = window.open("", "_blank");
   if (!popup) { notify("اسمح بفتح نافذة الطباعة في المتصفح."); return; }
   try {
@@ -137,14 +208,14 @@ async function renderLog(root, onNew, onEdit) {
       <thead><tr><th>اسم الفعالية</th><th>نوع الفعالية</th><th>تاريخ التنفيذ</th><th>تاريخ الطلب</th><th></th></tr></thead>
       <tbody>${rows.map((r) => `<tr>
         <td>${esc(r.title)}</td><td>${esc(r.eventType) || "—"}</td><td class="num">${esc(r.date) || "—"}</td><td class="num">${esc(r.requestDate) || "—"}</td>
-        <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(r.id)}" type="button">تعديل</button><button class="btn btn-ghost" data-print="${esc(r.id)}" type="button">طباعة</button><button class="btn btn-ghost forms-danger" data-remove="${esc(r.id)}" type="button">حذف</button></div></td>
+        <td><div class="forms-actions"><button class="btn btn-ghost" data-edit="${esc(r.id)}" type="button">تعديل</button>${PRINT_TEMPLATES.map((t) => `<button class="btn btn-ghost" data-print="${esc(r.id)}" data-template="${t.key}" type="button">طباعة: ${t.label}</button>`).join("")}<button class="btn btn-ghost forms-danger" data-remove="${esc(r.id)}" type="button">حذف</button></div></td>
       </tr>`).join("")}</tbody>
     </table></div>` : '<div class="empty">لا توجد استمارات اعتماد محفوظة بعد</div>'}
   </div>`;
   root.querySelector("#approval-new-btn").addEventListener("click", onNew);
   root.querySelector("#approval-blank-btn").addEventListener("click", () => printApproval({ schoolName: SCHOOL_NAME }));
   root.querySelectorAll("[data-edit]").forEach((btn) => btn.addEventListener("click", () => onEdit(btn.dataset.edit)));
-  root.querySelectorAll("[data-print]").forEach((btn) => btn.addEventListener("click", () => printApproval(rows.find((r) => r.id === btn.dataset.print))));
+  root.querySelectorAll("[data-print]").forEach((btn) => btn.addEventListener("click", () => printApproval(rows.find((r) => r.id === btn.dataset.print), btn.dataset.template)));
   root.querySelectorAll("[data-remove]").forEach((btn) => btn.addEventListener("click", async () => {
     if (!await confirmDialog("حذف استمارة الاعتماد هذه نهائيًا؟")) return;
     await removeEventApproval(btn.dataset.remove);
@@ -201,7 +272,7 @@ async function renderEditor(root, id, onDone) {
       <datalist id="approval-teachers">${teachers.map((t) => t.name).filter(Boolean).map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>
       <div class="forms-actions forms-wide">
         <button class="btn btn-primary" type="submit" id="approval-save">حفظ الاستمارة</button>
-        <button class="btn btn-ghost" type="button" id="approval-print">طباعة</button>
+        ${PRINT_TEMPLATES.map((t) => `<button class="btn btn-ghost" type="button" data-print-template="${t.key}">طباعة: ${t.label}</button>`).join("")}
       </div>
     </form>
   </div>`;
@@ -238,11 +309,11 @@ async function renderEditor(root, id, onDone) {
     finally { button.disabled = false; button.textContent = original; }
   });
 
-  root.querySelector("#approval-print").addEventListener("click", async () => {
+  root.querySelectorAll("[data-print-template]").forEach((button) => button.addEventListener("click", async () => {
     const data = values();
     if (!data.title?.trim()) { notify("اكتب اسم الفعالية أولًا"); return; }
-    await printApproval(data);
-  });
+    await printApproval(data, button.dataset.printTemplate);
+  }));
 }
 
 export async function renderEventApprovals(root) {
