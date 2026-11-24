@@ -80,14 +80,14 @@ export const PRINT_CSS = `
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: #fff; color: #000; }
-  body { font-family: Arial, "Cairo", "Segoe UI", Tahoma, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Sakkal Majalla", "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ea-page { width: 210mm; min-height: 296mm; padding: 9mm 12mm 6mm; margin: 0 auto; }
-  .ea-head { text-align: center; }
-  .ea-head img { height: 13mm; max-width: 100%; }
-  .ea-title { text-align: center; font-size: 13pt; font-weight: 700; margin: 3mm 0 2.5mm; }
-  .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; margin-top: 1.6mm; }
+  .ea-head { display: flex; justify-content: center; }
+  .ea-head img { display: block; height: 13mm; max-width: 100%; margin: 0 auto; }
+  .ea-title { text-align: center; font-size: 18pt; font-weight: 700; margin: 3mm 0 2.5mm; }
+  .ea-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12pt; margin-top: 1.6mm; }
   .ea-info { margin-top: 0; }
-  .ea-grid th, .ea-grid td { border: .3mm solid #000; padding: .8mm 1.6mm; height: 7.4mm; vertical-align: middle; line-height: 1.35; overflow-wrap: anywhere; }
+  .ea-grid th, .ea-grid td { border: .3mm solid #000; padding: .4mm 1.6mm; height: 7.2mm; vertical-align: middle; line-height: 1.05; overflow-wrap: anywhere; }
   .ea-grid th { background: #bfbfbf; font-weight: 400; text-align: right; }
   .ea-cols th, .ea-cols td { text-align: center; }
   .ea-cols tr > th:first-child[rowspan] { text-align: right; }
@@ -117,6 +117,7 @@ async function printApproval(data = {}) {
     popup.document.close();
     const logo = popup.document.querySelector(".ea-head img");
     const logoReady = logo.complete ? Promise.resolve() : new Promise((resolve) => { logo.onload = logo.onerror = resolve; });
+    // الخط الأساسي Sakkal Majalla من خطوط الجهاز (موجود مع ويندوز)، وCairo احتياطي لو ما كان مثبّتًا.
     const fontsReady = Promise.all([400, 700].map((w) => popup.document.fonts.load(`${w} 12px "Cairo"`, "استمارة"))).catch(() => {});
     await Promise.race([Promise.all([logoReady, fontsReady]), new Promise((resolve) => setTimeout(resolve, 4000))]);
     await popup.document.fonts.ready;
