@@ -494,7 +494,7 @@
   .print-approval { display: none; }
   .forms-empty-print { display: none; }
   .forms-empty-screen { color: var(--ink-500); font-size: 12px; font-style: normal; font-weight: 400; }
-  /* استمارة اعتماد فعالية: عناوين أقسام المحرر، وشبكة الطباعة بنمط النموذج الرسمي. */
+  /* استمارة اعتماد فعالية: عناوين أقسام المحرر (الطباعة بنموذج الوزارة في event-approval-ui.js). */
   /* ملف الفعالية: مراحل مرقّمة وأزرار رد ولي الأمر. */
   .event-step .step-no { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-inline-end: 6px; border-radius: 50%; background: var(--teal-600); color: #fff; font-size: 13px; }
   .consent-toggle { display: inline-flex; gap: 6px; flex-wrap: wrap; }
@@ -520,10 +520,6 @@
   .event-approval-section { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink-800); }
   .event-approval-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   .event-approval-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-  .event-approval-print .ea-pairs th { width: 22%; }
-  .event-approval-print .ea-counts th, .event-approval-print .ea-counts td { text-align: center; }
-  .event-approval-print .ea-counts tbody th { text-align: right; width: 22%; }
-  .event-approval-print .ea-multiline { white-space: pre-wrap; }
   .forms-entry-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--ink-500); font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; font-size: 10.5px; }
   .forms-entry-footer strong { color: inherit; font-weight: 700; }
   .teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
