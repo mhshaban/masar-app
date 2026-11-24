@@ -24,3 +24,12 @@ test("البيانات تُطبع بصيغة النموذج وتُهرّب ال�
   assert.ok(html.includes("ساعة و30 دقيقة"));
   assert.ok(html.includes(">120<"));
 });
+
+test("قالب القسم (البطاقات) باقٍ كخيار طباعة ثانٍ", async () => {
+  const { eventApprovalCardsMarkup, PRINT_TEMPLATES } = await import("../src/modules/forms/event-approval-ui.js");
+  assert.deepEqual(PRINT_TEMPLATES.map((t) => t.key), ["official", "cards"]);
+  const html = eventApprovalCardsMarkup({ title: "فعالية", ben_students: "30" });
+  for (const label of ["بيانات الفعالية", "موعد التنفيذ والتمويل", "عدد المنتفعين", "اعتماد مدير المدرسة", "قسم الإرشاد الأكاديمي والتوجيه المهني"]) assert.ok(html.includes(label), label);
+  assert.ok(!html.includes("مسار"));
+  assert.ok(!html.includes("رئيس قسم"));
+});
