@@ -37,8 +37,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v6
       - name: Prepare static application
         run: |
           mkdir -p _site/scripts
@@ -47,9 +47,9 @@ jobs:
           cp -R src _site/src
           cp -R scripts/lib _site/scripts/lib
           touch _site/.nojekyll
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
       - name: Publish after successful tests
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
