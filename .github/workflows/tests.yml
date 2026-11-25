@@ -24,18 +24,13 @@ jobs:
       - name: Check JavaScript syntax
         run: find src -name '*.js' -not -path 'src/vendor/*' -print0 | xargs -0 -n1 node --check
       - run: npm test
-  deploy:
+  build-site:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v6
@@ -50,6 +45,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+  # Deploy runs in its own job: when deploy-pages runs in the same job right
+  # after the upload, its artifact lookup can miss the just-finalized artifact
+  # ("No artifacts named github-pages"), see actions/deploy-pages#451.
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build-site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Publish after successful tests
         id: deployment
         uses: actions/deploy-pages@v5
