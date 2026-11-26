@@ -62,3 +62,14 @@ test("compact names keep the type only when two schools share a town", async () 
   assert.equal(m.get("مدرسة مدينة عيسى الابتدائية الإعدادية للبنين"), "مدينة عيسى الابتدائية الإعدادية");
   assert.equal(m.get("مدرسة جو الابتدائية الإعدادية للبنين"), "جو");
 });
+
+test("view helpers sort, hide small schools and build findings", async () => {
+  const { viewOf, keyFindings, sectionPrintMarkup } = await import("../src/modules/grades/feeder-schools-ui.js");
+  const a = buildFeederSchoolAnalysis(students, cps);
+  assert.deepEqual(viewOf(a, { sort: "avg-desc" }).schools.map((s) => s.shortName), ["الرفاع", "عالي"]);
+  assert.deepEqual(viewOf(a, { sort: "avg-asc", subject: "math" }).schools.map((s) => s.shortName), ["عالي", "الرفاع"]);
+  assert.equal(viewOf(a, { hideSmall: true }).schools.length, 0);
+  assert.ok(keyFindings(a).length >= 2);
+  for (const v of ["overview", "average", "subjects", "checkpoints"]) assert.match(sectionPrintMarkup(v, a, ""), /forms-print/);
+  assert.match(sectionPrintMarkup("subjects", a, "", { subject: "math" }), /ترتيب المدارس في الرياضيات/);
+});
