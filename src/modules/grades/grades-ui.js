@@ -7,6 +7,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academi
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountCheckpointsTab } from "./checkpoints-ui.js?v=2026-11-23-bulk-result-1";
+import { mountFeederSchoolsTab } from "./feeder-schools-ui.js?v=2026-11-26-feeder-1";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -320,17 +321,20 @@ export async function mountGradesView(container, { onGoto } = {}) {
     <div class="tabs">
       <div class="tab active" data-tab="classification">تصنيف الطلاب</div>
       <div class="tab" data-tab="checkpoints">الوقفات التقويمية</div>
+      <div class="tab" data-tab="feeder">المدارس الرافدة</div>
       <div class="tab" data-tab="analytics">التحليلات</div>
     </div>
     <div id="grades-classification-root"></div>
     <div id="grades-checkpoints-root" style="display:none;"></div>
+    <div id="grades-feeder-root" style="display:none;"></div>
     <div id="grades-analytics-root" style="display:none;"></div>
   `;
 
   const analyticsRoot = container.querySelector("#grades-analytics-root");
   const classificationRoot = container.querySelector("#grades-classification-root");
   const checkpointsRoot = container.querySelector("#grades-checkpoints-root");
-  const roots = { analytics: analyticsRoot, classification: classificationRoot, checkpoints: checkpointsRoot };
+  const feederRoot = container.querySelector("#grades-feeder-root");
+  const roots = { analytics: analyticsRoot, classification: classificationRoot, checkpoints: checkpointsRoot, feeder: feederRoot };
 
   await renderClassificationTab(classificationRoot, onGoto);
 
@@ -343,6 +347,7 @@ export async function mountGradesView(container, { onGoto } = {}) {
       if (active === "analytics") await renderAnalyticsTab(analyticsRoot);
       if (active === "classification") await renderClassificationTab(classificationRoot, onGoto);
       if (active === "checkpoints") await mountCheckpointsTab(checkpointsRoot, { onGoto });
+      if (active === "feeder") await mountFeederSchoolsTab(feederRoot, { onGoto });
     });
   });
 }
