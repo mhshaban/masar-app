@@ -7,7 +7,7 @@ import { ensureXlsx } from "../../services/vendor-loader.js?v=2026-09-07-academi
 import { logAuditEvent } from "../audit/audit-service.js?v=2026-09-04-audit-1";
 import { notify } from "../shared/ui-states.js?v=2026-09-06-polish-1";
 import { mountCheckpointsTab } from "./checkpoints-ui.js?v=2026-11-23-bulk-result-1";
-import { mountFeederSchoolsTab } from "./feeder-schools-ui.js?v=2026-11-26-feeder-1";
+import { mountFeederSchoolsTab } from "./feeder-schools-ui.js?v=2026-11-26-feeder-2";
 
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
